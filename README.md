@@ -1,6 +1,7 @@
 
 <!-- include image 'documentation/resources/ovrlpy-logo.png -->
 ![ovrlpy logo](documentation/resources/ovrlpy-logo.png)
+
 A python tool to investigate vertical signal properties of imaging-based spatial transcriptomics data.
 
 ## introduction
