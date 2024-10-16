@@ -14,7 +14,16 @@ dynamic         = ["version"]
 authors = [
     { name = "Sebastian Tiesmeyer", email = "sebastian.tiesmeyer@bih-charite.de" },
 ]
-dependencies = ["matplotlib", "numpy", "pandas", "scanpy", "scikit-learn", "scipy"]
+dependencies = [
+    "anndata",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "scikit-image",
+    "scikit-learn",
+    "scipy",
+    "tqdm",
+]
 classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
@@ -24,7 +33,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-tutorial = ["pandas[parquet]"]
+tutorial = ["pandas[parquet], scanpy"]
 docs = [
     "sphinx",
     "sphinx-autoapi>=3.1",
