@@ -1,0 +1,28 @@
+[build-system]
+requires      = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name            = "ovrlpy"
+description     = "A quality control tool for spatial transcriptomics data"
+readme          = { file = "README.md", content-type = "text/markdown" }
+license         = { file = "LICENSE" }
+requires-python = ">=3.6, <3.13"
+version         = "0.1.0"
+
+authors = [
+    { name = "Sebastian Tiesmeyer", email = "sebastian.tiesmeyer@bih-charite.de" },
+]
+dependencies = ["matplotlib", "numpy", "pandas", "scanpy", "scikit-learn", "scipy"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage      = "https://github.com/HiDiHlabs/ovrl.py"
+Documentation = "https://ovrlpy.readthedocs.io"
+Repository    = "https://github.com/HiDiHlabs/ovrl.py"
+Issues        = "https://github.com/HiDiHlabs/ovrl.py/issues"
