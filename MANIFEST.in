@@ -1,0 +1,8 @@
+# setuptools-scm includes all tracked files by default in sdist
+
+# exclude tutorial as it contains large files
+prune tutorial
+
+# exclude unnecessary configs
+exclude .pre-commit-config.yaml .readthedocs.yaml .gitignore
+prune .github

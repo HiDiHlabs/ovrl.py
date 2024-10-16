@@ -1,5 +1,5 @@
 [build-system]
-requires      = ["setuptools"]
+requires      = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 
@@ -9,7 +9,7 @@ description     = "A quality control tool for spatial transcriptomics data"
 readme          = { file = "README.md", content-type = "text/markdown" }
 license         = { file = "LICENSE" }
 requires-python = ">=3.6, <3.13"
-version         = "0.1.0"
+dynamic         = ["version"]
 
 authors = [
     { name = "Sebastian Tiesmeyer", email = "sebastian.tiesmeyer@bih-charite.de" },
