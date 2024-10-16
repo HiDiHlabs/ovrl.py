@@ -35,7 +35,7 @@ nb_execution_mode = "off"
 autodoc_typehints = "none"
 autodoc_typehints_format = "short"
 
-autoapi_dirs = ["../../src"]
+autoapi_dirs = ["../../ovrlpy"]
 autoapi_options = [
     "members",
     "undoc-members",
