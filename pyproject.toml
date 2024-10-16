@@ -23,6 +23,15 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 
+[project.optional-dependencies]
+tutorial = ["pandas[parquet]"]
+docs = [
+    "sphinx",
+    "sphinx-autoapi>=3.1",
+    "sphinx-copybutton",
+    "sphinx-rtd-theme",
+    "myst-nb",
+]
 
 [project.urls]
 Homepage      = "https://github.com/HiDiHlabs/ovrl.py"
