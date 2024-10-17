@@ -1,0 +1,55 @@
+[build-system]
+requires      = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name            = "ovrlpy"
+description     = "A quality control tool for spatial transcriptomics data"
+readme          = { file = "README.md", content-type = "text/markdown" }
+license         = { file = "LICENSE" }
+requires-python = ">=3.6, <3.13"
+dynamic         = ["version"]
+
+authors = [
+    { name = "Sebastian Tiesmeyer", email = "sebastian.tiesmeyer@bih-charite.de" },
+]
+dependencies = [
+    "anndata",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "scikit-image",
+    "scikit-learn",
+    "scipy",
+    "tqdm",
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+[project.optional-dependencies]
+tutorial = ["pandas[parquet]", "scanpy"]
+docs = [
+    "sphinx",
+    "sphinx-autoapi>=3.1",
+    "sphinx-copybutton",
+    "sphinx-rtd-theme",
+    "myst-nb",
+]
+
+[project.urls]
+Homepage      = "https://github.com/HiDiHlabs/ovrl.py"
+Documentation = "https://ovrlpy.readthedocs.io"
+Repository    = "https://github.com/HiDiHlabs/ovrl.py"
+Issues        = "https://github.com/HiDiHlabs/ovrl.py/issues"
+
+
+[tool]
+
+[tool.setuptools]
+packages = ["ovrlpy"]
