@@ -877,7 +877,7 @@ class Visualizer:
             neighbor_indices,
             genes,
             subsample.gene.cat.codes.values,
-            bandwidth=1.0,
+            bandwidth=self.KDE_bandwidth,
         )
         local_expression = local_expression / ((local_expression**2).sum(0) ** 0.5)
         subsample_embedding, subsample_embedding_color = transform_embeddings(
@@ -931,7 +931,7 @@ class Visualizer:
             neighbor_indices,
             genes,
             subsample.gene.cat.codes.values,
-            bandwidth=1.0,
+            bandwidth=self.KDE_bandwidth,
         )
         local_expression = local_expression / ((local_expression**2).sum(0) ** 0.5)
 
