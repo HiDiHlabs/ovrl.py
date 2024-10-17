@@ -768,7 +768,7 @@ def count_cells_at_localmax(adata, step=1, radius=50):
         mask = dist_from_center <= radius
         return mask
 
-    mask = make_sphere_mask(60)
+    mask = make_sphere_mask(radius)
 
     ct_map = adata.uns["spatial"]["ct_map_filtered"]
 
