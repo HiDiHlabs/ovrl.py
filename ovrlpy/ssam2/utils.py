@@ -2,6 +2,7 @@
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
+from skimage import measure
 from skimage.feature import peak_local_max
 
 
@@ -157,8 +158,6 @@ def fill_celltypemaps(
     :param output_mask: If given, the cell type maps will be filtered using the output mask.
     :type output_mask: np.ndarray(bool)
     """
-
-    from skimage import measure
 
     filtered_ctmaps = np.zeros_like(ct_map) - 1
 
