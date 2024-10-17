@@ -33,7 +33,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-tutorial = ["pandas[parquet], scanpy"]
+tutorial = ["pandas[parquet]", "scanpy"]
 docs = [
     "sphinx",
     "sphinx-autoapi>=3.1",
