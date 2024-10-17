@@ -7,7 +7,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 
-from .ssam2.ssam import ssam
+from .ssam2 import ssam
 from .utils import (
     compute_divergence_patched,
     create_histogram,

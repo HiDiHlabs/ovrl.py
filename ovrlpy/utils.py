@@ -11,7 +11,7 @@ from scipy.ndimage import gaussian_filter, maximum_filter
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
-from .ssam2.ssam import utils as ssam_utils
+from .ssam2 import utils as ssam_utils
 
 
 def draw_outline(ax, artist, lw=2, color="black"):
