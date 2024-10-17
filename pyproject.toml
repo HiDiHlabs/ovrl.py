@@ -47,3 +47,9 @@ Homepage      = "https://github.com/HiDiHlabs/ovrl.py"
 Documentation = "https://ovrlpy.readthedocs.io"
 Repository    = "https://github.com/HiDiHlabs/ovrl.py"
 Issues        = "https://github.com/HiDiHlabs/ovrl.py/issues"
+
+
+[tool]
+
+[tool.setuptools]
+packages = ["ovrlpy"]
