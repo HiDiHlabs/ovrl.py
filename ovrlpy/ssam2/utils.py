@@ -1,7 +1,8 @@
 ### utils file with basic functions needed for the SSAM algorithm.
 
 import numpy as np
-from scipy.ndimage import gaussian_filter, maximum_filter
+from scipy.ndimage import gaussian_filter
+from skimage.feature import peak_local_max
 
 
 def kde_2d(coordinates, name=None, size=None, bandwidth=1.5):
@@ -83,27 +84,17 @@ def kde_3d(coordinates, size=None, bandwidth=1.5):
     return output
 
 
-def find_local_maxima(vf, min_pixel_distance=5, min_expression=2):
+def find_local_maxima(vf, min_pixel_distance: int = 5, min_expression: float = 2):
     """
     Find local maxima in a vector field.
     """
-    # find local maxima
-    local_max = maximum_filter(vf, size=min_pixel_distance, mode="constant")
-    local_max = vf == local_max
-    # remove maxima with low expression
-    local_max[vf < min_expression] = False
-    # remove maxima at the border
-    local_max[0, :] = False
-    local_max[-1, :] = False
-    local_max[:, 0] = False
-    local_max[:, -1] = False
-    # remove maxima at the border
-    local_max[0, :] = False
-    local_max[-1, :] = False
-    local_max[:, 0] = False
-    local_max[:, -1] = False
-    # find coordinates of local maxima
-    local_maxima = np.array(np.where(local_max)).T
+    local_maxima = peak_local_max(
+        vf,
+        min_distance=min_pixel_distance,
+        threshold_abs=min_expression,
+        exclude_border=True,
+    )
+
     return local_maxima
 
 

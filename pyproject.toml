@@ -19,7 +19,7 @@ dependencies = [
     "matplotlib",
     "numpy",
     "pandas",
-    "scikit-image",
+    "scikit-image >= 0.18",
     "scikit-learn",
     "scipy",
     "tqdm",
