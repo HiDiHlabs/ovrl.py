@@ -42,6 +42,7 @@ import ovrlpy
 
 # define ovrlpy analysis parameters:
 kde_bandwidth = 2
+n_expected_celltypes=20
 
 # load the data
 
@@ -55,5 +56,46 @@ you can then fit an ovrlpy model to the data and create a signal integrity map:
 
 # fit the ovrlpy model to the data
 
+from ovrlpy import ovrlp 
+
+integrity, signal, visualizer = ovrlp.compute_coherence_map(df=coordinate_df,KDE_bandwidth=kde_bandwidth,n_expected_celltypes=n_expected_celltypes)
+
+```
+
+returns a signal integrity map, a signal map and a visualizer object that can be used to visualize the data:
+
+```python
+visualizer.plot_fit()
+```
+
+and visualize the signal integrity map:
+
+```python
+fig, ax = ovrlp.plot_signal_integrity(integrity,signal,signal_threshold=4.0)
+```
+
+Ovrlpy can also identify individual overlap events in the data:
+
+```python
+import matplotlib.pyplot as plt
+doublet_df = ovrlp.detect_doublets(integrity,signal,signal_cutoff=4,coherence_sigma=1)
+
+doublet_df.head()
+```
+
+And use the visualizer to show a 3D visualization of the overlaps in the tissue:
+
+```python
+window_size=60          # size of the window around the doublet to show
+n_doublet_to_show = 0   # index of the doublet to show
+x,y = doublet_df.loc[doublet_case,['x','y']] # location of the doublet event
+
+# subsample the data around the doublet event
+subsample = visualizer.subsample_df(x,y,coordinate_df,window_size=window_size)  
+# transform the subsample using the fitted color embedding model
+subsample_embedding, subsample_embedding_color = visualizer.transform(subsample)
+
+# plot the subsample instance:
+visualizer.plot_instance(subsample,subsample[['x','y']].values,subsample_embedding_color,x,y,window_size=window_size)
 
 ```
