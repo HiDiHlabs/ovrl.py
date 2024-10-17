@@ -16,7 +16,7 @@ TODO ...
    self
    installation
    usage
-   tutorials/Vizgen-liver
+   tutorials/index
 
 
 Indices and tables
