@@ -1,11 +1,13 @@
 ### utils file with basic functions needed for the SSAM algorithm.
 
+from typing import Optional
+
 import numpy as np
 from scipy.ndimage import gaussian_filter
 from skimage.feature import peak_local_max
 
 
-def kde_2d(coordinates, size=None, bandwidth=1.5):
+def kde_2d(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
     """
     Create a histogram of the data.
     """
@@ -13,7 +15,7 @@ def kde_2d(coordinates, size=None, bandwidth=1.5):
     return _kde_nd(coordinates[:, :2], size=size, bandwidth=bandwidth)
 
 
-def kde_3d(coordinates, size=None, bandwidth=1.5):
+def kde_3d(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
     """
     Create a histogram of the data.
     """
@@ -21,7 +23,7 @@ def kde_3d(coordinates, size=None, bandwidth=1.5):
     return _kde_nd(coordinates[:, :3], size=size, bandwidth=bandwidth)
 
 
-def _kde_nd(coordinates, size=None, bandwidth=1.5):
+def _kde_nd(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
     """
     Create a histogram of the data.
     """
@@ -56,7 +58,9 @@ def _kde_nd(coordinates, size=None, bandwidth=1.5):
     return output
 
 
-def find_local_maxima(vf, min_pixel_distance: int = 5, min_expression: float = 2):
+def find_local_maxima(
+    vf: np.ndarray, min_pixel_distance: int = 5, min_expression: float = 2
+):
     """
     Find local maxima in a vector field.
     """
@@ -70,7 +74,12 @@ def find_local_maxima(vf, min_pixel_distance: int = 5, min_expression: float = 2
     return local_maxima
 
 
-def kde_and_sample(coordinates, sampling_coordinates, size=None, bandwidth=1.5):
+def kde_and_sample(
+    coordinates: np.ndarray,
+    sampling_coordinates: np.ndarray,
+    size: Optional[tuple[int, ...]] = None,
+    bandwidth: float = 1.5,
+):
     """
     Create a kde of the data and sample at 'sampling_coordinates'.
     """
