@@ -1,3 +1,5 @@
+import warnings
+
 import anndata
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,7 +8,6 @@ import umap
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
-import warnings
 
 from ._ssam2 import _ssam
 from ._utils import (
@@ -19,8 +20,8 @@ from ._utils import (
     _get_knn_expression,
     _get_spatial_subsample_mask,
     _min_to_max,
-    _transform_embeddings,
     _plot_embeddings,
+    _transform_embeddings,
 )
 
 # This is a package to detect overlapping cells in a 2d spatial transcriptomics sample.
@@ -117,16 +118,20 @@ def assign_z_mean_message_passing(df, z_column="z", delim_column="z_delim", roun
         warnings.simplefilter("ignore", category=RuntimeWarning)
         for r in range(rounds):
             elevation_map_ = (
-                np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=0)], axis=0) / 4
+                np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=0)], axis=0)
+                / 4
             )
             elevation_map_ += (
-                np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=1)], axis=0) / 4
+                np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=1)], axis=0)
+                / 4
             )
             elevation_map_ += (
-                np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=0)], axis=0) / 4
+                np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=0)], axis=0)
+                / 4
             )
             elevation_map_ += (
-                np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=1)], axis=0) / 4
+                np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=1)], axis=0)
+                / 4
             )
 
             elevation_map = elevation_map_
@@ -492,7 +497,7 @@ def plot_signal_integrity(
         img = ax[0].imshow(
             integrity,
             cmap=cmap,
-            alpha=((signal / signal_threshold).clip(0, 1)**2),
+            alpha=((signal / signal_threshold).clip(0, 1) ** 2),
             vmin=0,
             vmax=1,
         )
@@ -836,7 +841,7 @@ class Visualizer:
             )
         )
         factors = self.pca_2d.fit_transform(self.localmax_celltyping_samples.T)
-        
+
         print(f"Modeling {factors.shape[0]} pseudo-celltypes")
 
         self.embedder_2d = umap.UMAP(**self.umap_kwargs)
@@ -844,9 +849,7 @@ class Visualizer:
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
 
-        embedding_color = self.embedder_3d.fit_transform(
-            factors
-        )  
+        embedding_color = self.embedder_3d.fit_transform(factors)
 
         embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
@@ -945,7 +948,7 @@ class Visualizer:
 
     def roi_df(self):
         """
-        Returns a pandas data frame containing the gene-count matrix of the fitted tissue's determined pseudo-cells.       
+        Returns a pandas data frame containing the gene-count matrix of the fitted tissue's determined pseudo-cells.
         """
         roi_df = pd.DataFrame(
             {"x": self.rois_celltyping_x, "y": self.rois_celltyping_y}
@@ -1028,16 +1031,23 @@ class Visualizer:
             s=1,
             rasterized=rasterized,
         )
-                
+
         ax2.set_axis_off()
         # __plot_embeddings(subsample_embedding,subsample_embedding_color,self.celltype_centers,celltypes,rasterized=rasterized)
         ax2.set_title("UMAP")
 
         ax = fig.add_subplot(gs[0, 1], label="celltype_map")
-        self.plot_tissue(rasterized=rasterized,s=1)
+        self.plot_tissue(rasterized=rasterized, s=1)
         ax.set_yticks([], [])
-                
-        artist = plt.Rectangle((x - window_size, y - window_size), 2 * window_size, 2 * window_size, fill=False, edgecolor='k', linewidth=2)
+
+        artist = plt.Rectangle(
+            (x - window_size, y - window_size),
+            2 * window_size,
+            2 * window_size,
+            fill=False,
+            edgecolor="k",
+            linewidth=2,
+        )
         ax.add_artist(artist)
 
         ax.set_title("celltype map")
@@ -1144,10 +1154,10 @@ class Visualizer:
         plt.figure(figsize=(15, 7))
 
         plt.subplot(121)
-        self.plot_umap(rasterized=rasterized,**{'scatter_kwargs':{'s':1}})
+        self.plot_umap(rasterized=rasterized, **{"scatter_kwargs": {"s": 1}})
 
         plt.subplot(122)
-        self.plot_tissue(rasterized=rasterized,**{'s':1})
+        self.plot_tissue(rasterized=rasterized, **{"s": 1})
 
     def save(self, path):
         """Stores the visualizer and its attributes in an h5ad file.
@@ -1354,11 +1364,11 @@ def compute_coherence_map(
 
     """
 
-    KDE_bandwidth = cell_diameter/4
-    min_distance = cell_diameter*0.7
+    KDE_bandwidth = cell_diameter / 4
+    min_distance = cell_diameter * 0.7
 
     if n_expected_celltypes is None:
-        n_expected_celltypes = 0.8  
+        n_expected_celltypes = 0.8
 
     print("Running vertical adjustment")
     assign_xy(df)

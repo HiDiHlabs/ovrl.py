@@ -5,7 +5,6 @@ import anndata
 import numpy as np
 import pandas as pd
 import tqdm
-from scipy.signal import fftconvolve
 
 from . import _utils
 
@@ -129,15 +128,19 @@ def _sample_expression_nd(
         for c in coord_columns
     ]
 
-    print(f"Searching within x:{bounds[0]}, y:{bounds[1]}, n_molecules:{len(coordinate_dataframe_)}")
-    print(f"Using bandwidth: {kde_bandwidth}, min_expression: {minimum_expression}, min_pixel_distance: {min_pixel_distance}")
+    print(
+        f"Searching within x:{bounds[0]}, y:{bounds[1]}, n_molecules:{len(coordinate_dataframe_)}"
+    )
+    print(
+        f"Using bandwidth: {kde_bandwidth}, min_expression: {minimum_expression}, min_pixel_distance: {min_pixel_distance}"
+    )
     # perform a global KDE to determine local maxima:
     vector_field_norm = _utils._kde_nd(
         coordinate_dataframe_[coord_columns].values, bandwidth=1.1
     )
     local_maximum_coordinates = _utils.find_local_maxima(
         vector_field_norm,
-        min_pixel_distance=1+int(min_pixel_distance/kde_bandwidth),
+        min_pixel_distance=1 + int(min_pixel_distance / kde_bandwidth),
         min_expression=minimum_expression,
     )
 
@@ -203,48 +206,3 @@ def _sample_expression_nd(
                 pbar.update(1)
 
     return adata_ssam
-
-
-# def count_cells_at_localmax(adata, step=1, radius=50):
-#     """
-#     Sweep a sphere window along a lattice on the image, and count the number of cell types in each window.
-
-#     :param step: The lattice spacing.
-#     :type step: int
-#     :param radius: The radius of the sphere window.
-#     :type radius: int
-#     """
-
-#     def make_sphere_mask(radius):
-#         dia = radius * 2 + 1
-#         X, Y, Z = np.ogrid[:dia, :dia, :dia]
-#         dist_from_center = np.sqrt(
-#             (X - radius) ** 2 + (Y - radius) ** 2 + (Z - radius) ** 2
-#         )
-#         mask = dist_from_center <= radius
-#         return mask
-
-#     mask = make_sphere_mask(radius)
-
-#     ct_map = adata.uns["spatial"]["ct_map_filtered"]
-
-#     celltype_count_at_localmax = pd.DataFrame(
-#         index=adata.obs_names, columns=np.arange(ct_map.max())
-#     )
-#     celltype_count_at_localmax.loc[:] = 0
-#     celltype_count_at_localmax = celltype_count_at_localmax.astype(int)
-
-#     for i, celltype in enumerate(np.arange(ct_map.max())):
-#         count_aggregated_map = fftconvolve(
-#             (ct_map == celltype).astype(int), mask, mode="same"
-#         )
-#         celltype_count_at_localmax.iloc[:, i] = (
-#             count_aggregated_map[
-#                 (adata.obsm["spatial"][:, 0] / 2.5).astype(int),
-#                 (adata.obsm["spatial"][:, 1] / 2.5).astype(int),
-#             ]
-#             .round()
-#             .astype(int)
-#         )
-
-#     return
