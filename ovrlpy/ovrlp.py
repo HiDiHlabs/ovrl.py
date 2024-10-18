@@ -308,7 +308,7 @@ def compute_divergence(
 
     Returns
     -------
-    divergence : numpy.array
+    divergence : numpy.ndarray
         A matrix of divergence values.
     """
 
@@ -369,9 +369,9 @@ def compute_divergence_map(
 
     Returns
     -------
-    divergence : numpy.array
+    divergence : numpy.ndarray
         A pixel map of divergence values.
-    signal_histogram : numpy.array
+    signal_histogram : numpy.ndarray
         A pixel map of signal magnitude.
     """
 
@@ -433,7 +433,7 @@ def find_overlaps(
 
     Parameters
     ----------
-    coordinate_df : pd.DataFrame
+    coordinate_df : pandas.DataFrame
         A dataframe of coordinates.
     adata : anndata.AnnData, optional
         An AnnData object containing the coordinates.
@@ -1427,6 +1427,7 @@ def compute_coherence_map(
     transcriptomics dataset.
     It includes the entire ovrlpy pipeline, returning a coherence map and a signal
     strength map and produces a visualizer object that can be used to plot the results.
+
     Parameters
     ----------
     df : pandas.DataFrame
@@ -1445,7 +1446,6 @@ def compute_coherence_map(
         TODO
     cumap_kwargs : dict, optional
         TODO
-
     """
 
     KDE_bandwidth = cell_diameter / 4
