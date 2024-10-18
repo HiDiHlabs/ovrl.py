@@ -118,9 +118,6 @@ def _fill_color_axes(rgb, dimred=None):
 
     # rotate the ica_facs 45 in all the dimensions:
     # define a 45-degree 3d rotation matrix
-    # (0.500 | 0.500 | -0.707
-    # -0.146 | 0.854 | 0.500
-    # 0.854 | -0.146 | 0.500)
     rotation_matrix = np.array(
         [
             [0.500, 0.500, -0.707],

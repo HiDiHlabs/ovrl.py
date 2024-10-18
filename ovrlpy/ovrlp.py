@@ -39,14 +39,14 @@ def _assign_xy(
     ----------
     df : pandas.DataFrame
         A dataframe of coordinates.
-    xyz_columns : list, optional
-        The names of the columns containing the x,y,z coordinates.
+    xy_columns : list, optional
+        The names of the columns containing the x,y,z-coordinates.
     grid_size : int, optional
         The size of the grid.
 
     Returns
     -------
-    df : pandas.DataFrame
+    pandas.DataFrame
         A dataframe with an x,y coordinate assigned to each row.
 
     """
@@ -61,19 +61,19 @@ def _assign_xy(
 
 def _assign_z_median(df: pd.DataFrame, z_column: str = "z"):
     """
-    Assigns a z coordinate to a pd.DataFrame of coordinates.
+    Assigns a z-coordinate to a pd.DataFrame of coordinates.
 
     Parameters
     ----------
     df : pandas.DataFrame
         A dataframe of coordinates.
     z_column : str, optional
-        The name of the column containing the z coordinate.
+        The name of the column containing the z-coordinate.
 
     Returns
     -------
-    df : pandas.DataFrame
-        A dataframe with a z coordinate assigned to each row.
+    pandas.DataFrame
+        A dataframe with a z-coordinate assigned to each row.
 
     """
     if "n_pixel" not in df.columns:
@@ -93,21 +93,21 @@ def _assign_z_mean_message_passing(
     rounds: int = 3,
 ):
     """
-    Assigns a z coordinate to a pd.DataFrame of coordinates.
+    Assigns a z-coordinate to a pd.DataFrame of coordinates.
 
     Parameters
     ----------
     df : pandas.DataFrame
         A dataframe of coordinates.
     z_column : str, optional
-        The name of the column containing the z coordinate.
+        The name of the column containing the z-coordinate.
     rounds : int, optional
         TODO
 
     Returns
     -------
-    df : pandas.DataFrame
-        A dataframe with a z coordinate assigned to each row.
+    pandas.DataFrame
+        A dataframe with a z-coordinate assigned to each row.
 
     """
     if "n_pixel" not in df.columns:
@@ -157,18 +157,18 @@ def _assign_z_mean_message_passing(
 
 def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
     """
-    Assigns a z coordinate to a pd.DataFrame of coordinates.
+    Assigns a z-coordinate to a pd.DataFrame of coordinates.
     Parameters
     ----------
     df : pandas.DataFrame
         A dataframe of coordinates.
     z_column : str, optional
-        The name of the column containing the z coordinate.
+        The name of the column containing the z-coordinate.
 
     Returns
     -------
-    df : pandas.DataFrame
-        A dataframe with a z coordinate assigned to each row.
+    pandas.DataFrame
+        A dataframe with a z-coordinate assigned to each row.
 
     """
     if "n_pixel" not in df.columns:
@@ -226,7 +226,7 @@ def get_rois(
 
 def get_expression_vectors_at_rois(
     df, rois_x, rois_y, genes=None, KDE_bandwidth=1, min_expression: float = 0
-):
+) -> pd.DataFrame:
     """
     Returns a matrix of gene expression vectors at each local maximum.
 
@@ -247,6 +247,7 @@ def get_expression_vectors_at_rois(
 
     Returns
     -------
+    pandas.DataFrame
     """
 
     if genes is None:
@@ -309,7 +310,7 @@ def compute_divergence(
     Returns
     -------
     divergence : numpy.ndarray
-        A matrix of divergence values.
+        A matrix of divergence values. TODO (outdated)
     """
 
     divergence, signal_histogram = compute_divergence_map(
@@ -606,7 +607,7 @@ def detect_doublets(
     max_incoherence=0.4,
     signal_cutoff=3,
     coherence_sigma=None,
-):
+) -> pd.DataFrame:
     """
     This function is used to find individual peaks of signal incoherence in the tissue
     map as an indicator of single occurrences overlapping cells.
@@ -1319,7 +1320,7 @@ class Visualizer:
         adata.write_h5ad(path)
 
 
-def load_visualizer(path: str):
+def load_visualizer(path: str) -> Visualizer:
     """
     Loads a visualizer from an h5ad file.
 
@@ -1327,6 +1328,10 @@ def load_visualizer(path: str):
     ----------
     path : str
         The path to the file.
+
+    Returns
+    -------
+    Visualizer
     """
 
     import base64
@@ -1446,6 +1451,10 @@ def compute_coherence_map(
         TODO
     cumap_kwargs : dict, optional
         TODO
+
+    Returns
+    -------
+    TODO
     """
 
     KDE_bandwidth = cell_diameter / 4
