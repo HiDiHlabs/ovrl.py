@@ -1,10 +1,14 @@
+"""This is a package to detect overlapping cells in a 2D spatial transcriptomics sample."""
+
 import warnings
+from typing import Collection, Optional
 
 import anndata
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import umap
+from matplotlib.axes import Axes
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
@@ -24,24 +28,25 @@ from ._utils import (
     _transform_embeddings,
 )
 
-# This is a package to detect overlapping cells in a 2d spatial transcriptomics sample.
 
-
-def assign_xy(df, xy_columns=["x", "y"], grid_size=1):
+def _assign_xy(
+    df: pd.DataFrame, xy_columns: Collection[str] = ["x", "y"], grid_size: int = 1
+):
     """
     Assigns an x,y coordinate to a pd.DataFrame of coordinates.
+
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         A dataframe of coordinates.
     xyz_columns : list, optional
-        The names of the columns containing the x,y,z coordinates. The default is ['x','y', 'z'].
+        The names of the columns containing the x,y,z coordinates.
     grid_size : int, optional
-        The size of the grid. The default is 1.
+        The size of the grid.
 
     Returns
     -------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         A dataframe with an x,y coordinate assigned to each row.
 
     """
@@ -54,19 +59,20 @@ def assign_xy(df, xy_columns=["x", "y"], grid_size=1):
     return df
 
 
-def assign_z_median(df, z_column="z"):
+def _assign_z_median(df: pd.DataFrame, z_column: str = "z"):
     """
     Assigns a z coordinate to a pd.DataFrame of coordinates.
+
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         A dataframe of coordinates.
     z_column : str, optional
-        The name of the column containing the z coordinate. The default is 'z'.
+        The name of the column containing the z coordinate.
 
     Returns
     -------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         A dataframe with a z coordinate assigned to each row.
 
     """
@@ -80,19 +86,27 @@ def assign_z_median(df, z_column="z"):
     return medians
 
 
-def assign_z_mean_message_passing(df, z_column="z", delim_column="z_delim", rounds=3):
+def _assign_z_mean_message_passing(
+    df: pd.DataFrame,
+    z_column: str = "z",
+    delim_column: str = "z_delim",
+    rounds: int = 3,
+):
     """
     Assigns a z coordinate to a pd.DataFrame of coordinates.
+
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         A dataframe of coordinates.
     z_column : str, optional
-        The name of the column containing the z coordinate. The default is 'z'.
+        The name of the column containing the z coordinate.
+    rounds : int, optional
+        TODO
 
     Returns
     -------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         A dataframe with a z coordinate assigned to each row.
 
     """
@@ -141,19 +155,19 @@ def assign_z_mean_message_passing(df, z_column="z", delim_column="z_delim", roun
     return df[delim_column]
 
 
-def assign_z_mean(df, z_column="z"):
+def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
     """
     Assigns a z coordinate to a pd.DataFrame of coordinates.
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         A dataframe of coordinates.
     z_column : str, optional
-        The name of the column containing the z coordinate. The default is 'z'.
+        The name of the column containing the z coordinate.
 
     Returns
     -------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         A dataframe with a z coordinate assigned to each row.
 
     """
@@ -167,20 +181,32 @@ def assign_z_mean(df, z_column="z"):
     return means
 
 
-def get_rois(df, genes=None, min_distance=10, KDE_bandwidth=1, min_expression=5):
+def get_rois(
+    df: pd.DataFrame,
+    genes=None,
+    min_distance: int = 10,
+    KDE_bandwidth: float = 1,
+    min_expression: float = 5,
+):
     """
     Returns a list of local maxima in a kde of the data frame.
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         A dataframe of coordinates.
-    min_distance : int
+    genes : TODO, optional
+        TODO
+    min_distance : int, optional
         The minimum distance between local maxima.
+    KDE_bandwidth : float, optional
+        TODO
+    min_expression : float, optional
+        TODO
 
     Returns
     -------
     rois : list
-        A list of local maxima in a kde of the data frame.
+        A list of local maxima in a KDE of the data frame.
 
     """
 
@@ -199,15 +225,26 @@ def get_rois(df, genes=None, min_distance=10, KDE_bandwidth=1, min_expression=5)
 
 
 def get_expression_vectors_at_rois(
-    df, rois_x, rois_y, genes=None, KDE_bandwidth=1, min_expression=0
+    df, rois_x, rois_y, genes=None, KDE_bandwidth=1, min_expression: float = 0
 ):
     """
     Returns a matrix of gene expression vectors at each local maximum.
+
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         A dataframe of coordinates.
-    kde_plot_window_size : int
+    rois_x :
+        TODO
+    rois_y :
+        TODO
+    genes :
+        TODO
+    KDE_bandwidth :
+        TODO
+    min_expression : float, optional
+        TODO
+
     Returns
     -------
     """
@@ -244,9 +281,10 @@ def compute_divergence(
 ):
     """
     Computes the divergence between the top and bottom of the tissue sample.
+
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         A dataframe of coordinates.
     genes : list
         A list of genes to compute the divergence for.
@@ -256,11 +294,21 @@ def compute_divergence(
         The fraction of the loss score's maximum, used as a cutoff value.
     min_distance : int
         The minimum distance between two retrieved regions of interest.
+    min_expression :
+        TODO
+    density_weight :
+        TODO
     plot : bool
         Whether to plot the KDE.
+    return_maps : bool
+        TODO
+    divergence_spatial_blur :
+        TODO
+
+
     Returns
     -------
-    divergence : np.array
+    divergence : numpy.array
         A matrix of divergence values.
     """
 
@@ -300,26 +348,30 @@ def compute_divergence(
 
 
 def compute_divergence_map(
-    df,
-    genes,
-    KDE_bandwidth,
-    min_expression,
+    df: pd.DataFrame,
+    genes: Collection[str],
+    KDE_bandwidth: float,
+    min_expression: float,
 ):
     """
     Computes the divergence map between the top and bottom of the tissue sample.
+
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         A dataframe of coordinates.
-    genes : list
+    genes : list[str]
         A list of genes to compute the divergence for.
     KDE_bandwidth : int
         The bandwidth of the KDE.
+    min_expression : float
+        TODO
+
     Returns
     -------
-    divergence : np.array
+    divergence : numpy.array
         A pixel map of divergence values.
-    signal_histogram : np.array
+    signal_histogram : numpy.array
         A pixel map of signal magnitude.
     """
 
@@ -364,25 +416,26 @@ def compute_divergence_map(
 
 
 def find_overlaps(
-    coordinate_df=None,
-    adata=None,
-    coordinates_key="spatial",
-    genes_key="gene",
+    coordinate_df: Optional[pd.DataFrame] = None,
+    adata: Optional[anndata.AnnData] = None,
+    coordinates_key: str = "spatial",
+    genes_key: str = "gene",
     genes=None,
-    KDE_bandwidth=1.0,
-    threshold_fraction=0.5,
-    min_distance=10,
-    min_expression=5,
+    KDE_bandwidth: float = 1.0,
+    threshold_fraction: float = 0.5,
+    min_distance: int = 10,
+    min_expression: float = 5,
     density_weight=2,
-    return_maps=False,
+    return_maps: bool = False,
 ):
     """
     Finds regions of overlap between the top and bottom of the tissue sample.
+
     Parameters
     ----------
     coordinate_df : pd.DataFrame
         A dataframe of coordinates.
-    adata : anndata.AnnData
+    adata : anndata.AnnData, optional
         An AnnData object containing the coordinates.
     coordinates_key : str
         The key in the AnnData object's uns attribute containing the coordinates.
@@ -394,7 +447,18 @@ def find_overlaps(
         The bandwidth of the KDE.
     threshold_fraction : float
         The fraction of the divergence score's maximum, used as a cutoff value.
+    min_distance: int, optional
+        TODO
+    min_expression: float, optional
+        TODO
+    density_weight : TODO
+        TODO
+    return_maps: bool, optional
+        TODO
 
+    Returns
+    -------
+        TODO
     """
 
     if (coordinate_df is None) and (adata is None):
@@ -406,8 +470,8 @@ def find_overlaps(
     if genes is None:
         genes = sorted(coordinate_df[genes_key].unique())
 
-    assign_xy(coordinate_df)
-    assign_z_mean(coordinate_df)
+    _assign_xy(coordinate_df)
+    _assign_z_mean(coordinate_df)
 
     if return_maps:
         (
@@ -455,17 +519,24 @@ def find_overlaps(
 
 
 def plot_signal_integrity(
-    integrity, signal, signal_threshold=2.0, cmap="BIH", plot_hist=True
+    integrity, signal, signal_threshold: float = 2.0, cmap="BIH", plot_hist: bool = True
 ):
     """
     Plots the determined signal integrity of the tissue sample in a signal integrity map.
 
-    Args:
-        integrity: Integrity map obtained from ovrlpy analysis
-        signal: Signal map from ovrlpy analysis
-        signal_threshold: Threshold below which the signal is faded out in the plot, to avoid displaying noisy areas with low predictive confidence.
-        cmap: Colormap for display. Defaults to 'BIH'.
-        plot_hist Whether to plot a histogram of integrity values alongside the map: Defaults to False.
+    Parameters
+    ----------
+        integrity : TODO
+            Integrity map obtained from ovrlpy analysis
+        signal : TODO
+            Signal map from ovrlpy analysis
+        signal_threshold : float, optional
+            Threshold below which the signal is faded out in the plot,
+            to avoid displaying noisy areas with low predictive confidence.
+        cmap : TODO
+            Colormap for display.
+        plot_hist : bool, optional
+            Whether to plot a histogram of integrity values alongside the map.
     """
 
     figure_height = int(15 * integrity.shape[0] / integrity.shape[1]) + 1
@@ -537,18 +608,25 @@ def detect_doublets(
     coherence_sigma=None,
 ):
     """
-    This function is used to find individual peaks of signal incoherence in the tissue map as an indicator of single occurrences overlapping cells.
-    Args:
-        coherence: Coherence map obtained from ovrlpy analysis
-        signal: Signal map from ovrlpy analysis
-        min_distance: Minimum distance between reported peaks
-        max_incoherence: Maximum incoherence value for a peak to be considered
-        signal_cutoff: Minimum signal value for a peak to be considered
-        coherence_sigma: Optional sigma value for gaussian filtering of the coherence map, which leads to the detection of overlap regions with larger spatial extent.
-    """
+    This function is used to find individual peaks of signal incoherence in the tissue
+    map as an indicator of single occurrences overlapping cells.
 
-    # if signal_cutoff is None:
-    #     signal_cutoff = signal.max()*0.6
+    Parameters
+    ----------
+        coherence :
+            Coherence map obtained from ovrlpy analysis
+        signal :
+            Signal map from ovrlpy analysis
+        min_distance :
+            Minimum distance between reported peaks
+        max_incoherence :
+            Maximum incoherence value for a peak to be considered
+        signal_cutoff :
+            Minimum signal value for a peak to be considered
+        coherence_sigma :
+            Optional sigma value for gaussian filtering of the coherence map,
+            which leads to the detection of overlap regions with larger spatial extent.
+    """
 
     if coherence_sigma is not None:
         coherence = gaussian_filter(coherence, coherence_sigma)
@@ -574,7 +652,7 @@ def detect_doublets(
     return doublet_df
 
 
-def determine_celltype_class_assignments(expression_samples, signature_matrix):
+def _determine_celltype_class_assignments(expression_samples, signature_matrix):
     expression_samples_ = expression_samples.copy().loc[signature_matrix.index]
     correlations = np.array(
         [
@@ -591,44 +669,21 @@ class Visualizer:
     """
     A class to visualize spatial transcriptomics data.
     Contains a latent gene expression UMAP and RGB embedding.
+
     Parameters
     ----------
     KDE_bandwidth : float, optional
-        The bandwidth of the KDE. Default is 1.5.
+        The bandwidth of the KDE.
     celltyping_min_expression : int, optional
-        Minimum expression level for cell typing. Default is 10.
+        Minimum expression level for cell typing.
     celltyping_min_distance : int, optional
-        Minimum distance for cell typing. Default is 5.
+        Minimum distance for cell typing.
     n_components_pca : float, optional
-        Number of components for PCA. Default is 0.7.
+        Number of components for PCA.
     umap_kwargs : dict, optional
-        Keyword arguments for 2D UMAP embedding. Default is {"n_components": 2, "min_dist": 0.0, "n_neighbors": 20, "random_state": None}.
+        Keyword arguments for 2D UMAP embedding.
     cumap_kwargs : dict, optional
-        Keyword arguments for 3D UMAP embedding. Default is {"n_components": 3, "min_dist": 0.001, "n_neighbors": 50, "random_state": None}.
-    Methods
-    -------
-    fit_ssam(coordinate_df=None, adata=None, genes=None, gene_key="gene", coordinates_key="spatial", signature_matrix=None, n_workers=32)
-        Fits the visualizer to a spatial transcriptomics dataset using the SSAM algorithm.
-    fit_signatures(signature_matrix=None)
-        Fits the visualizer with a given signature matrix.
-    subsample_df(x, y, coordinate_df=None, window_size=30)
-        Subsamples the coordinate dataframe based on given x, y coordinates and window size.
-    transform(coordinate_df)
-        Transforms the coordinate dataframe to the embedding space.
-    roi_df()
-        Returns a pandas DataFrame containing the gene-count matrix of the fitted tissue's determined pseudo-cells.
-    linear_transform(x, y, coordinate_df=None, window_size=30)
-        Performs a linear transformation on the coordinate dataframe based on given x, y coordinates and window size.
-    plot_instance(subsample, subsample_embedding, subsample_embedding_color, x, y, window_size=30, rasterized=True)
-        Plots an instance of the visualized data.
-    plot_umap(display_text=True, ax=None, rasterized=False, **kwargs)
-        Plots the UMAP embedding.
-    plot_tissue(rasterized=False, **kwargs)
-        Plots the tissue embedding.
-    plot_fit(rasterized=True)
-        Plots the fitted model.
-    save(path)
-        Stores the visualizer and its attributes in an h5ad file.
+        Keyword arguments for 3D UMAP embedding.
     """
 
     def __init__(
@@ -679,114 +734,22 @@ class Visualizer:
         self.coherence_map = None
         self.signal_map = None
 
-    # def fit(
-    #     self,
-    #     coordinate_df=None,
-    #     adata=None,
-    #     genes=None,
-    #     gene_key="gene",
-    #     coordinates_key="spatial",
-    #     signature_matrix=None,
-    # ):
-    #     """ """
-
-    #     if (coordinate_df is None) and (adata is None):
-    #         raise ValueError("Either adata or coordinate_df must be provided.")
-
-    #     if coordinate_df is None:
-    #         coordinate_df = adata.uns[coordinates_key]
-
-    #     if genes is None:
-    #         genes = sorted(coordinate_df[gene_key].unique())
-
-    #     self.genes = genes
-
-    #     if signature_matrix is None:
-    #         signature_matrix = pd.DataFrame(
-    #             np.eye(len(genes)), index=genes, columns=genes
-    #         ).astype(float)
-    #         signature_matrix[:] = np.eye(len(genes))
-
-    #     self.signatures = signature_matrix
-
-    #     self.rois_celltyping_x, self.rois_celltyping_y = get_rois(
-    #         coordinate_df,
-    #         genes=genes,
-    #         min_distance=self.celltyping_min_distance,
-    #         KDE_bandwidth=self.KDE_bandwidth,
-    #         min_expression=self.celltyping_min_expression,
-    #     )
-
-    #     self.localmax_celltyping_samples = get_expression_vectors_at_rois(
-    #         coordinate_df, self.rois_celltyping_x, self.rois_celltyping_y, genes
-    #     )
-
-    #     self.localmax_celltyping_samples = (
-    #         self.localmax_celltyping_samples
-    #         / (self.localmax_celltyping_samples.to_numpy() ** 2).sum(0, keepdims=True)
-    #         ** 0.5
-    #     )
-
-    #     self.pca_2d = PCA(
-    #         n_components=min(
-    #             self.n_components_pca, self.localmax_celltyping_samples.shape[0] // 2
-    #         )
-    #     )
-    #     factors = self.pca_2d.fit_transform(self.localmax_celltyping_samples.T)
-    #     print(f"Modeling {factors.shape[0]} pseudo-celltypes")
-
-    #     # init=np.concatenate([self.embedding,0.01*np.random.normal(size=(self.embedding.shape[0],1))],axis=1))
-    #     # embedding_color = embedder_3d.fit_transform(factors)
-
-    #     self.embedder_2d = umap.UMAP(**self.umap_kwargs)
-    #     self.embedding = self.embedder_2d.fit_transform(factors)
-
-    #     self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-    #     # metric=discounted_euclidean_grad, metric_kwds={'discount':0.5},
-    #     # metric=discounted_euclidean_grad, output_metric_kwds={'discount':1.0})
-
-    #     embedding_color = self.embedder_3d.fit_transform(
-    #         factors
-    #     )  # np.tile(self.embedding,[1,2]))
-
-    #     embedding_color, self.pca_3d = __fill_color_axes(embedding_color)
-
-    #     color_min = embedding_color.min(0)
-    #     color_max = embedding_color.max(0)
-
-    #     self.colors = _min_to_max(embedding_color.copy())
-    #     self.colors_min_max = [color_min, color_max]
-
-    #     self.fit_signatures(signature_matrix)
-
-    #     gene_assignments = determine_celltype_class_assignments(
-    #         self.localmax_celltyping_samples,
-    #         pd.DataFrame(np.eye(len(genes)), index=genes, columns=genes).astype(float),
-    #     )
-
-    #     # # determine the center of gravity of each celltype in the embedding:
-    #     self.gene_centers = np.array(
-    #         [
-    #             np.median(self.embedding[gene_assignments == i, :], axis=0)
-    #             for i in range(len(self.genes))
-    #         ]
-    #     )
-
     def fit_ssam(
         self,
-        coordinate_df=None,
-        adata=None,
+        coordinate_df: Optional[pd.DataFrame] = None,
+        adata: Optional[anndata.AnnData] = None,
         genes=None,
-        gene_key="gene",
-        coordinates_key="spatial",
+        gene_key: str = "gene",
+        coordinates_key: str = "spatial",
         signature_matrix=None,
-        n_workers=32,
+        n_workers: int = 32,
     ):
         """
         Fits the visualizer to a spatial transcripts dataset using the SSAM algorithm.
+
         Parameters
         ----------
-        coordinate_df : pd.DataFrame
+        coordinate_df : pandas.DataFrame
             A dataframe of coordinates.
         adata : anndata.AnnData
             An AnnData object containing the coordinates.
@@ -796,8 +759,9 @@ class Visualizer:
             The key in the dataframe containing the gene names.
         coordinates_key : str
             The key in the dataframe containing the coordinates.
-        signature_matrix : pd.DataFrame
-            A matrix of celltypes x gene signatures to use to annotate the UMAP. None defaults to displaying individual genes.
+        signature_matrix : pandas.DataFrame
+            A matrix of celltypes x gene signatures to use to annotate the UMAP.
+            None defaults to displaying individual genes.
         n_workers : int
             The number of workers to use in the SSAM algorithm
         """
@@ -861,12 +825,12 @@ class Visualizer:
 
         self.fit_signatures(signature_matrix)
 
-        gene_assignments = determine_celltype_class_assignments(
+        gene_assignments = _determine_celltype_class_assignments(
             self.localmax_celltyping_samples,
             pd.DataFrame(np.eye(len(genes)), index=genes, columns=genes).astype(float),
         )
 
-        # # determine the center of gravity of each celltype in the embedding:
+        # determine the center of gravity of each celltype in the embedding:
         self.gene_centers = np.array(
             [
                 np.median(self.embedding[gene_assignments == i, :], axis=0)
@@ -875,7 +839,14 @@ class Visualizer:
         )
 
     def fit_signatures(self, signature_matrix=None):
-        """ """
+        """
+        Fits the visualizer with a given signature matrix.
+
+        Parameters
+        ----------
+        signature_matrix : TODO
+            TODO
+        """
 
         if signature_matrix is None:
             signature_matrix = pd.DataFrame(
@@ -886,7 +857,7 @@ class Visualizer:
         self.signatures = signature_matrix
         celltypes = sorted(signature_matrix.columns)
 
-        self.celltype_class_assignments = determine_celltype_class_assignments(
+        self.celltype_class_assignments = _determine_celltype_class_assignments(
             self.localmax_celltyping_samples, signature_matrix
         )
 
@@ -900,8 +871,24 @@ class Visualizer:
             ]
         )
 
-    def subsample_df(self, x, y, coordinate_df=None, window_size=30):
-        """ """
+    def subsample_df(
+        self, x, y, coordinate_df: Optional[pd.DataFrame] = None, window_size: int = 30
+    ):
+        """
+        Subsamples the coordinate dataframe based on given x, y coordinates and window
+        size.
+
+        Parameters
+        ----------
+        x : TODO
+            TODO
+        y : TODO
+            TODO
+        coordinate_df : Optional[pandas.DataFrame]
+            TODO
+        window_size : int, optional
+            TODO
+        """
 
         subsample_mask = _get_spatial_subsample_mask(
             coordinate_df, x, y, plot_window_size=window_size
@@ -910,8 +897,15 @@ class Visualizer:
 
         return subsample
 
-    def transform(self, coordinate_df):
-        """ """
+    def transform(self, coordinate_df: pd.DataFrame):
+        """
+        Transforms the coordinate dataframe to the embedding space.
+
+        Parameters
+        ----------
+        coordinate_df : pandas.DataFrame
+            TODO
+        """
 
         genes = self.genes
 
@@ -946,9 +940,14 @@ class Visualizer:
 
         return subsample_embedding, subsample_embedding_color
 
-    def roi_df(self):
+    def roi_df(self) -> pd.DataFrame:
         """
-        Returns a pandas data frame containing the gene-count matrix of the fitted tissue's determined pseudo-cells.
+        Returns a pandas.DataFrame containing the gene-count matrix of the fitted
+        tissue's determined pseudo-cells.
+
+        Returns
+        ----------
+        pandas.DataFrame
         """
         roi_df = pd.DataFrame(
             {"x": self.rois_celltyping_x, "y": self.rois_celltyping_y}
@@ -962,8 +961,24 @@ class Visualizer:
 
         return roi_df
 
-    def linear_transform(self, x, y, coordinate_df=None, window_size=30):
-        """ """
+    def linear_transform(
+        self, x, y, coordinate_df: Optional[pd.DataFrame] = None, window_size: int = 30
+    ):
+        """
+        Performs a linear transformation on the coordinate dataframe based on given
+        x, y coordinates and window size.
+
+        Parameters
+        ----------
+        x : TODO
+            TODO
+        y : TODO
+            TODO
+        coordinate_df : Optional[pandas.DataFrame]
+            TODO
+        window_size : int, optional
+            TODO
+        """
 
         genes = self.genes
 
@@ -993,10 +1008,29 @@ class Visualizer:
         subsample_embedding_color,
         x,
         y,
-        window_size=30,
-        rasterized=True,
+        window_size: int = 30,
+        rasterized: bool = True,
     ):
-        """ """
+        """
+        Plots an instance of the visualized data.
+
+        Parameters
+        ----------
+        subsample : TODO
+            TODO
+        subsample_embedding : TODO
+            TODO
+        subsample_embedding_color : Optional[pandas.DataFrame]
+            TODO
+        x :
+            TODO
+        y :
+            TODO
+        window_size : int, optional
+            TODO
+        rasterized : bool, optional
+            TODO
+        """
         vertical_indices = subsample.z.argsort()
         subsample = subsample.sort_values("z")
         subsample_embedding = subsample_embedding[vertical_indices]
@@ -1033,7 +1067,6 @@ class Visualizer:
         )
 
         ax2.set_axis_off()
-        # __plot_embeddings(subsample_embedding,subsample_embedding_color,self.celltype_centers,celltypes,rasterized=rasterized)
         ax2.set_title("UMAP")
 
         ax = fig.add_subplot(gs[0, 1], label="celltype_map")
@@ -1122,8 +1155,32 @@ class Visualizer:
         ax4.set_aspect("equal", adjustable="box")
         plt.title("ROI, vertical, y-cut")
 
-    def plot_umap(self, display_text=True, ax=None, rasterized=False, **kwargs):
-        """ """
+    def plot_umap(
+        self,
+        ax: Optional[Axes] = None,
+        rasterized: bool = False,
+        **kwargs,
+    ):
+        """
+        Plots the UMAP embedding.
+
+        Parameters
+        ----------
+        ax : Optional[matplotlib.axes.Axes]
+            TODO
+        subsample_embedding_color : Optional[pandas.DataFrame]
+            TODO
+        x :
+            TODO
+        y :
+            TODO
+        window_size : int, optional
+            TODO
+        rasterized : bool, optional
+            TODO
+        kwargs
+            TODO
+        """
         _plot_embeddings(
             self.embedding,
             self.colors,
@@ -1134,8 +1191,17 @@ class Visualizer:
             **kwargs,
         )
 
-    def plot_tissue(self, rasterized=False, **kwargs):
-        """ """
+    def plot_tissue(self, rasterized: bool = False, **kwargs):
+        """
+        Plots the tissue embedding.
+
+        Parameters
+        ----------
+        rasterized : bool, optional
+            TODO
+        kwargs
+            TODO
+        """
         ax = plt.gca()
         ax.scatter(
             self.rois_celltyping_x,
@@ -1148,8 +1214,15 @@ class Visualizer:
         )
         ax.set_aspect("equal", adjustable="box")
 
-    def plot_fit(self, rasterized=True):
-        """ """
+    def plot_fit(self, rasterized: bool = True):
+        """
+        Plots the fitted model.
+
+        Parameters
+        ----------
+        rasterized : bool, optional
+            TODO
+        """
 
         plt.figure(figsize=(15, 7))
 
@@ -1159,8 +1232,10 @@ class Visualizer:
         plt.subplot(122)
         self.plot_tissue(rasterized=rasterized, **{"s": 1})
 
-    def save(self, path):
-        """Stores the visualizer and its attributes in an h5ad file.
+    def save(self, path: str):
+        """
+        Stores the visualizer and its attributes in an h5ad file.
+
         Parameters
         ----------
         path : str
@@ -1244,9 +1319,14 @@ class Visualizer:
         adata.write_h5ad(path)
 
 
-def load_visualizer(path):
+def load_visualizer(path: str):
     """
     Loads a visualizer from an h5ad file.
+
+    Parameters
+    ----------
+    path : str
+        The path to the file.
     """
 
     import base64
@@ -1322,16 +1402,11 @@ def load_visualizer(path):
 
 
 def compute_coherence_map(
-    df,
+    df: pd.DataFrame,
     n_expected_celltypes=None,
     cell_diameter=10,
-    # KDE_bandwidth=2,
-    min_expression=0.5,
-    # min_distance=8,
-    # n_components_pca=0.7,
-    return_visualizer=True,
+    min_expression: float = 0.5,
     signature_matrix=None,
-    metric="cosine_similarity",
     umap_kwargs={
         "n_components": 2,
         "min_dist": 0.0,
@@ -1348,19 +1423,28 @@ def compute_coherence_map(
     },
 ):
     """
-    This is a wrapper function that computes the coherence map for a given spatial transcriptomics dataset.
-    It includes the entire ovrlpy pipeline, returning a coherence map and a signal strength map and produces a visualizer object that can be used to plot the results.
+    This is a wrapper function that computes the coherence map for a given spatial
+    transcriptomics dataset.
+    It includes the entire ovrlpy pipeline, returning a coherence map and a signal
+    strength map and produces a visualizer object that can be used to plot the results.
     Parameters
     ----------
     df : pandas.DataFrame
         The spatial transcriptomics dataset.
-    KDE_bandwidth : float, optional
-        The bandwidth of the kernel density estimator used to construct the gene expression densities, by default 2
+    n_expected_celltypes : TODO
+        TODO
+    cell_diameter : TODO
+        TODO
     min_expression : int, optional
         A threshold value to discard areas with low expression, by default 5
-        Can be interpreted as: The minimum number of transcripts to appear within a radius of 'KDE_bandwidth' for a region to be considered containing a cell.
-    min_distance : int, optional
-        The minimum distance between two cells, by default 10
+        Can be interpreted as: The minimum number of transcripts to appear within a
+        radius of 'KDE_bandwidth' for a region to be considered containing a cell.
+    signature_matrix : TODO
+        TODO
+    umap_kwargs : dict, optional
+        TODO
+    cumap_kwargs : dict, optional
+        TODO
 
     """
 
@@ -1371,8 +1455,8 @@ def compute_coherence_map(
         n_expected_celltypes = 0.8
 
     print("Running vertical adjustment")
-    assign_xy(df)
-    assign_z_mean_message_passing(df, rounds=4)
+    _assign_xy(df)
+    _assign_z_mean_message_passing(df, rounds=4)
 
     vis = Visualizer(
         KDE_bandwidth=KDE_bandwidth,
