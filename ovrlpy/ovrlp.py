@@ -182,11 +182,11 @@ def get_rois(df, genes=None, min_distance=10, KDE_bandwidth=1, min_expression=5)
     if genes is None:
         genes = sorted(df.gene.unique())
 
-    hist = create_histogram(
+    hist = _create_histogram(
         df, genes=genes, min_expression=min_expression, KDE_bandwidth=KDE_bandwidth
     )
 
-    rois_x, rois_y, _ = determine_localmax(
+    rois_x, rois_y, _ = _determine_localmax(
         hist, min_distance=min_distance, min_expression=min_expression
     )
 
@@ -216,7 +216,7 @@ def get_expression_vectors_at_rois(
     expressions[:] = 0
 
     for gene in genes:
-        hist = create_histogram(
+        hist = _create_histogram(
             df, genes=[gene], min_expression=min_expression, KDE_bandwidth=KDE_bandwidth
         )
 
@@ -268,7 +268,7 @@ def compute_divergence(
     distance_map = gaussian_filter(distance_map, sigma=divergence_spatial_blur)
     distance_threshold = distance_map.max() * threshold_fraction
 
-    rois_x, rois_y, distance_score = determine_localmax(
+    rois_x, rois_y, distance_score = _determine_localmax(
         distance_map, min_distance, distance_threshold
     )
 
@@ -318,7 +318,7 @@ def compute_divergence_map(
         A pixel map of signal magnitude.
     """
 
-    signal_histogram = create_histogram(
+    signal_histogram = _create_histogram(
         df, genes=genes, min_expression=min_expression, KDE_bandwidth=KDE_bandwidth
     )
 
@@ -331,7 +331,7 @@ def compute_divergence_map(
     y_max = df.y_pixel.max()
 
     for gene in genes:
-        hist_top = create_histogram(
+        hist_top = _create_histogram(
             df_top,
             genes=[gene],
             min_expression=0,
@@ -339,7 +339,7 @@ def compute_divergence_map(
             x_max=x_max,
             y_max=y_max,
         )
-        hist_bottom = create_histogram(
+        hist_bottom = _create_histogram(
             df_bottom,
             genes=[gene],
             min_expression=0,
@@ -352,8 +352,8 @@ def compute_divergence_map(
         hist_top[mask] /= signal_histogram[mask]
         hist_bottom[mask] /= signal_histogram[mask]
 
-        divergence[mask] += get_kl_divergence(hist_top[mask], hist_bottom[mask])
-        divergence[mask] += get_kl_divergence(hist_bottom[mask], hist_top[mask])
+        divergence[mask] += _get_kl_divergence(hist_top[mask], hist_bottom[mask])
+        divergence[mask] += _get_kl_divergence(hist_bottom[mask], hist_top[mask])
 
     return divergence, signal_histogram
 
@@ -548,7 +548,7 @@ def detect_doublets(
     if coherence_sigma is not None:
         coherence = gaussian_filter(coherence, coherence_sigma)
 
-    dist_x, dist_y, dist_t = determine_localmax(
+    dist_x, dist_y, dist_t = _determine_localmax(
         (1 - coherence) * (signal > signal_cutoff),
         min_distance=min_distance,
         min_expression=max_incoherence,
@@ -744,12 +744,12 @@ class Visualizer:
     #         factors
     #     )  # np.tile(self.embedding,[1,2]))
 
-    #     embedding_color, self.pca_3d = fill_color_axes(embedding_color)
+    #     embedding_color, self.pca_3d = __fill_color_axes(embedding_color)
 
     #     color_min = embedding_color.min(0)
     #     color_max = embedding_color.max(0)
 
-    #     self.colors = min_to_max(embedding_color.copy())
+    #     self.colors = _min_to_max(embedding_color.copy())
     #     self.colors_min_max = [color_min, color_max]
 
     #     self.fit_signatures(signature_matrix)
@@ -836,6 +836,8 @@ class Visualizer:
             )
         )
         factors = self.pca_2d.fit_transform(self.localmax_celltyping_samples.T)
+        
+        print(f"Modeling {factors.shape[0]} pseudo-celltypes")
 
         self.embedder_2d = umap.UMAP(**self.umap_kwargs)
         self.embedding = self.embedder_2d.fit_transform(factors)
@@ -846,12 +848,12 @@ class Visualizer:
             factors
         )  
 
-        embedding_color, self.pca_3d = fill_color_axes(embedding_color)
+        embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
         color_min = embedding_color.min(0)
         color_max = embedding_color.max(0)
 
-        self.colors = min_to_max(embedding_color.copy())
+        self.colors = _min_to_max(embedding_color.copy())
         self.colors_min_max = [color_min, color_max]
 
         self.fit_signatures(signature_matrix)
@@ -898,7 +900,7 @@ class Visualizer:
     def subsample_df(self, x, y, coordinate_df=None, window_size=30):
         """ """
 
-        subsample_mask = get_spatial_subsample_mask(
+        subsample_mask = _get_spatial_subsample_mask(
             coordinate_df, x, y, plot_window_size=window_size
         )
         subsample = coordinate_df[subsample_mask]
@@ -912,10 +914,10 @@ class Visualizer:
 
         subsample = coordinate_df
 
-        distances, neighbor_indices = create_knn_graph(
+        distances, neighbor_indices = _create_knn_graph(
             subsample[["x", "y", "z"]].values, k=90
         )
-        local_expression = get_knn_expression(
+        local_expression = _get_knn_expression(
             distances,
             neighbor_indices,
             genes,
@@ -923,14 +925,14 @@ class Visualizer:
             bandwidth=self.KDE_bandwidth,
         )
         local_expression = local_expression / ((local_expression**2).sum(0) ** 0.5)
-        subsample_embedding, subsample_embedding_color = transform_embeddings(
+        subsample_embedding, subsample_embedding_color = _transform_embeddings(
             local_expression.T.values,
             self.pca_2d,
             embedder_2d=self.embedder_2d,
             embedder_3d=self.embedder_3d,
             colors_min_max=self.colors_min_max,
         )
-        subsample_embedding_color, _ = fill_color_axes(
+        subsample_embedding_color, _ = _fill_color_axes(
             subsample_embedding_color, self.pca_3d
         )
         color_min, color_max = self.colors_min_max
@@ -962,15 +964,15 @@ class Visualizer:
 
         genes = self.genes
 
-        subsample_mask = get_spatial_subsample_mask(
+        subsample_mask = _get_spatial_subsample_mask(
             coordinate_df, x, y, plot_window_size=window_size
         )
         subsample = coordinate_df[subsample_mask]
 
-        distances, neighbor_indices = create_knn_graph(
+        distances, neighbor_indices = _create_knn_graph(
             subsample[["x", "y", "z"]].values, k=90
         )
-        local_expression = get_knn_expression(
+        local_expression = _get_knn_expression(
             distances,
             neighbor_indices,
             genes,
@@ -1028,7 +1030,7 @@ class Visualizer:
         )
                 
         ax2.set_axis_off()
-        # _plot_embeddings(subsample_embedding,subsample_embedding_color,self.celltype_centers,celltypes,rasterized=rasterized)
+        # __plot_embeddings(subsample_embedding,subsample_embedding_color,self.celltype_centers,celltypes,rasterized=rasterized)
         ax2.set_title("UMAP")
 
         ax = fig.add_subplot(gs[0, 1], label="celltype_map")
@@ -1353,10 +1355,10 @@ def compute_coherence_map(
     """
 
     KDE_bandwidth = cell_diameter/4
-    min_distance = cell_diameter*0.5
+    min_distance = cell_diameter*0.7
 
     if n_expected_celltypes is None:
-        n_expected_celltypes = 0.  
+        n_expected_celltypes = 0.8  
 
     print("Running vertical adjustment")
     assign_xy(df)
@@ -1373,7 +1375,7 @@ def compute_coherence_map(
 
     vis.fit_ssam(df, signature_matrix=signature_matrix)
 
-    coherence_, signal_ = compute_divergence_patched(
+    coherence_, signal_ = _compute_divergence_patched(
         df,
         vis.genes,
         vis.pca_2d.components_,

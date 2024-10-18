@@ -132,10 +132,10 @@ def _sample_expression_nd(
     print(f"Searching within x:{bounds[0]}, y:{bounds[1]}, n_molecules:{len(coordinate_dataframe_)}")
     print(f"Using bandwidth: {kde_bandwidth}, min_expression: {minimum_expression}, min_pixel_distance: {min_pixel_distance}")
     # perform a global KDE to determine local maxima:
-    vector_field_norm = utils._kde_nd(
+    vector_field_norm = _utils._kde_nd(
         coordinate_dataframe_[coord_columns].values, bandwidth=1.1
     )
-    local_maximum_coordinates = utils.find_local_maxima(
+    local_maximum_coordinates = _utils.find_local_maxima(
         vector_field_norm,
         min_pixel_distance=1+int(min_pixel_distance/kde_bandwidth),
         min_expression=minimum_expression,
@@ -182,7 +182,7 @@ def _sample_expression_nd(
         with ThreadPoolExecutor(max_workers=n_workers) as executor:
             fs = {
                 executor.submit(
-                    utils.kde_and_sample,
+                    _utils.kde_and_sample,
                     df_gene_grouped.loc[gene],
                     local_maximum_coordinates,
                     size=size,
