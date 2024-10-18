@@ -11,16 +11,16 @@ from scipy.ndimage import gaussian_filter, maximum_filter
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
-from .ssam2 import utils as ssam_utils
+from ._ssam2 import _utils as ssam_utils
 
 
-def draw_outline(ax, artist, lw=2, color="black"):
+def _draw_outline(ax, artist, lw=2, color="black"):
     _ = artist.set_path_effects(
         [PathEffects.withStroke(linewidth=lw, foreground=color), PathEffects.Normal()]
     )
 
 
-def plot_scalebar(
+def _plot_scalebar(
     ax,
     x,
     y,
@@ -43,13 +43,13 @@ def plot_scalebar(
     )
 
     if edge_color is not None:
-        draw_outline(ax, plot_artist[0], lw=5, color=edge_color)
-        draw_outline(ax, text_artist, lw=5, color=edge_color)
+        _draw_outline(ax, plot_artist[0], lw=5, color=edge_color)
+        _draw_outline(ax, text_artist, lw=5, color=edge_color)
 
     return plot_artist, text_artist
 
 
-def create_circular_kernel(r):
+def _create_circular_kernel(r):
     """
     Creates a circular kernel of radius r.
     Parameters
@@ -69,7 +69,7 @@ def create_circular_kernel(r):
     return (X**2 + Y**2) ** 0.5 <= 1
 
 
-def get_kl_divergence(p, q):
+def _get_kl_divergence(p, q):
     # mask = (p!=0) * (q!=0)
     output = np.zeros(p.shape)
     # output[mask] = p[mask]*np.log(p[mask]/q[mask])
@@ -77,7 +77,7 @@ def get_kl_divergence(p, q):
     return output
 
 
-def determine_localmax(distribution, min_distance=3, min_expression=5):
+def _determine_localmax(distribution, min_distance=3, min_expression=5):
     """
     Returns a list of local maxima in a kde of the data frame.
     Parameters
@@ -97,7 +97,7 @@ def determine_localmax(distribution, min_distance=3, min_expression=5):
         A list of y coordinates of local maxima.
 
     """
-    localmax_kernel = create_circular_kernel(min_distance)
+    localmax_kernel = _create_circular_kernel(min_distance)
     localmax_projection = distribution == maximum_filter(
         distribution, footprint=localmax_kernel
     )
@@ -110,7 +110,7 @@ def determine_localmax(distribution, min_distance=3, min_expression=5):
 ## These functions are going to be seperated into a package of their own at some point:
 
 
-def fill_color_axes(rgb, dimred=None):
+def _fill_color_axes(rgb, dimred=None):
     if dimred is None:
         dimred = PCA(n_components=3).fit(rgb)
 
@@ -136,7 +136,7 @@ def fill_color_axes(rgb, dimred=None):
 
 
 # normalize array:
-def min_to_max(arr, arr_min=None, arr_max=None):
+def _min_to_max(arr, arr_min=None, arr_max=None):
     if arr_min is None:
         arr_min = arr.min(0, keepdims=True)
     if arr_max is None:
@@ -147,7 +147,7 @@ def min_to_max(arr, arr_min=None, arr_max=None):
 
 
 # define a function that fits expression data to into the umap embeddings:
-def transform_embeddings(
+def _transform_embeddings(
     expression, pca, embedder_2d, embedder_3d, colors_min_max=[None, None]
 ):
     factors = pca.transform(expression)
@@ -156,13 +156,13 @@ def transform_embeddings(
     embedding_color = embedder_3d.transform(factors)
     # embedding_color = embedder_3d.transform(embedding)
 
-    # embedding_color = min_to_max(embedding_color,colors_min_max[0],colors_min_max[1])
+    # embedding_color = _min_to_max(embedding_color,colors_min_max[0],colors_min_max[1])
 
     return embedding, embedding_color
 
 
 # define a function that plots the embeddings, with celltype centers rendered as plt.texts on top:
-def plot_embeddings(
+def _plot_embeddings(
     embedding,
     embedding_color,
     celltype_centers,
@@ -209,10 +209,10 @@ def plot_embeddings(
         )
         text_artists.append(t)
 
-    untangle_text(text_artists, ax)
+    _untangle_text(text_artists, ax)
 
 
-def untangle_text(text_artists, ax=None, max_iterations=10000):
+def _untangle_text(text_artists, ax=None, max_iterations=10000):
     if ax is None:
         ax = plt.gca()
     inv = ax.transData.inverted()
@@ -274,7 +274,7 @@ def untangle_text(text_artists, ax=None, max_iterations=10000):
 
 
 # define a function that subsamples spots around x,y given a window size:
-def get_spatial_subsample_mask(coordinate_df, x, y, plot_window_size=5):
+def _get_spatial_subsample_mask(coordinate_df, x, y, plot_window_size=5):
     return (
         (coordinate_df.x > x - plot_window_size)
         & (coordinate_df.x < x + plot_window_size)
@@ -284,14 +284,14 @@ def get_spatial_subsample_mask(coordinate_df, x, y, plot_window_size=5):
 
 
 # define a function that returns the k nearest neighbors of x,y:
-def create_knn_graph(coords, k=10):
+def _create_knn_graph(coords, k=10):
     nbrs = NearestNeighbors(n_neighbors=k, algorithm="ball_tree").fit(coords)
     distances, indices = nbrs.kneighbors(coords)
     return distances, indices
 
 
 # get a kernel-weighted average of the expression values of the k nearest neighbors of x,y:
-def get_knn_expression(distances, neighbor_indices, genes, gene_labels, bandwidth=2.5):
+def _get_knn_expression(distances, neighbor_indices, genes, gene_labels, bandwidth=2.5):
     weights = np.exp(-distances / bandwidth)
     local_expression = pd.DataFrame(
         index=genes, columns=np.arange(distances.shape[0])
@@ -305,7 +305,7 @@ def get_knn_expression(distances, neighbor_indices, genes, gene_labels, bandwidt
     return local_expression
 
 
-def create_histogram(
+def _create_histogram(
     df, genes=None, min_expression=0, KDE_bandwidth=None, x_max=None, y_max=None
 ):
     """
@@ -351,7 +351,7 @@ def create_histogram(
     return hist
 
 
-def compute_divergence_embedded(
+def _compute_divergence_embedded(
     df,
     genes,
     visualizer,
@@ -360,7 +360,7 @@ def compute_divergence_embedded(
     metric="cosine_similarity",
     pca_divergence=0.8,
 ):
-    signal = create_histogram(
+    signal = _create_histogram(
         df,
         genes,
         x_max=df.x_pixel.max(),
@@ -388,7 +388,7 @@ def compute_divergence_embedded(
             continue
 
         hist_top = np.dot(
-            create_histogram(
+            _create_histogram(
                 df_top,
                 genes=[g],
                 x_max=df.x_pixel.max(),
@@ -398,7 +398,7 @@ def compute_divergence_embedded(
             pca.components_[None, :, i],
         )
         hist_bot = np.dot(
-            create_histogram(
+            _create_histogram(
                 df_bot,
                 genes=[g],
                 x_max=df.x_pixel.max(),
@@ -476,7 +476,7 @@ def compute_divergence_embedded(
         return distance_, signal
 
 
-def compute_embedding_vectors(subset_df, signal_mask, factor):
+def _compute_embedding_vectors(subset_df, signal_mask, factor):
     # for i,g in tqdm.tqdm(enumerate(genes),total=len(genes)):
 
     if len(subset_df) < 2:
@@ -503,7 +503,7 @@ def compute_embedding_vectors(subset_df, signal_mask, factor):
     return signal_top, signal_bottom
 
 
-def compute_divergence_patched(
+def _compute_divergence_patched(
     df,
     gene_list,
     pca_component_matrix,
@@ -573,11 +573,11 @@ def compute_divergence_patched(
                 # df_gene_grouped = df_gene_grouped[df_gene_grouped.apply(lambda x: x.shape[0]>0)]
 
                 with ThreadPoolExecutor(max_workers=n_workers) as executor:
-                    # compute_embedding_vectors(df_gene_grouped.loc[gene_list[0]],patch_signal_mask,pca_component_matrix[:,0])
+                    # _compute_embedding_vectors(df_gene_grouped.loc[gene_list[0]],patch_signal_mask,pca_component_matrix[:,0])
                     # return cosine_similarity, signal
                     fs = {
                         executor.submit(
-                            compute_embedding_vectors,
+                            _compute_embedding_vectors,
                             df_gene_grouped.loc[gene],
                             patch_signal_mask,
                             pca_component_matrix[:, i],

@@ -8,19 +8,19 @@ from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 import warnings
 
-from .ssam2 import ssam
-from .utils import (
-    compute_divergence_patched,
-    create_histogram,
-    create_knn_graph,
-    determine_localmax,
-    fill_color_axes,
-    get_kl_divergence,
-    get_knn_expression,
-    get_spatial_subsample_mask,
-    min_to_max,
-    plot_embeddings,
-    transform_embeddings,
+from ._ssam2 import _ssam
+from ._utils import (
+    _compute_divergence_patched,
+    _create_histogram,
+    _create_knn_graph,
+    _determine_localmax,
+    _fill_color_axes,
+    _get_kl_divergence,
+    _get_knn_expression,
+    _get_spatial_subsample_mask,
+    _min_to_max,
+    _transform_embeddings,
+    _plot_embeddings,
 )
 
 # This is a package to detect overlapping cells in a 2d spatial transcriptomics sample.
@@ -114,7 +114,7 @@ def assign_z_mean_message_passing(df, z_column="z", delim_column="z_delim", roun
     )
 
     with warnings.catch_warnings():
-        warnings.simplefilter("always")
+        warnings.simplefilter("ignore", category=RuntimeWarning)
         for r in range(rounds):
             elevation_map_ = (
                 np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=0)], axis=0) / 4
@@ -214,8 +214,6 @@ def get_expression_vectors_at_rois(
 
     expressions = pd.DataFrame(index=genes, columns=rois_n_pixel, dtype=float)
     expressions[:] = 0
-
-    # print(expressions)
 
     for gene in genes:
         hist = create_histogram(
@@ -585,7 +583,48 @@ def determine_celltype_class_assignments(expression_samples, signature_matrix):
 
 
 class Visualizer:
-    """"""
+    """
+    A class to visualize spatial transcriptomics data.
+    Contains a latent gene expression UMAP and RGB embedding.
+    Parameters
+    ----------
+    KDE_bandwidth : float, optional
+        The bandwidth of the KDE. Default is 1.5.
+    celltyping_min_expression : int, optional
+        Minimum expression level for cell typing. Default is 10.
+    celltyping_min_distance : int, optional
+        Minimum distance for cell typing. Default is 5.
+    n_components_pca : float, optional
+        Number of components for PCA. Default is 0.7.
+    umap_kwargs : dict, optional
+        Keyword arguments for 2D UMAP embedding. Default is {"n_components": 2, "min_dist": 0.0, "n_neighbors": 20, "random_state": None}.
+    cumap_kwargs : dict, optional
+        Keyword arguments for 3D UMAP embedding. Default is {"n_components": 3, "min_dist": 0.001, "n_neighbors": 50, "random_state": None}.
+    Methods
+    -------
+    fit_ssam(coordinate_df=None, adata=None, genes=None, gene_key="gene", coordinates_key="spatial", signature_matrix=None, n_workers=32)
+        Fits the visualizer to a spatial transcriptomics dataset using the SSAM algorithm.
+    fit_signatures(signature_matrix=None)
+        Fits the visualizer with a given signature matrix.
+    subsample_df(x, y, coordinate_df=None, window_size=30)
+        Subsamples the coordinate dataframe based on given x, y coordinates and window size.
+    transform(coordinate_df)
+        Transforms the coordinate dataframe to the embedding space.
+    roi_df()
+        Returns a pandas DataFrame containing the gene-count matrix of the fitted tissue's determined pseudo-cells.
+    linear_transform(x, y, coordinate_df=None, window_size=30)
+        Performs a linear transformation on the coordinate dataframe based on given x, y coordinates and window size.
+    plot_instance(subsample, subsample_embedding, subsample_embedding_color, x, y, window_size=30, rasterized=True)
+        Plots an instance of the visualized data.
+    plot_umap(display_text=True, ax=None, rasterized=False, **kwargs)
+        Plots the UMAP embedding.
+    plot_tissue(rasterized=False, **kwargs)
+        Plots the tissue embedding.
+    plot_fit(rasterized=True)
+        Plots the fitted model.
+    save(path)
+        Stores the visualizer and its attributes in an h5ad file.
+    """
 
     def __init__(
         self,
@@ -635,98 +674,98 @@ class Visualizer:
         self.coherence_map = None
         self.signal_map = None
 
-    def fit(
-        self,
-        coordinate_df=None,
-        adata=None,
-        genes=None,
-        gene_key="gene",
-        coordinates_key="spatial",
-        signature_matrix=None,
-    ):
-        """ """
+    # def fit(
+    #     self,
+    #     coordinate_df=None,
+    #     adata=None,
+    #     genes=None,
+    #     gene_key="gene",
+    #     coordinates_key="spatial",
+    #     signature_matrix=None,
+    # ):
+    #     """ """
 
-        if (coordinate_df is None) and (adata is None):
-            raise ValueError("Either adata or coordinate_df must be provided.")
+    #     if (coordinate_df is None) and (adata is None):
+    #         raise ValueError("Either adata or coordinate_df must be provided.")
 
-        if coordinate_df is None:
-            coordinate_df = adata.uns[coordinates_key]
+    #     if coordinate_df is None:
+    #         coordinate_df = adata.uns[coordinates_key]
 
-        if genes is None:
-            genes = sorted(coordinate_df[gene_key].unique())
+    #     if genes is None:
+    #         genes = sorted(coordinate_df[gene_key].unique())
 
-        self.genes = genes
+    #     self.genes = genes
 
-        if signature_matrix is None:
-            signature_matrix = pd.DataFrame(
-                np.eye(len(genes)), index=genes, columns=genes
-            ).astype(float)
-            signature_matrix[:] = np.eye(len(genes))
+    #     if signature_matrix is None:
+    #         signature_matrix = pd.DataFrame(
+    #             np.eye(len(genes)), index=genes, columns=genes
+    #         ).astype(float)
+    #         signature_matrix[:] = np.eye(len(genes))
 
-        self.signatures = signature_matrix
+    #     self.signatures = signature_matrix
 
-        self.rois_celltyping_x, self.rois_celltyping_y = get_rois(
-            coordinate_df,
-            genes=genes,
-            min_distance=self.celltyping_min_distance,
-            KDE_bandwidth=self.KDE_bandwidth,
-            min_expression=self.celltyping_min_expression,
-        )
+    #     self.rois_celltyping_x, self.rois_celltyping_y = get_rois(
+    #         coordinate_df,
+    #         genes=genes,
+    #         min_distance=self.celltyping_min_distance,
+    #         KDE_bandwidth=self.KDE_bandwidth,
+    #         min_expression=self.celltyping_min_expression,
+    #     )
 
-        self.localmax_celltyping_samples = get_expression_vectors_at_rois(
-            coordinate_df, self.rois_celltyping_x, self.rois_celltyping_y, genes
-        )
+    #     self.localmax_celltyping_samples = get_expression_vectors_at_rois(
+    #         coordinate_df, self.rois_celltyping_x, self.rois_celltyping_y, genes
+    #     )
 
-        self.localmax_celltyping_samples = (
-            self.localmax_celltyping_samples
-            / (self.localmax_celltyping_samples.to_numpy() ** 2).sum(0, keepdims=True)
-            ** 0.5
-        )
+    #     self.localmax_celltyping_samples = (
+    #         self.localmax_celltyping_samples
+    #         / (self.localmax_celltyping_samples.to_numpy() ** 2).sum(0, keepdims=True)
+    #         ** 0.5
+    #     )
 
-        self.pca_2d = PCA(
-            n_components=min(
-                self.n_components_pca, self.localmax_celltyping_samples.shape[0] // 2
-            )
-        )
-        factors = self.pca_2d.fit_transform(self.localmax_celltyping_samples.T)
-        print(f"Modeling {factors.shape[0]} pseudo-celltypes")
+    #     self.pca_2d = PCA(
+    #         n_components=min(
+    #             self.n_components_pca, self.localmax_celltyping_samples.shape[0] // 2
+    #         )
+    #     )
+    #     factors = self.pca_2d.fit_transform(self.localmax_celltyping_samples.T)
+    #     print(f"Modeling {factors.shape[0]} pseudo-celltypes")
 
-        # init=np.concatenate([self.embedding,0.01*np.random.normal(size=(self.embedding.shape[0],1))],axis=1))
-        # embedding_color = embedder_3d.fit_transform(factors)
+    #     # init=np.concatenate([self.embedding,0.01*np.random.normal(size=(self.embedding.shape[0],1))],axis=1))
+    #     # embedding_color = embedder_3d.fit_transform(factors)
 
-        self.embedder_2d = umap.UMAP(**self.umap_kwargs)
-        self.embedding = self.embedder_2d.fit_transform(factors)
+    #     self.embedder_2d = umap.UMAP(**self.umap_kwargs)
+    #     self.embedding = self.embedder_2d.fit_transform(factors)
 
-        self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-        # metric=discounted_euclidean_grad, metric_kwds={'discount':0.5},
-        # metric=discounted_euclidean_grad, output_metric_kwds={'discount':1.0})
+    #     self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
+    #     # metric=discounted_euclidean_grad, metric_kwds={'discount':0.5},
+    #     # metric=discounted_euclidean_grad, output_metric_kwds={'discount':1.0})
 
-        embedding_color = self.embedder_3d.fit_transform(
-            factors
-        )  # np.tile(self.embedding,[1,2]))
+    #     embedding_color = self.embedder_3d.fit_transform(
+    #         factors
+    #     )  # np.tile(self.embedding,[1,2]))
 
-        embedding_color, self.pca_3d = fill_color_axes(embedding_color)
+    #     embedding_color, self.pca_3d = fill_color_axes(embedding_color)
 
-        color_min = embedding_color.min(0)
-        color_max = embedding_color.max(0)
+    #     color_min = embedding_color.min(0)
+    #     color_max = embedding_color.max(0)
 
-        self.colors = min_to_max(embedding_color.copy())
-        self.colors_min_max = [color_min, color_max]
+    #     self.colors = min_to_max(embedding_color.copy())
+    #     self.colors_min_max = [color_min, color_max]
 
-        self.fit_signatures(signature_matrix)
+    #     self.fit_signatures(signature_matrix)
 
-        gene_assignments = determine_celltype_class_assignments(
-            self.localmax_celltyping_samples,
-            pd.DataFrame(np.eye(len(genes)), index=genes, columns=genes).astype(float),
-        )
+    #     gene_assignments = determine_celltype_class_assignments(
+    #         self.localmax_celltyping_samples,
+    #         pd.DataFrame(np.eye(len(genes)), index=genes, columns=genes).astype(float),
+    #     )
 
-        # # determine the center of gravity of each celltype in the embedding:
-        self.gene_centers = np.array(
-            [
-                np.median(self.embedding[gene_assignments == i, :], axis=0)
-                for i in range(len(self.genes))
-            ]
-        )
+    #     # # determine the center of gravity of each celltype in the embedding:
+    #     self.gene_centers = np.array(
+    #         [
+    #             np.median(self.embedding[gene_assignments == i, :], axis=0)
+    #             for i in range(len(self.genes))
+    #         ]
+    #     )
 
     def fit_ssam(
         self,
@@ -738,7 +777,25 @@ class Visualizer:
         signature_matrix=None,
         n_workers=32,
     ):
-        """ """
+        """
+        Fits the visualizer to a spatial transcripts dataset using the SSAM algorithm.
+        Parameters
+        ----------
+        coordinate_df : pd.DataFrame
+            A dataframe of coordinates.
+        adata : anndata.AnnData
+            An AnnData object containing the coordinates.
+        genes : list
+            A list of genes to utilize in the model. None uses all genes.
+        gene_key : str
+            The key in the dataframe containing the gene names.
+        coordinates_key : str
+            The key in the dataframe containing the coordinates.
+        signature_matrix : pd.DataFrame
+            A matrix of celltypes x gene signatures to use to annotate the UMAP. None defaults to displaying individual genes.
+        n_workers : int
+            The number of workers to use in the SSAM algorithm
+        """
 
         if (coordinate_df is None) and (adata is None):
             raise ValueError("Either adata or coordinate_df must be provided.")
@@ -759,7 +816,7 @@ class Visualizer:
 
         self.signatures = signature_matrix
 
-        adata_ssam = ssam.sample_expression(
+        adata_ssam = _ssam._sample_expression(
             coordinate_df,
             gene_column=gene_key,
             minimum_expression=self.celltyping_min_expression,
@@ -885,7 +942,9 @@ class Visualizer:
         return subsample_embedding, subsample_embedding_color
 
     def roi_df(self):
-        """ """
+        """
+        Returns a pandas data frame containing the gene-count matrix of the fitted tissue's determined pseudo-cells.       
+        """
         roi_df = pd.DataFrame(
             {"x": self.rois_celltyping_x, "y": self.rois_celltyping_y}
         )
@@ -969,7 +1028,7 @@ class Visualizer:
         )
                 
         ax2.set_axis_off()
-        # plot_embeddings(subsample_embedding,subsample_embedding_color,self.celltype_centers,celltypes,rasterized=rasterized)
+        # _plot_embeddings(subsample_embedding,subsample_embedding_color,self.celltype_centers,celltypes,rasterized=rasterized)
         ax2.set_title("UMAP")
 
         ax = fig.add_subplot(gs[0, 1], label="celltype_map")
@@ -1053,7 +1112,7 @@ class Visualizer:
 
     def plot_umap(self, display_text=True, ax=None, rasterized=False, **kwargs):
         """ """
-        plot_embeddings(
+        _plot_embeddings(
             self.embedding,
             self.colors,
             self.celltype_centers,
@@ -1255,7 +1314,7 @@ def compute_coherence_map(
     n_expected_celltypes=None,
     cell_diameter=10,
     # KDE_bandwidth=2,
-    min_expression=2,
+    min_expression=0.5,
     # min_distance=8,
     # n_components_pca=0.7,
     return_visualizer=True,
@@ -1294,14 +1353,14 @@ def compute_coherence_map(
     """
 
     KDE_bandwidth = cell_diameter/4
-    min_distance = cell_diameter
+    min_distance = cell_diameter*0.5
 
     if n_expected_celltypes is None:
-        n_expected_celltypes = 0.8
+        n_expected_celltypes = 0.  
 
-    print("")
+    print("Running vertical adjustment")
     assign_xy(df)
-    assign_z_mean_message_passing(df, rounds=40)
+    assign_z_mean_message_passing(df, rounds=4)
 
     vis = Visualizer(
         KDE_bandwidth=KDE_bandwidth,
