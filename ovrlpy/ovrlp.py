@@ -705,7 +705,7 @@ class Visualizer:
             "random_state": None,
         },
     ) -> None:
-        """ """
+        # TODO: document attributes
         self.KDE_bandwidth = KDE_bandwidth
 
         self.celltyping_min_expression = celltyping_min_expression
