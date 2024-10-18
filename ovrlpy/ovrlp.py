@@ -9,7 +9,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 
-from ._ssam2 import _ssam
+from ._ssam2 import sample_expression
 from ._utils import (
     _compute_divergence_patched,
     _create_histogram,
@@ -821,7 +821,7 @@ class Visualizer:
 
         self.signatures = signature_matrix
 
-        adata_ssam = _ssam.sample_expression(
+        adata_ssam = sample_expression(
             coordinate_df,
             gene_column=gene_key,
             minimum_expression=self.celltyping_min_expression,

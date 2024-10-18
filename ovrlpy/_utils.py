@@ -11,7 +11,7 @@ from scipy.ndimage import gaussian_filter, maximum_filter
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
-from ._ssam2 import _utils as ssam_utils
+from ._ssam2 import kde_2d
 
 
 def _draw_outline(ax, artist, lw=2, color="black"):
@@ -488,14 +488,12 @@ def _compute_embedding_vectors(subset_df, signal_mask, factor):
     if len(subset_top) == 0:
         signal_top = 0
     else:
-        signal_top = ssam_utils.kde_2d(subset_top[:, :2], size=signal_mask.shape)[
-            signal_mask
-        ]
+        signal_top = kde_2d(subset_top[:, :2], size=signal_mask.shape)[signal_mask]
         signal_top = signal_top[:, None] * factor[None]
     if len(subset_bottom) == 0:
         signal_bottom = 0
     else:
-        signal_bottom = ssam_utils.kde_2d(subset_bottom[:, :2], size=signal_mask.shape)[
+        signal_bottom = kde_2d(subset_bottom[:, :2], size=signal_mask.shape)[
             signal_mask
         ]
         signal_bottom = signal_bottom[:, None] * factor[None]
@@ -515,7 +513,7 @@ def _compute_divergence_patched(
 ):
     n_components = pca_component_matrix.shape[0]
 
-    signal = ssam_utils.kde_2d(df[["x", "y"]].values)
+    signal = kde_2d(df[["x", "y"]].values)
 
     cosine_similarity = np.zeros_like(signal)
 
@@ -551,7 +549,7 @@ def _compute_divergence_patched(
                     pbar.update(1)
                     continue
 
-                patch_signal = ssam_utils.kde_2d(patch_df[["x", "y"]].values)
+                patch_signal = kde_2d(patch_df[["x", "y"]].values)
 
                 patch_signal_mask = patch_signal > min_expression
 
