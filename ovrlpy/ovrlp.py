@@ -6,6 +6,7 @@ import umap
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
+import warnings
 
 from .ssam2 import ssam
 from .utils import (
@@ -112,21 +113,23 @@ def assign_z_mean_message_passing(df, z_column="z", delim_column="z_delim", roun
         pixel_coordinate_df[delim_column]
     )
 
-    for r in range(rounds):
-        elevation_map_ = (
-            np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=0)], axis=0) / 4
-        )
-        elevation_map_ += (
-            np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=1)], axis=0) / 4
-        )
-        elevation_map_ += (
-            np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=0)], axis=0) / 4
-        )
-        elevation_map_ += (
-            np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=1)], axis=0) / 4
-        )
+    with warnings.catch_warnings():
+        warnings.simplefilter("always")
+        for r in range(rounds):
+            elevation_map_ = (
+                np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=0)], axis=0) / 4
+            )
+            elevation_map_ += (
+                np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=1)], axis=0) / 4
+            )
+            elevation_map_ += (
+                np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=0)], axis=0) / 4
+            )
+            elevation_map_ += (
+                np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=1)], axis=0) / 4
+            )
 
-        elevation_map = elevation_map_
+            elevation_map = elevation_map_
 
     df[delim_column] = elevation_map[df.x_pixel, df.y_pixel]
 
@@ -491,12 +494,12 @@ def plot_signal_integrity(
         img = ax[0].imshow(
             integrity,
             cmap=cmap,
-            alpha=((signal / signal_threshold).clip(0, 1)),
+            alpha=((signal / signal_threshold).clip(0, 1)**2),
             vmin=0,
             vmax=1,
         )
         ax[0].invert_yaxis()
-        ax[0].set_axis_off()
+        ax[0].spines[["top", "right"]].set_visible(False)
 
         if plot_hist:
             vals, bins = np.histogram(
@@ -514,6 +517,7 @@ def plot_signal_integrity(
             ax[1].invert_xaxis()
             ax[1].yaxis.tick_right()
             ax[1].spines[["top", "bottom", "left"]].set_visible(False)
+            ax[1].set_ylabel("signal integrity")
 
         else:
             fig.colorbar(img)
@@ -685,6 +689,7 @@ class Visualizer:
             )
         )
         factors = self.pca_2d.fit_transform(self.localmax_celltyping_samples.T)
+        print(f"Modeling {factors.shape[0]} pseudo-celltypes")
 
         # init=np.concatenate([self.embedding,0.01*np.random.normal(size=(self.embedding.shape[0],1))],axis=1))
         # embedding_color = embedder_3d.fit_transform(factors)
@@ -754,7 +759,6 @@ class Visualizer:
 
         self.signatures = signature_matrix
 
-        print(dir(ssam))
         adata_ssam = ssam.sample_expression(
             coordinate_df,
             gene_column=gene_key,
@@ -769,14 +773,6 @@ class Visualizer:
         self.localmax_celltyping_samples = pd.DataFrame(
             adata_ssam.X.T, columns=adata_ssam.obs_names, index=adata_ssam.var_names
         )
-
-        # self.rois_celltyping_x,self.rois_celltyping_y = get_rois(coordinate_df, genes = genes, min_distance=self.celltyping_min_distance,
-        #                     KDE_bandwidth=self.KDE_bandwidth, min_expression=self.celltyping_min_expression,)
-
-        # self.localmax_celltyping_samples =  get_expression_vectors_at_rois(coordinate_df,self.rois_celltyping_x,self.rois_celltyping_y,genes,)
-
-        # self.localmax_celltyping_samples = self.localmax_celltyping_samples/(self.localmax_celltyping_samples.to_numpy()**2).sum(0,keepdims=True)**0.5
-
         self.pca_2d = PCA(
             n_components=min(
                 self.n_components_pca, self.localmax_celltyping_samples.shape[0] // 2
@@ -784,19 +780,14 @@ class Visualizer:
         )
         factors = self.pca_2d.fit_transform(self.localmax_celltyping_samples.T)
 
-        # init=np.concatenate([self.embedding,0.01*np.random.normal(size=(self.embedding.shape[0],1))],axis=1))
-        # embedding_color = embedder_3d.fit_transform(factors)
-
         self.embedder_2d = umap.UMAP(**self.umap_kwargs)
         self.embedding = self.embedder_2d.fit_transform(factors)
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-        # metric=discounted_euclidean_grad, metric_kwds={'discount':0.5},
-        # metric=discounted_euclidean_grad, output_metric_kwds={'discount':1.0})
 
         embedding_color = self.embedder_3d.fit_transform(
             factors
-        )  # np.tile(self.embedding,[1,2]))
+        )  
 
         embedding_color, self.pca_3d = fill_color_axes(embedding_color)
 
@@ -862,11 +853,6 @@ class Visualizer:
 
         genes = self.genes
 
-        # celltypes = self.signatures.columns
-
-        # subsample_mask = get_spatial_subsample_mask(coordinate_df,x,y,plot_window_size=window_size)
-        # subsample = coordinate_df[subsample_mask]
-
         subsample = coordinate_df
 
         distances, neighbor_indices = create_knn_graph(
@@ -887,7 +873,6 @@ class Visualizer:
             embedder_3d=self.embedder_3d,
             colors_min_max=self.colors_min_max,
         )
-        # subsample_embedding_color = np.nan_to_num(subsample_embedding_color)
         subsample_embedding_color, _ = fill_color_axes(
             subsample_embedding_color, self.pca_3d
         )
@@ -964,7 +949,7 @@ class Visualizer:
             subsample.z,
             c=subsample_embedding_color,
             marker=".",
-            alpha=0.1,
+            alpha=0.5,
             rasterized=rasterized,
         )
         ax1.set_zlim(
@@ -982,13 +967,17 @@ class Visualizer:
             s=1,
             rasterized=rasterized,
         )
+                
         ax2.set_axis_off()
         # plot_embeddings(subsample_embedding,subsample_embedding_color,self.celltype_centers,celltypes,rasterized=rasterized)
         ax2.set_title("UMAP")
 
         ax = fig.add_subplot(gs[0, 1], label="celltype_map")
-        self.plot_tissue(rasterized=rasterized)
+        self.plot_tissue(rasterized=rasterized,s=1)
         ax.set_yticks([], [])
+                
+        artist = plt.Rectangle((x - window_size, y - window_size), 2 * window_size, 2 * window_size, fill=False, edgecolor='k', linewidth=2)
+        ax.add_artist(artist)
 
         ax.set_title("celltype map")
 
@@ -1042,7 +1031,7 @@ class Visualizer:
             subsample.z[halving_mask],
             c=subsample_embedding_color[halving_mask],
             s=10,
-            alpha=0.1,
+            alpha=0.5,
             rasterized=rasterized,
         )
         ax5.set_aspect("equal", adjustable="box")
@@ -1056,7 +1045,7 @@ class Visualizer:
             subsample.z[halving_mask],
             c=subsample_embedding_color[halving_mask],
             s=10,
-            alpha=0.1,
+            alpha=0.5,
             rasterized=rasterized,
         )
         ax4.set_aspect("equal", adjustable="box")
@@ -1094,10 +1083,10 @@ class Visualizer:
         plt.figure(figsize=(15, 7))
 
         plt.subplot(121)
-        self.plot_umap(rasterized=rasterized)
+        self.plot_umap(rasterized=rasterized,**{'scatter_kwargs':{'s':1}})
 
         plt.subplot(122)
-        self.plot_tissue(rasterized=rasterized)
+        self.plot_tissue(rasterized=rasterized,**{'s':1})
 
     def save(self, path):
         """Stores the visualizer and its attributes in an h5ad file.
@@ -1263,10 +1252,12 @@ def load_visualizer(path):
 
 def compute_coherence_map(
     df,
-    KDE_bandwidth=2,
+    n_expected_celltypes=None,
+    cell_diameter=10,
+    # KDE_bandwidth=2,
     min_expression=2,
-    min_distance=8,
-    n_components_pca=0.7,
+    # min_distance=8,
+    # n_components_pca=0.7,
     return_visualizer=True,
     signature_matrix=None,
     metric="cosine_similarity",
@@ -1302,9 +1293,13 @@ def compute_coherence_map(
 
     """
 
-    if min_distance is None:
-        min_distance = KDE_bandwidth * 3
+    KDE_bandwidth = cell_diameter/4
+    min_distance = cell_diameter
 
+    if n_expected_celltypes is None:
+        n_expected_celltypes = 0.8
+
+    print("")
     assign_xy(df)
     assign_z_mean_message_passing(df, rounds=40)
 
@@ -1312,7 +1307,7 @@ def compute_coherence_map(
         KDE_bandwidth=KDE_bandwidth,
         celltyping_min_expression=min_expression,
         celltyping_min_distance=min_distance,
-        n_components_pca=n_components_pca,
+        n_components_pca=n_expected_celltypes,
         umap_kwargs=umap_kwargs,
         cumap_kwargs=cumap_kwargs,
     )

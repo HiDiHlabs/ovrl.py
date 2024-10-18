@@ -120,7 +120,7 @@ def _sample_expression_nd(
     # lower resolution instead of increasing bandwidth!
     coordinate_dataframe_[coord_columns] /= kde_bandwidth
 
-    print("determining local maxima:")
+    print("determining pseudocells:")
     bounds = [
         (
             int(np.min(coordinate_dataframe_[c])),
@@ -129,18 +129,19 @@ def _sample_expression_nd(
         for c in coord_columns
     ]
 
-    print(bounds)
+    print(f"Searching within x:{bounds[0]}, y:{bounds[1]}, n_molecules:{len(coordinate_dataframe_)}")
+    print(f"Using bandwidth: {kde_bandwidth}, min_expression: {minimum_expression}, min_pixel_distance: {min_pixel_distance}")
     # perform a global KDE to determine local maxima:
     vector_field_norm = utils._kde_nd(
         coordinate_dataframe_[coord_columns].values, bandwidth=1.1
     )
     local_maximum_coordinates = utils.find_local_maxima(
         vector_field_norm,
-        min_pixel_distance=min_pixel_distance,
+        min_pixel_distance=1+int(min_pixel_distance/kde_bandwidth),
         min_expression=minimum_expression,
     )
 
-    print("found", len(local_maximum_coordinates), "local maxima")
+    print("found", len(local_maximum_coordinates), "pseudocells")
 
     size = vector_field_norm.shape
 
