@@ -28,6 +28,19 @@ from ._utils import (
     _transform_embeddings,
 )
 
+_BIH_CMAP = LinearSegmentedColormap.from_list(
+    "BIH",
+    [
+        "#430541",
+        "mediumvioletred",
+        "violet",
+        "powderblue",
+        "powderblue",
+        "white",
+        "white",
+    ][::-1],
+)
+
 
 def _assign_xy(
     df: pd.DataFrame, xy_columns: Collection[str] = ["x", "y"], grid_size: int = 1
@@ -545,18 +558,7 @@ def plot_signal_integrity(
 
     with plt.style.context("dark_background"):
         if cmap == "BIH":
-            cmap = LinearSegmentedColormap.from_list(
-                "BIH",
-                [
-                    "#430541",
-                    "mediumvioletred",
-                    "violet",
-                    "powderblue",
-                    "powderblue",
-                    "white",
-                    "white",
-                ][::-1],
-            )
+            cmap = _BIH_CMAP
 
         if plot_hist:
             fig, ax = plt.subplots(
