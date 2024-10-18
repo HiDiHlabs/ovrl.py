@@ -23,7 +23,7 @@ Citation
 
 If you are using `ovrlpy` for your research please cite 
 
-Publication 
+ 
 
 
 .. toctree::
