@@ -821,7 +821,7 @@ class Visualizer:
 
         self.signatures = signature_matrix
 
-        adata_ssam = _ssam._sample_expression(
+        adata_ssam = _ssam.sample_expression(
             coordinate_df,
             gene_column=gene_key,
             minimum_expression=self.celltyping_min_expression,
