@@ -1,9 +1,9 @@
 Ovrlpy 
 ==========================
-ovrlpy is a python tool to investigate cell overlaps in imaging-based spatial transcriptomics data.
+**ovrlpy** is a python tool to investigate cell overlaps in imaging-based spatial transcriptomics data.
 
 Introduction
-------------
+"""""""""
 In spatial biology, tissue slices are commonly used to study the spatial distribution of cells and molecules. However, since these slices represent 3D structures in 2D, overlapping structures in the vertical dimension can lead to artefacts and inconsistencies in the data.
 
 **ovrlpy** is a quality-control tool for spatial transcriptomics data that can help analysts find sources of vertical signal inconsistency in their data.
