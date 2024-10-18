@@ -6,7 +6,7 @@ from skimage import measure
 from skimage.feature import peak_local_max
 
 
-def kde_2d(coordinates, name=None, size=None, bandwidth=1.5):
+def kde_2d(coordinates, size=None, bandwidth=1.5):
     """
     Create a histogram of the data.
     """
