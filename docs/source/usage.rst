@@ -6,7 +6,8 @@ Quickstart
 
 This quickstart guide will walk you through the basic steps of using **ovrlpy** to create a signal integrity map from a imaging-based spatial transcriptomics dataset. Follow the steps below to get started.
 
-### 1. Set Up Parameters and Load Your Data
+1. Set Up Parameters and Load Your Data
+"""""""""
 
 Start by defining the key parameters for the analysis and loading your spatial transcriptomics data.
 
@@ -27,7 +28,8 @@ Start by defining the key parameters for the analysis and loading your spatial t
 
 In this step, we load the dataset and configure the model parameters, such as `kde_bandwidth` (to control smoothness) and `n_expected_celltypes` (to set the expected number of cell types).
 
-### 2. Fit the ovrlpy Model
+2. Fit the ovrlpy Model
+"""""""""
 
 Fit the **ovrlpy** model to generate the signal integrity map.
 
@@ -47,7 +49,8 @@ This function generates:
 - **signal**: The signal map representing the strength of spatial signals.
 - **visualizer**: A visualizer object that helps to plot and explore the results.
 
-### 3. Visualize the Model Fit
+3. Visualize the Model Fit
+"""""""""
 
 Once the model is fitted, you can visualize how well it matches your spatial data.
 
@@ -58,7 +61,8 @@ Once the model is fitted, you can visualize how well it matches your spatial dat
 
 This plot gives you a visual representation of the models fit to the spatial transcriptomics data.
 
-### 4. Plot the Signal Integrity Map
+4. Plot the Signal Integrity Map
+"""""""""
 
 Now, plot the signal integrity map using a threshold to highlight areas with strong signal coherence.
 
@@ -68,7 +72,8 @@ Now, plot the signal integrity map using a threshold to highlight areas with str
    fig, ax = ovrlp.plot_signal_integrity(integrity, signal, signal_threshold=4.0)
 
 
-### 5. Detect and Visualize Overlaps (Doublets)
+5. Detect and Visualize Overlaps (Doublets)
+"""""""""
 
 Identify overlapping signals (doublets) in the tissue and visualize them.
 
@@ -87,7 +92,8 @@ Identify overlapping signals (doublets) in the tissue and visualize them.
    # Display the detected doublets
    doublet_df.head()
 
-### 6. 3D Visualization of a Doublet Event
+6. 3D Visualization of a Doublet Event
+"""""""""
 
 Visualize a specific overlap event (doublet) in 3D to see how it looks in the tissue.
 
