@@ -516,6 +516,7 @@ def plot_signal_integrity(
             ax[1].yaxis.tick_right()
             ax[1].spines[["top", "bottom", "left"]].set_visible(False)
             ax[1].set_ylabel("signal integrity")
+            ax[1].yaxis.set_label_position("right")
 
         else:
             fig.colorbar(img)
@@ -837,7 +838,7 @@ class Visualizer:
         )
         factors = self.pca_2d.fit_transform(self.localmax_celltyping_samples.T)
         
-        print(f"Modeling {factors.shape[0]} pseudo-celltypes")
+        print(f"Modeling {factors.shape[1]} pseudo-celltype clusters")
 
         self.embedder_2d = umap.UMAP(**self.umap_kwargs)
         self.embedding = self.embedder_2d.fit_transform(factors)
@@ -866,8 +867,8 @@ class Visualizer:
         # # determine the center of gravity of each celltype in the embedding:
         self.gene_centers = np.array(
             [
-                np.median(self.embedding[gene_assignments == i, :], axis=0)
-                for i in range(len(self.genes))
+                np.median(self.embedding[gene_assignments == i, :], axis=0) if (gene_assignments == i).sum() > 0 else (np.nan,np.nan)
+                for i in range(len(self.genes)) 
             ]
         )
 
@@ -1316,7 +1317,7 @@ def compute_coherence_map(
     n_expected_celltypes=None,
     cell_diameter=10,
     # KDE_bandwidth=2,
-    min_expression=0.5,
+    min_expression=1,
     # min_distance=8,
     # n_components_pca=0.7,
     return_visualizer=True,
@@ -1354,8 +1355,8 @@ def compute_coherence_map(
 
     """
 
-    KDE_bandwidth = cell_diameter/4
-    min_distance = cell_diameter*0.7
+    KDE_bandwidth = cell_diameter/5
+    min_distance = cell_diameter*0.9
 
     if n_expected_celltypes is None:
         n_expected_celltypes = 0.8  

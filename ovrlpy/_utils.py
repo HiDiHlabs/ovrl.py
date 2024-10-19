@@ -200,14 +200,15 @@ def _plot_embeddings(
 
     text_artists = []
     for i in range(len(celltypes)):
-        t = ax.text(
-            np.nan_to_num((celltype_centers[i, 0])),
-            np.nan_to_num(celltype_centers[i, 1]),
-            celltypes[i],
-            color="k",
-            fontsize=12,
-        )
-        text_artists.append(t)
+        if not np.isnan(celltype_centers[i, 0]): 
+            t = ax.text(
+                np.nan_to_num((celltype_centers[i, 0])),
+                np.nan_to_num(celltype_centers[i, 1]),
+                celltypes[i],
+                color="k",
+                fontsize=12,
+            )
+            text_artists.append(t)
 
     _untangle_text(text_artists, ax)
 

@@ -61,11 +61,13 @@ def find_local_maxima(vf, min_pixel_distance: int = 5, min_expression: float = 2
     """
     Find local maxima in a vector field.
     """
+    
+    # print(f"Searching local maxima in a vector field with shape {vf.shape} and max value of {vf.max()}. Min pixel distance: {min_pixel_distance}, Min expression: {min_expression}")
     local_maxima = peak_local_max(
         vf,
         min_distance=min_pixel_distance,
         threshold_abs=min_expression,
-        exclude_border=True,
+        exclude_border=False,
     )
 
     return local_maxima
