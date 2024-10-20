@@ -206,4 +206,3 @@ def _sample_expression_nd(
                 pbar.update(1)
 
     return adata_ssam
-

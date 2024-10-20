@@ -13,9 +13,6 @@ from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 
-import warnings
-
-from ._ssam2 import _ssam
 from ._utils import (
     _compute_divergence_patched,
     _create_histogram,
@@ -673,23 +670,23 @@ def _determine_celltype_class_assignments(expression_samples, signature_matrix):
 
 class Visualizer:
     """
-    A class to visualize spatial transcriptomics data.
-    Contains a latent gene expression UMAP and RGB embedding.
+        A class to visualize spatial transcriptomics data.
+        Contains a latent gene expression UMAP and RGB embedding.
 
-Parameters
-    ----------
-    KDE_bandwidth : float, optional
-        The bandwidth of the KDE.
-    celltyping_min_expression : int, optional
-        Minimum expression level for cell typing.
-    celltyping_min_distance : int, optional
-        Minimum distance for cell typing.
-    n_components_pca : float, optional
-        Number of components for PCA.
-    umap_kwargs : dict, optional
-        Keyword arguments for 2D UMAP embedding.
-    cumap_kwargs : dict, optional
-        Keyword arguments for 3D UMAP embedding.
+    Parameters
+        ----------
+        KDE_bandwidth : float, optional
+            The bandwidth of the KDE.
+        celltyping_min_expression : int, optional
+            Minimum expression level for cell typing.
+        celltyping_min_distance : int, optional
+            Minimum distance for cell typing.
+        n_components_pca : float, optional
+            Number of components for PCA.
+        umap_kwargs : dict, optional
+            Keyword arguments for 2D UMAP embedding.
+        cumap_kwargs : dict, optional
+            Keyword arguments for 3D UMAP embedding.
     """
 
     def __init__(
@@ -739,7 +736,6 @@ Parameters
 
         self.coherence_map = None
         self.signal_map = None
-
 
     def fit_ssam(
         self,
@@ -813,7 +809,6 @@ Parameters
         )
         factors = self.pca_2d.fit_transform(self.localmax_celltyping_samples.T)
 
-        
         print(f"Modeling {factors.shape[1]} pseudo-celltype clusters")
 
         self.embedder_2d = umap.UMAP(**self.umap_kwargs)
@@ -821,9 +816,7 @@ Parameters
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
 
-        embedding_color = self.embedder_3d.fit_transform(
-            factors
-        )  
+        embedding_color = self.embedder_3d.fit_transform(factors)
 
         embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
@@ -843,8 +836,10 @@ Parameters
         # determine the center of gravity of each celltype in the embedding:
         self.gene_centers = np.array(
             [
-                np.median(self.embedding[gene_assignments == i, :], axis=0) if (gene_assignments == i).sum() > 0 else (np.nan,np.nan)
-                for i in range(len(self.genes)) 
+                np.median(self.embedding[gene_assignments == i, :], axis=0)
+                if (gene_assignments == i).sum() > 0
+                else (np.nan, np.nan)
+                for i in range(len(self.genes))
             ]
         )
 
@@ -1081,10 +1076,17 @@ Parameters
 
         ax = fig.add_subplot(gs[0, 1], label="celltype_map")
         self.plot_tissue(rasterized=rasterized, s=1)
-        
+
         ax.set_yticks([], [])
-                
-        artist = plt.Rectangle((x - window_size, y - window_size), 2 * window_size, 2 * window_size, fill=False, edgecolor='k', linewidth=2)
+
+        artist = plt.Rectangle(
+            (x - window_size, y - window_size),
+            2 * window_size,
+            2 * window_size,
+            fill=False,
+            edgecolor="k",
+            linewidth=2,
+        )
         ax.add_artist(artist)
 
         artist = plt.Rectangle(

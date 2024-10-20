@@ -14,7 +14,6 @@ from sklearn.neighbors import NearestNeighbors
 from ._ssam2 import kde_2d
 
 
-
 def _draw_outline(ax, artist, lw=2, color="black"):
     _ = artist.set_path_effects(
         [PathEffects.withStroke(linewidth=lw, foreground=color), PathEffects.Normal()]
