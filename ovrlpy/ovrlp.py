@@ -13,7 +13,9 @@ from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 
-from ._ssam2 import sample_expression
+import warnings
+
+from ._ssam2 import _ssam
 from ._utils import (
     _compute_divergence_patched,
     _create_histogram,
@@ -595,6 +597,7 @@ def plot_signal_integrity(
             ax[1].yaxis.tick_right()
             ax[1].spines[["top", "bottom", "left"]].set_visible(False)
             ax[1].set_ylabel("signal integrity")
+            ax[1].yaxis.set_label_position("right")
 
         else:
             fig.colorbar(img)
@@ -673,7 +676,7 @@ class Visualizer:
     A class to visualize spatial transcriptomics data.
     Contains a latent gene expression UMAP and RGB embedding.
 
-    Parameters
+Parameters
     ----------
     KDE_bandwidth : float, optional
         The bandwidth of the KDE.
@@ -736,6 +739,7 @@ class Visualizer:
 
         self.coherence_map = None
         self.signal_map = None
+
 
     def fit_ssam(
         self,
@@ -809,14 +813,17 @@ class Visualizer:
         )
         factors = self.pca_2d.fit_transform(self.localmax_celltyping_samples.T)
 
-        print(f"Modeling {factors.shape[0]} pseudo-celltypes")
+        
+        print(f"Modeling {factors.shape[1]} pseudo-celltype clusters")
 
         self.embedder_2d = umap.UMAP(**self.umap_kwargs)
         self.embedding = self.embedder_2d.fit_transform(factors)
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
 
-        embedding_color = self.embedder_3d.fit_transform(factors)
+        embedding_color = self.embedder_3d.fit_transform(
+            factors
+        )  
 
         embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
@@ -836,8 +843,8 @@ class Visualizer:
         # determine the center of gravity of each celltype in the embedding:
         self.gene_centers = np.array(
             [
-                np.median(self.embedding[gene_assignments == i, :], axis=0)
-                for i in range(len(self.genes))
+                np.median(self.embedding[gene_assignments == i, :], axis=0) if (gene_assignments == i).sum() > 0 else (np.nan,np.nan)
+                for i in range(len(self.genes)) 
             ]
         )
 
@@ -1074,7 +1081,11 @@ class Visualizer:
 
         ax = fig.add_subplot(gs[0, 1], label="celltype_map")
         self.plot_tissue(rasterized=rasterized, s=1)
+        
         ax.set_yticks([], [])
+                
+        artist = plt.Rectangle((x - window_size, y - window_size), 2 * window_size, 2 * window_size, fill=False, edgecolor='k', linewidth=2)
+        ax.add_artist(artist)
 
         artist = plt.Rectangle(
             (x - window_size, y - window_size),

@@ -8,6 +8,7 @@ from skimage.feature import peak_local_max
 
 
 def kde_2d(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
+
     """
     Create a histogram of the data.
     """
@@ -16,6 +17,7 @@ def kde_2d(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
 
 
 def kde_3d(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
+
     """
     Create a histogram of the data.
     """
@@ -24,6 +26,7 @@ def kde_3d(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
 
 
 def _kde_nd(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
+
     """
     Create a histogram of the data.
     """
@@ -68,7 +71,7 @@ def find_local_maxima(
         vf,
         min_distance=min_pixel_distance,
         threshold_abs=min_expression,
-        exclude_border=True,
+        exclude_border=False,
     )
 
     return local_maxima
