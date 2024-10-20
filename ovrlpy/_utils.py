@@ -11,7 +11,7 @@ from scipy.ndimage import gaussian_filter, maximum_filter
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
-from ._ssam2 import _utils as ssam_utils
+from ._ssam2 import kde_2d
 
 
 def _draw_outline(ax, artist, lw=2, color="black"):
@@ -118,9 +118,7 @@ def _fill_color_axes(rgb, dimred=None):
 
     # rotate the ica_facs 45 in all the dimensions:
     # define a 45-degree 3d rotation matrix
-    # (0.500 | 0.500 | -0.707
-    # -0.146 | 0.854 | 0.500
-    # 0.854 | -0.146 | 0.500)
+
     rotation_matrix = np.array(
         [
             [0.500, 0.500, -0.707],
@@ -200,15 +198,14 @@ def _plot_embeddings(
 
     text_artists = []
     for i in range(len(celltypes)):
-        if not np.isnan(celltype_centers[i, 0]): 
-            t = ax.text(
-                np.nan_to_num((celltype_centers[i, 0])),
-                np.nan_to_num(celltype_centers[i, 1]),
-                celltypes[i],
-                color="k",
-                fontsize=12,
-            )
-            text_artists.append(t)
+        t = ax.text(
+            np.nan_to_num((celltype_centers[i, 0])),
+            np.nan_to_num(celltype_centers[i, 1]),
+            celltypes[i],
+            color="k",
+            fontsize=12,
+        )
+        text_artists.append(t)
 
     _untangle_text(text_artists, ax)
 
@@ -489,14 +486,12 @@ def _compute_embedding_vectors(subset_df, signal_mask, factor):
     if len(subset_top) == 0:
         signal_top = 0
     else:
-        signal_top = ssam_utils.kde_2d(subset_top[:, :2], size=signal_mask.shape)[
-            signal_mask
-        ]
+        signal_top = kde_2d(subset_top[:, :2], size=signal_mask.shape)[signal_mask]
         signal_top = signal_top[:, None] * factor[None]
     if len(subset_bottom) == 0:
         signal_bottom = 0
     else:
-        signal_bottom = ssam_utils.kde_2d(subset_bottom[:, :2], size=signal_mask.shape)[
+        signal_bottom = kde_2d(subset_bottom[:, :2], size=signal_mask.shape)[
             signal_mask
         ]
         signal_bottom = signal_bottom[:, None] * factor[None]
@@ -516,7 +511,7 @@ def _compute_divergence_patched(
 ):
     n_components = pca_component_matrix.shape[0]
 
-    signal = ssam_utils.kde_2d(df[["x", "y"]].values)
+    signal = kde_2d(df[["x", "y"]].values)
 
     cosine_similarity = np.zeros_like(signal)
 
@@ -552,7 +547,7 @@ def _compute_divergence_patched(
                     pbar.update(1)
                     continue
 
-                patch_signal = ssam_utils.kde_2d(patch_df[["x", "y"]].values)
+                patch_signal = kde_2d(patch_df[["x", "y"]].values)
 
                 patch_signal_mask = patch_signal > min_expression
 
