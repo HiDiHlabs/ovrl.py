@@ -43,8 +43,8 @@ autoapi_options = [
     "show-module-summary",
     "imported-members",
 ]
+autoapi_own_page_level = "function"
 # autoapi_python_class_content = "both"
-# autoapi_own_page_level = "attribute"
 # autoapi_template_dir = "_templates"
 # autoapi_member_order = "groupwise"
 
