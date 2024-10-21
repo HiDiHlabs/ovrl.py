@@ -1024,13 +1024,13 @@ class Visualizer:
         subsample_embedding_color : Optional[pandas.DataFrame]
             TODO
         x : float
-            TODO
+            Center x-coordinate for the region-of-interest.
         y : float
-            TODO
+            Center y-coordinate for the region-of-interest.
         window_size : float, optional
-            TODO
+            Window size of the region-of-interest.
         rasterized : bool, optional
-            TODO
+            If True all plots will be rasterized.
         """
         vertical_indices = subsample.z.argsort()
         subsample = subsample.sort_values("z")
@@ -1175,7 +1175,7 @@ class Visualizer:
         window_size : int, optional
             TODO
         rasterized : bool, optional
-            TODO
+            If True the plot will be rasterized.
         kwargs
             TODO
         """
@@ -1196,7 +1196,7 @@ class Visualizer:
         Parameters
         ----------
         rasterized : bool, optional
-            TODO
+            If True the plot will be rasterized.
         kwargs
             TODO
         """
@@ -1228,7 +1228,7 @@ class Visualizer:
         Parameters
         ----------
         rasterized : bool, optional
-            TODO
+            If True all plots will be rasterized.
         """
 
         plt.figure(figsize=(15, 7))
