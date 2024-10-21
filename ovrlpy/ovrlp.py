@@ -3,7 +3,7 @@
 import warnings
 from functools import reduce
 from operator import add
-from typing import Collection, Optional, Sequence
+from typing import Optional, Sequence
 
 import anndata
 import matplotlib.pyplot as plt
@@ -15,14 +15,13 @@ from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 
-from ._ssam2 import sample_expression
+from ._ssam2 import _sample_expression
 from ._utils import (
     _compute_divergence_patched,
     _create_histogram,
     _create_knn_graph,
     _determine_localmax,
     _fill_color_axes,
-    _get_kl_divergence,
     _get_knn_expression,
     _get_spatial_subsample_mask,
     _min_to_max,
@@ -117,7 +116,7 @@ def _assign_z_mean_message_passing(
     z_column : str, optional
         The name of the column containing the z-coordinate.
     rounds : int, optional
-        TODO
+        Number of rounds for the message passing algorithm.
 
     Returns
     -------
@@ -189,6 +188,53 @@ def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
     return means
 
 
+def pre_process_coordinates(
+    coordinate_df: pd.DataFrame,
+    grid_size: int = 1,
+    use_message_passing: bool = True,
+    measure: str = "mean",
+    inplace: bool = True,
+) -> pd.DataFrame:
+    """Runs the pre-processing routine of the coordinate dataframe.
+    It assigns x,y coordinate pixels to all molecules in the data frame and determines a z-coordinate-center for each pixel.
+
+    Parameters:
+    -----------
+    coordinate_df (pandas.DataFrame):
+        A dataframe of coordinates.
+    grid_size (int, optional):
+        The size of the pixel grid. Defaults to 1.
+    use_message_passing (bool, optional):
+        Whether to use message passing to determine the z-dimension delimiter. Defaults to True.
+    measure (str, optional):
+        The measure to use to determine the z-dimension delimiter. Defaults to 'mean'. Other option is 'median'.
+    inplace (bool, optional):
+        Whether to modify the input dataframe or return a copy. Defaults to True.
+
+    Returns:
+    --------
+    pandas.DataFrame: A dataframe with added x_pixel, y_pixel and z_delim columns.
+    """
+
+    if not inplace:
+        coordinate_df = coordinate_df.copy()
+
+    _assign_xy(coordinate_df, grid_size=grid_size)
+
+    if use_message_passing:
+        _assign_z_mean_message_passing(coordinate_df)
+
+    else:
+        if measure == "mean":
+            _assign_z_mean(coordinate_df)
+        elif measure == "median":
+            _assign_z_median(coordinate_df)
+        else:
+            raise ValueError("measure must be either 'mean' or 'median'")
+
+    return coordinate_df
+
+
 def get_rois(
     df: pd.DataFrame,
     genes=None,
@@ -203,14 +249,15 @@ def get_rois(
     ----------
     df : pandas.DataFrame
         A dataframe of coordinates.
-    genes : TODO, optional
-        TODO
+    genes : list, optional
+        A list of genes to include in the expression model.
+        Defaults to all genes in the dataframe.
     min_distance : int, optional
         The minimum distance between local maxima.
     KDE_bandwidth : float, optional
-        TODO
+        Bandwidth of the Gaussian smoothing function used during the KDE.
     min_expression : float, optional
-        TODO
+        A minimal expression threshold to report as local maximum regions of interest.
 
     Returns
     -------
@@ -242,17 +289,18 @@ def get_expression_vectors_at_rois(
     Parameters
     ----------
     df : pandas.DataFrame
-        A dataframe of coordinates.
-    rois_x :
-        TODO
-    rois_y :
-        TODO
-    genes :
-        TODO
-    KDE_bandwidth :
-        TODO
+        A dataframe of coordinates that will be sampled for gene expression.
+    rois_x : list
+        x-coordinates to sample gene expression at.
+    rois_y : list
+        y-coordinates to sample gene expression at.
+    genes : list, optional
+        list of genes to sample expression for.
+        Defaults to all genes in the dataframe.
+    KDE_bandwidth : float, optional
+        Bandwidth of the Gaussian smoothing function used during the KDE.
     min_expression : float, optional
-        TODO
+        A minimal expression threshold to report as local maximum regions of interest.
 
     Returns
     -------
@@ -277,257 +325,6 @@ def get_expression_vectors_at_rois(
     return expressions
 
 
-def compute_divergence(
-    df,
-    genes,
-    KDE_bandwidth=1,
-    threshold_fraction=0.5,
-    min_distance=3,
-    min_expression=5,
-    density_weight=2,
-    plot=False,
-    return_maps=False,
-    divergence_spatial_blur=2,
-):
-    """
-    Computes the divergence between the top and bottom of the tissue sample.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        A dataframe of coordinates.
-    genes : list
-        A list of genes to compute the divergence for.
-    KDE_bandwidth : int
-        The bandwidth of the KDE.
-    threshold_fraction : float
-        The fraction of the loss score's maximum, used as a cutoff value.
-    min_distance : int
-        The minimum distance between two retrieved regions of interest.
-    min_expression :
-        TODO
-    density_weight :
-        TODO
-    plot : bool
-        Whether to plot the KDE.
-    return_maps : bool
-        TODO
-    divergence_spatial_blur :
-        TODO
-
-
-    Returns
-    -------
-    divergence : numpy.ndarray
-        A matrix of divergence values. TODO (outdated)
-    """
-
-    divergence, signal_histogram = compute_divergence_map(
-        df, genes, KDE_bandwidth, min_expression
-    )
-
-    distance_map = divergence * signal_histogram**density_weight
-    # gaussian filter on distance score:
-    distance_map = gaussian_filter(distance_map, sigma=divergence_spatial_blur)
-    distance_threshold = distance_map.max() * threshold_fraction
-
-    rois_x, rois_y, distance_score = _determine_localmax(
-        distance_map, min_distance, distance_threshold
-    )
-
-    if plot:
-        plt.imshow(signal_histogram, cmap="Greens")
-        alpha = np.nan_to_num(divergence)
-        alpha = alpha - alpha.min()
-        alpha = alpha / alpha.max()
-
-        plt.imshow(divergence, cmap="Reds", alpha=alpha**0.5)
-        # plt.scatter(rois_y, rois_x, c='b', marker='x')
-
-    if return_maps:
-        return (
-            rois_x,
-            rois_y,
-            distance_score,
-            distance_map,
-            signal_histogram,
-            divergence,
-        )
-
-    return rois_x, rois_y, distance_score
-
-
-def compute_divergence_map(
-    df: pd.DataFrame,
-    genes: Collection[str],
-    KDE_bandwidth: float,
-    min_expression: float,
-):
-    """
-    Computes the divergence map between the top and bottom of the tissue sample.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        A dataframe of coordinates.
-    genes : list[str]
-        A list of genes to compute the divergence for.
-    KDE_bandwidth : int
-        The bandwidth of the KDE.
-    min_expression : float
-        TODO
-
-    Returns
-    -------
-    divergence : numpy.ndarray
-        A pixel map of divergence values.
-    signal_histogram : numpy.ndarray
-        A pixel map of signal magnitude.
-    """
-
-    signal_histogram = _create_histogram(
-        df, genes=genes, min_expression=min_expression, KDE_bandwidth=KDE_bandwidth
-    )
-
-    divergence = np.zeros_like(signal_histogram)
-
-    df_top = df[df.z_delim < df.z]
-    df_bottom = df[df.z_delim > df.z]
-
-    x_max = df.x_pixel.max()
-    y_max = df.y_pixel.max()
-
-    for gene in genes:
-        hist_top = _create_histogram(
-            df_top,
-            genes=[gene],
-            min_expression=0,
-            KDE_bandwidth=KDE_bandwidth,
-            x_max=x_max,
-            y_max=y_max,
-        )
-        hist_bottom = _create_histogram(
-            df_bottom,
-            genes=[gene],
-            min_expression=0,
-            KDE_bandwidth=KDE_bandwidth,
-            x_max=x_max,
-            y_max=y_max,
-        )
-
-        mask = (hist_top > 0) & (hist_bottom > 0) & (signal_histogram > 0)
-        hist_top[mask] /= signal_histogram[mask]
-        hist_bottom[mask] /= signal_histogram[mask]
-
-        divergence[mask] += _get_kl_divergence(hist_top[mask], hist_bottom[mask])
-        divergence[mask] += _get_kl_divergence(hist_bottom[mask], hist_top[mask])
-
-    return divergence, signal_histogram
-
-
-def find_overlaps(
-    coordinate_df: Optional[pd.DataFrame] = None,
-    adata: Optional[anndata.AnnData] = None,
-    coordinates_key: str = "spatial",
-    genes_key: str = "gene",
-    genes=None,
-    KDE_bandwidth: float = 1.0,
-    threshold_fraction: float = 0.5,
-    min_distance: int = 10,
-    min_expression: float = 5,
-    density_weight=2,
-    return_maps: bool = False,
-):
-    """
-    Finds regions of overlap between the top and bottom of the tissue sample.
-
-    Parameters
-    ----------
-    coordinate_df : pandas.DataFrame
-        A dataframe of coordinates.
-    adata : anndata.AnnData, optional
-        An AnnData object containing the coordinates.
-    coordinates_key : str
-        The key in the AnnData object's uns attribute containing the coordinates.
-    genes_key : str
-        The key in the AnnData object's uns attribute containing the genes.
-    genes : list
-        A list of genes to compute the divergence for.
-    KDE_bandwidth : float
-        The bandwidth of the KDE.
-    threshold_fraction : float
-        The fraction of the divergence score's maximum, used as a cutoff value.
-    min_distance: int, optional
-        TODO
-    min_expression: float, optional
-        TODO
-    density_weight : TODO
-        TODO
-    return_maps: bool, optional
-        TODO
-
-    Returns
-    -------
-        TODO
-    """
-
-    if (coordinate_df is None) and (adata is None):
-        raise ValueError("Either adata or coordinate_df must be provided.")
-
-    if coordinate_df is None:
-        coordinate_df = adata.uns[coordinates_key]
-
-    if genes is None:
-        genes = sorted(coordinate_df[genes_key].unique())
-
-    _assign_xy(coordinate_df)
-    _assign_z_mean(coordinate_df)
-
-    if return_maps:
-        (
-            rois_x,
-            rois_y,
-            distance_score,
-            distance_map,
-            signal_histogram,
-            divergence_map,
-        ) = compute_divergence(
-            coordinate_df,
-            genes,
-            KDE_bandwidth=KDE_bandwidth,
-            threshold_fraction=threshold_fraction,
-            min_distance=min_distance,
-            min_expression=min_expression,
-            density_weight=density_weight,
-            return_maps=return_maps,
-        )
-
-    else:
-        rois_x, rois_y, distance_score = compute_divergence(
-            coordinate_df,
-            genes,
-            KDE_bandwidth=KDE_bandwidth,
-            threshold_fraction=threshold_fraction,
-            min_distance=min_distance,
-            min_expression=min_expression,
-            density_weight=density_weight,
-        )
-
-    roi_df = pd.DataFrame({"x": rois_x, "y": rois_y, "divergence": distance_score})
-    roi_df = roi_df.sort_values("divergence", ascending=False)
-
-    if adata is not None:
-        adata.uns["rois"] = roi_df
-        return_val = adata.uns["rois"]
-    else:
-        return_val = roi_df
-
-    if return_maps:
-        return return_val, distance_map, signal_histogram, divergence_map
-    else:
-        return return_val
-
-
 def plot_signal_integrity(
     integrity, signal, signal_threshold: float = 2.0, cmap="BIH", plot_hist: bool = True
 ):
@@ -536,14 +333,14 @@ def plot_signal_integrity(
 
     Parameters
     ----------
-        integrity : TODO
+        integrity : np.ndarray
             Integrity map obtained from ovrlpy analysis
-        signal : TODO
+        signal : np.ndarray
             Signal map from ovrlpy analysis
         signal_threshold : float, optional
             Threshold below which the signal is faded out in the plot,
             to avoid displaying noisy areas with low predictive confidence.
-        cmap : TODO
+        cmap : str, matplotlib.colors.cmap, optional
             Colormap for display.
         plot_hist : bool, optional
             Whether to plot a histogram of integrity values alongside the map.
@@ -613,17 +410,17 @@ def detect_doublets(
 
     Parameters
     ----------
-        coherence :
+        coherence : np.ndarray
             Coherence map obtained from ovrlpy analysis
-        signal :
+        signal : np.ndarray
             Signal map from ovrlpy analysis
-        min_distance :
+        min_distance : int, optional
             Minimum distance between reported peaks
-        max_incoherence :
+        max_incoherence : float, optional
             Maximum incoherence value for a peak to be considered
-        signal_cutoff :
+        signal_cutoff : float, optional
             Minimum signal value for a peak to be considered
-        coherence_sigma :
+        coherence_sigma : float, optional
             Optional sigma value for gaussian filtering of the coherence map,
             which leads to the detection of overlap regions with larger spatial extent.
     """
@@ -705,7 +502,7 @@ class Visualizer:
             "random_state": None,
         },
     ) -> None:
-        # TODO: document attributes
+        """TODO: document attributes"""
         self.KDE_bandwidth = KDE_bandwidth
 
         self.celltyping_min_expression = celltyping_min_expression
@@ -785,7 +582,7 @@ class Visualizer:
 
         self.signatures = signature_matrix
 
-        adata_ssam = sample_expression(
+        adata_ssam = _sample_expression(
             coordinate_df,
             gene_column=gene_key,
             minimum_expression=self.celltyping_min_expression,
@@ -844,8 +641,9 @@ class Visualizer:
 
         Parameters
         ----------
-        signature_matrix : TODO
-            TODO
+        signature_matrix : pandas.DataFrame
+            A matrix of celltypes x gene signatures to use to annotate the UMAP.
+            None defaults to displaying individual genes.
         """
 
         if signature_matrix is None:
@@ -871,23 +669,22 @@ class Visualizer:
             ]
         )
 
-    def subsample_df(
-        self, x, y, coordinate_df: Optional[pd.DataFrame] = None, window_size: int = 30
-    ):
+    def subsample_df(self, x, y, coordinate_df: pd.DataFrame, window_size: int = 30):
         """
-        Subsamples the coordinate dataframe based on given x, y coordinates and window
+        Subsamples the coordinate dataframe spatially based on given x, y coordinates and window
         size.
 
         Parameters
         ----------
-        x : TODO
-            TODO
-        y : TODO
-            TODO
-        coordinate_df : Optional[pandas.DataFrame]
-            TODO
+        x : float
+            x-coordinate to center the sampling window
+        y : float
+            y-coordinate to center the sampling window
+        coordinate_df : pandas.DataFrame
+            DataFrame of gene annotated molecule coordinates to create the subsample from
         window_size : int, optional
-            TODO
+            The window size of the sampling window. Molecules within this window around (x,y)
+            are sampled and returned as a new DataFrame.
         """
 
         subsample_mask = _get_spatial_subsample_mask(
@@ -899,12 +696,12 @@ class Visualizer:
 
     def transform(self, coordinate_df: pd.DataFrame):
         """
-        Transforms the coordinate dataframe to the embedding space.
+        Transforms the coordinate dataframe to the visualizers 2d and 3d embedding space.
 
         Parameters
         ----------
         coordinate_df : pandas.DataFrame
-            TODO
+            Data frame of gene-annotated molecule coordinates to transform.
         """
 
         genes = self.genes
@@ -961,53 +758,13 @@ class Visualizer:
 
         return roi_df
 
-    def linear_transform(
-        self, x, y, coordinate_df: Optional[pd.DataFrame] = None, window_size: int = 30
-    ):
-        """
-        Performs a linear transformation on the coordinate dataframe based on given
-        x, y coordinates and window size.
-
-        Parameters
-        ----------
-        x : TODO
-            TODO
-        y : TODO
-            TODO
-        coordinate_df : Optional[pandas.DataFrame]
-            TODO
-        window_size : int, optional
-            TODO
-        """
-
-        genes = self.genes
-
-        subsample_mask = _get_spatial_subsample_mask(
-            coordinate_df, x, y, plot_window_size=window_size
-        )
-        subsample = coordinate_df[subsample_mask]
-
-        distances, neighbor_indices = _create_knn_graph(
-            subsample[["x", "y", "z"]].values, k=90
-        )
-        local_expression = _get_knn_expression(
-            distances,
-            neighbor_indices,
-            genes,
-            subsample.gene.cat.codes.values,
-            bandwidth=self.KDE_bandwidth,
-        )
-        local_expression /= (local_expression**2).sum(0) ** 0.5
-
-        return subsample, local_expression
-
     def plot_instance(
         self,
-        subsample: pd.DataFrame,
+        subsample,
         subsample_embedding_color,
-        x: float,
-        y: float,
-        window_size: float = 30,
+        x: float = None,
+        y: float = None,
+        window_size: int = None,
         rasterized: bool = True,
     ):
         """
@@ -1016,9 +773,9 @@ class Visualizer:
         Parameters
         ----------
         subsample : pandas.DataFrame
-            TODO
+            A dataframe of molecule coordinates and gene assignments.
         subsample_embedding_color : Optional[pandas.DataFrame]
-            TODO
+            A list of rgb values for each molecule.
         x : float
             Center x-coordinate for the region-of-interest.
         y : float
@@ -1031,6 +788,13 @@ class Visualizer:
         vertical_indices = subsample.z.argsort()
         subsample = subsample.sort_values("z")
         subsample_embedding_color = subsample_embedding_color[vertical_indices]
+
+        if x is None:
+            x = (subsample.x.max() + subsample.x.min()) / 2
+        if y is None:
+            y = (subsample.y.max() + subsample.y.min()) / 2
+        if window_size is None:
+            window_size = int(1 + (subsample.x.max() - subsample.x.min()) / 2)
 
         roi = ((x - window_size, x + window_size), (y - window_size, y + window_size))
 
@@ -1118,6 +882,7 @@ class Visualizer:
             title="ROI celltype map, bottom",
             **roi_scatter_kwargs,
         )
+
         _plot_tissue_scatter_roi(ax_roi_bottom, x, y, roi, rasterized=rasterized)
 
         # side view of ROI
@@ -1161,19 +926,11 @@ class Visualizer:
         Parameters
         ----------
         ax : Optional[matplotlib.axes.Axes]
-            TODO
-        subsample_embedding_color : Optional[pandas.DataFrame]
-            TODO
-        x :
-            TODO
-        y :
-            TODO
-        window_size : int, optional
-            TODO
+            axis object to plot on.
         rasterized : bool, optional
             If True the plot will be rasterized.
         kwargs
-            TODO
+            Keyword arguments for the matplotlib's scatter plot function.
         """
         _plot_embeddings(
             self.embedding,
@@ -1194,7 +951,7 @@ class Visualizer:
         rasterized : bool, optional
             If True the plot will be rasterized.
         kwargs
-            TODO
+            Keyword arguments for the matplotlib's scatter plot function.
         """
         ax = plt.gca()
         self._plot_tissue_scatter(
@@ -1412,7 +1169,7 @@ def compute_coherence_map(
     df: pd.DataFrame,
     n_expected_celltypes=None,
     cell_diameter=10,
-    min_expression: float = 0.5,
+    min_expression: float = 1.0,
     signature_matrix=None,
     umap_kwargs={
         "n_components": 2,
@@ -1439,28 +1196,38 @@ def compute_coherence_map(
     ----------
     df : pandas.DataFrame
         The spatial transcriptomics dataset.
-    n_expected_celltypes : TODO
-        TODO
-    cell_diameter : TODO
-        TODO
+    n_expected_celltypes : int, optional.
+        A rough estimate of expected cell type clusters.
+        A higher number will lead to a more disjoint UMAP embedding and a higher
+        detection of overlap events.
+        Defaults to None, which will use a heuristic on the PCA explained variance to determine cluster count.
+    cell_diameter : float, optional
+        The expected diameter of the cell/structure of interest in the sample.
+        Defaults to 10.
     min_expression : int, optional
         A threshold value to discard areas with low expression, by default 5
         Can be interpreted as: The minimum number of transcripts to appear within a
         radius of 'KDE_bandwidth' for a region to be considered containing a cell.
-    signature_matrix : TODO
-        TODO
+    signature_matrix : pandas.DataFrame, optional
+        A celltypes x gene table of expression signatures to use to annotate the UMAP.
     umap_kwargs : dict, optional
-        TODO
+        Additional keyword arguments for the 2D UMAP embedding.
     cumap_kwargs : dict, optional
-        TODO
+        Additional keyword arguments for the 3D UMAP embedding.
 
     Returns
     -------
-    TODO
+    coherence_map : np.ndarray
+        A coherence pixel map of the spatial transcriptomics dataset.
+    signal_map : np.ndarray
+        A pixel map of the spatial transcriptomics dataset containing the detected signal.
+    vis : Visualizer
+        A visualizer object that can be used to plot the
+        results of the coherence map
     """
 
-    KDE_bandwidth = cell_diameter / 4
-    min_distance = cell_diameter * 0.7
+    KDE_bandwidth = cell_diameter / 5
+    min_distance = cell_diameter * 0.9
 
     if n_expected_celltypes is None:
         n_expected_celltypes = 0.8
@@ -1480,6 +1247,7 @@ def compute_coherence_map(
 
     vis.fit_ssam(df, signature_matrix=signature_matrix)
 
+    print("Creating signal integrity map:")
     coherence_, signal_ = _compute_divergence_patched(
         df,
         vis.genes,

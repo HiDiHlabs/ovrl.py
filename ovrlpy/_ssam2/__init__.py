@@ -1,4 +1,4 @@
-from ._ssam import sample_expression
+from ._ssam import _sample_expression
 from ._utils import find_local_maxima, kde_2d, kde_3d, kde_and_sample
 
 __all__ = [
@@ -6,5 +6,5 @@ __all__ = [
     "kde_2d",
     "kde_3d",
     "kde_and_sample",
-    "sample_expression",
+    "_sample_expression",
 ]
