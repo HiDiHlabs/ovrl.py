@@ -297,7 +297,12 @@ def _get_knn_expression(distances, neighbor_indices, genes, gene_labels, bandwid
 
 
 def _create_histogram(
-    df, genes=None, min_expression=0, KDE_bandwidth=None, x_max=None, y_max=None
+    df,
+    genes=None,
+    min_expression: float = 0,
+    KDE_bandwidth=None,
+    x_max=None,
+    y_max=None,
 ):
     """
     Creates a 2d histogram of the data frame's [x,y] coordinates.
@@ -308,12 +313,14 @@ def _create_histogram(
         A dataframe of coordinates.
     genes : list, optional
         A list of genes to include in the histogram. The default is None.
-    min_expression : int, optional
-        The minimum expression level to include in the histogram. The default is 5.
+    min_expression : float, optional
+        The minimum expression level to include in the histogram.
     KDE_bandwidth : int, optional
-        The bandwidth of the gaussian blur applied to the histogram. The default is 1.
-    grid_size : int, optional
-        The size of the grid. The default is 1.
+        The bandwidth of the gaussian blur applied to the histogram.
+    x_max :
+        TODO
+    y_max :
+        TODO
 
     Returns
     -------
@@ -331,7 +338,7 @@ def _create_histogram(
 
     df = df[df["gene"].isin(genes)].copy()
 
-    hist, xedges, yedges = np.histogram2d(
+    hist, *_ = np.histogram2d(
         df["x_pixel"], df["y_pixel"], bins=[np.arange(x_max + 2), np.arange(y_max + 2)]
     )
 
