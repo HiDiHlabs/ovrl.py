@@ -176,17 +176,8 @@ def _plot_embeddings(
     if ax is None:
         ax = plt.gca()
 
-    if "alpha" not in scatter_kwargs:
-        alpha = 0.1
-    else:
-        alpha = scatter_kwargs["alpha"]
-        scatter_kwargs.pop("alpha")
-
-    if "marker" not in scatter_kwargs:
-        marker = "."
-    else:
-        marker = scatter_kwargs["marker"]
-        scatter_kwargs.pop("marker")
+    alpha = 0.1 if "alpha" not in scatter_kwargs else scatter_kwargs.pop("alpha")
+    marker = "." if "marker" not in scatter_kwargs else scatter_kwargs.pop("marker")
 
     ax.scatter(
         embedding[:, 0],
