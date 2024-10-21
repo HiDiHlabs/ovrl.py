@@ -1201,7 +1201,7 @@ class Visualizer:
             ax,
             self.rois_celltyping_x,
             self.rois_celltyping_y,
-            c=self.colors,
+            self.colors,
             marker=".",
             alpha=1,
             rasterized=rasterized,
@@ -1210,7 +1210,7 @@ class Visualizer:
 
     @staticmethod
     def _plot_tissue_scatter(
-        ax: Axes, xs, ys, cs, *, title: Optional[str] = None, kwargs
+        ax: Axes, xs, ys, cs, *, title: Optional[str] = None, **kwargs
     ):
         ax.scatter(xs, ys, c=cs, **kwargs)
         ax.set_aspect("equal", adjustable="box")
