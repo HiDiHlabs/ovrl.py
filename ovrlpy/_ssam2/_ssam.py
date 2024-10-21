@@ -9,7 +9,7 @@ import tqdm
 from . import _utils
 
 
-def sample_expression(
+def _sample_expression(
     coordinate_dataframe: Optional[pd.DataFrame] = None,
     kde_bandwidth: float = 2.5,
     minimum_expression: int = 2,
@@ -136,7 +136,7 @@ def _sample_expression_nd(
     )
     # perform a global KDE to determine local maxima:
     vector_field_norm = _utils._kde_nd(
-        coordinate_dataframe_[coord_columns].values, bandwidth=1.1
+        coordinate_dataframe_[coord_columns].values, bandwidth=1
     )
     local_maximum_coordinates = _utils.find_local_maxima(
         vector_field_norm,

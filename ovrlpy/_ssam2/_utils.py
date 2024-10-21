@@ -68,7 +68,7 @@ def find_local_maxima(
         vf,
         min_distance=min_pixel_distance,
         threshold_abs=min_expression,
-        exclude_border=True,
+        exclude_border=False,
     )
 
     return local_maxima

@@ -56,7 +56,7 @@ you can then fit an ovrlpy model to the data and create a signal integrity map:
 
 # fit the ovrlpy model to the data
 
-from ovrlpy import ovrlp 
+from ovrlpy import ovrlp
 
 integrity, signal, visualizer = ovrlp.compute_coherence_map(df=coordinate_df,KDE_bandwidth=kde_bandwidth,n_expected_celltypes=n_expected_celltypes)
 
@@ -91,7 +91,7 @@ n_doublet_to_show = 0   # index of the doublet to show
 x,y = doublet_df.loc[doublet_case,['x','y']] # location of the doublet event
 
 # subsample the data around the doublet event
-subsample = visualizer.subsample_df(x,y,coordinate_df,window_size=window_size)  
+subsample = visualizer.subsample_df(x,y,coordinate_df,window_size=window_size)
 # transform the subsample using the fitted color embedding model
 subsample_embedding, subsample_embedding_color = visualizer.transform(subsample)
 
