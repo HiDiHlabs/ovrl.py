@@ -583,15 +583,13 @@ def _compute_divergence_patched(
                     }
 
                     for f in as_completed(fs):
-                        # try:
+
                         top_, bottom_ = f.result()
-                        # print(top_.shape)
+
                         if top_ is not None:
+                            assert bottom_ is not None
                             patch_embedding_top += top_
                             patch_embedding_bottom += bottom_
-
-                        # except Exception as exc:
-                        # print('%r generated an exception: %s' % (gene, exc))
 
                 patch_norm_top = np.linalg.norm(patch_embedding_top, axis=1)
                 patch_norm_bottom = np.linalg.norm(patch_embedding_bottom, axis=1)
