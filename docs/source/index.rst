@@ -13,7 +13,7 @@ The main feature of the tool is the production of 'signal integrity maps' that c
 Users can also use the built-in 3D visualisation tool to explore regions of signal inconsistency in their data on a molecular level.
 
 
-.. image:: resources/cell_overlap_visualization.jpg
+.. image:: ../resources/cell_overlap_visualization.jpg
    :alt: 3D slice visualization
    :align: center
    :width: 600px
