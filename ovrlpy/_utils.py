@@ -52,6 +52,7 @@ def _plot_scalebar(
 def _create_circular_kernel(r):
     """
     Creates a circular kernel of radius r.
+
     Parameters
     ----------
     r : int
@@ -80,6 +81,7 @@ def _get_kl_divergence(p, q):
 def _determine_localmax(distribution, min_distance=3, min_expression=5):
     """
     Returns a list of local maxima in a kde of the data frame.
+
     Parameters
     ----------
     distribution : np.array
@@ -174,17 +176,8 @@ def _plot_embeddings(
     if ax is None:
         ax = plt.gca()
 
-    if "alpha" not in scatter_kwargs:
-        alpha = 0.1
-    else:
-        alpha = scatter_kwargs["alpha"]
-        scatter_kwargs.pop("alpha")
-
-    if "marker" not in scatter_kwargs:
-        marker = "."
-    else:
-        marker = scatter_kwargs["marker"]
-        scatter_kwargs.pop("marker")
+    alpha = 0.1 if "alpha" not in scatter_kwargs else scatter_kwargs.pop("alpha")
+    marker = "." if "marker" not in scatter_kwargs else scatter_kwargs.pop("marker")
 
     ax.scatter(
         embedding[:, 0],
@@ -307,22 +300,30 @@ def _get_knn_expression(distances, neighbor_indices, genes, gene_labels, bandwid
 
 
 def _create_histogram(
-    df, genes=None, min_expression=0, KDE_bandwidth=None, x_max=None, y_max=None
+    df,
+    genes=None,
+    min_expression: float = 0,
+    KDE_bandwidth=None,
+    x_max=None,
+    y_max=None,
 ):
     """
     Creates a 2d histogram of the data frame's [x,y] coordinates.
+
     Parameters
     ----------
     df : pd.DataFrame
         A dataframe of coordinates.
     genes : list, optional
         A list of genes to include in the histogram. The default is None.
-    min_expression : int, optional
-        The minimum expression level to include in the histogram. The default is 5.
+    min_expression : float, optional
+        The minimum expression level to include in the histogram.
     KDE_bandwidth : int, optional
-        The bandwidth of the gaussian blur applied to the histogram. The default is 1.
-    grid_size : int, optional
-        The size of the grid. The default is 1.
+        The bandwidth of the gaussian blur applied to the histogram.
+    x_max :
+        TODO
+    y_max :
+        TODO
 
     Returns
     -------
@@ -340,7 +341,7 @@ def _create_histogram(
 
     df = df[df["gene"].isin(genes)].copy()
 
-    hist, xedges, yedges = np.histogram2d(
+    hist, *_ = np.histogram2d(
         df["x_pixel"], df["y_pixel"], bins=[np.arange(x_max + 2), np.arange(y_max + 2)]
     )
 
@@ -587,15 +588,12 @@ def _compute_divergence_patched(
                     }
 
                     for f in as_completed(fs):
-                        # try:
                         top_, bottom_ = f.result()
-                        # print(top_.shape)
+
                         if top_ is not None:
+                            assert bottom_ is not None
                             patch_embedding_top += top_
                             patch_embedding_bottom += bottom_
-
-                        # except Exception as exc:
-                        # print('%r generated an exception: %s' % (gene, exc))
 
                 patch_norm_top = np.linalg.norm(patch_embedding_top, axis=1)
                 patch_norm_bottom = np.linalg.norm(patch_embedding_bottom, axis=1)

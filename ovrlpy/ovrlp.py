@@ -1,7 +1,9 @@
 """This is a package to detect overlapping cells in a 2D spatial transcriptomics sample."""
 
 import warnings
-from typing import Collection, Optional
+from functools import reduce
+from operator import add
+from typing import Collection, Optional, Sequence
 
 import anndata
 import matplotlib.pyplot as plt
@@ -42,7 +44,7 @@ _BIH_CMAP = LinearSegmentedColormap.from_list(
 
 
 def _assign_xy(
-    df: pd.DataFrame, xy_columns: Collection[str] = ["x", "y"], grid_size: int = 1
+    df: pd.DataFrame, xy_columns: Sequence[str] = ["x", "y"], grid_size: int = 1
 ):
     """
     Assigns an x,y coordinate to a pd.DataFrame of coordinates.
@@ -52,7 +54,7 @@ def _assign_xy(
     df : pandas.DataFrame
         A dataframe of coordinates.
     xy_columns : list, optional
-        The names of the columns containing the x,y,z-coordinates.
+        The names of the columns containing the x,y-coordinates.
     grid_size : int, optional
         The size of the grid.
 
@@ -89,7 +91,7 @@ def _assign_z_median(df: pd.DataFrame, z_column: str = "z"):
 
     """
     if "n_pixel" not in df.columns:
-        print(
+        ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
     medians = df.groupby("n_pixel")[z_column].median()
@@ -123,7 +125,7 @@ def _assign_z_mean_message_passing(
 
     """
     if "n_pixel" not in df.columns:
-        print(
+        ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
 
@@ -133,8 +135,7 @@ def _assign_z_mean_message_passing(
     pixel_coordinate_df = (
         df[["n_pixel", "x_pixel", "y_pixel", delim_column]].groupby("n_pixel").max()
     )
-    elevation_map = np.zeros((df.x_pixel.max() + 1, df.y_pixel.max() + 1))
-    elevation_map.fill(np.nan)
+    elevation_map = np.full((df.x_pixel.max() + 1, df.y_pixel.max() + 1), np.nan)
 
     elevation_map[pixel_coordinate_df.x_pixel, pixel_coordinate_df.y_pixel] = (
         pixel_coordinate_df[delim_column]
@@ -142,25 +143,18 @@ def _assign_z_mean_message_passing(
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        for r in range(rounds):
-            elevation_map_ = (
-                np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=0)], axis=0)
-                / 4
+        for _ in range(rounds):
+            elevation_map = reduce(
+                add,
+                (
+                    np.nanmean(
+                        [elevation_map, np.roll(elevation_map, shift, axis=ax)], axis=0
+                    )
+                    for ax in (0, 1)
+                    for shift in (1, -1)
+                ),
             )
-            elevation_map_ += (
-                np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=1)], axis=0)
-                / 4
-            )
-            elevation_map_ += (
-                np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=0)], axis=0)
-                / 4
-            )
-            elevation_map_ += (
-                np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=1)], axis=0)
-                / 4
-            )
-
-            elevation_map = elevation_map_
+            elevation_map /= 4
 
     df[delim_column] = elevation_map[df.x_pixel, df.y_pixel]
 
@@ -170,6 +164,7 @@ def _assign_z_mean_message_passing(
 def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
     """
     Assigns a z-coordinate to a pd.DataFrame of coordinates.
+
     Parameters
     ----------
     df : pandas.DataFrame
@@ -184,7 +179,7 @@ def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
 
     """
     if "n_pixel" not in df.columns:
-        print(
+        ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
     means = df.groupby("n_pixel")[z_column].mean()
@@ -249,6 +244,7 @@ def get_rois(
 ):
     """
     Returns a list of local maxima in a kde of the data frame.
+
     Parameters
     ----------
     df : pandas.DataFrame
@@ -613,16 +609,12 @@ class Visualizer:
         self.embedding = self.embedder_2d.fit_transform(factors)
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-
         embedding_color = self.embedder_3d.fit_transform(factors)
 
         embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
-        color_min = embedding_color.min(0)
-        color_max = embedding_color.max(0)
-
         self.colors = _min_to_max(embedding_color.copy())
-        self.colors_min_max = [color_min, color_max]
+        self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
 
         self.fit_signatures(signature_matrix)
 
@@ -634,9 +626,11 @@ class Visualizer:
         # determine the center of gravity of each celltype in the embedding:
         self.gene_centers = np.array(
             [
-                np.median(self.embedding[gene_assignments == i, :], axis=0)
-                if (gene_assignments == i).sum() > 0
-                else (np.nan, np.nan)
+                (
+                    np.median(self.embedding[gene_assignments == i, :], axis=0)
+                    if (gene_assignments == i).sum() > 0
+                    else (np.nan, np.nan)
+                )
                 for i in range(len(self.genes))
             ]
         )
@@ -724,7 +718,7 @@ class Visualizer:
             subsample.gene.cat.codes.values,
             bandwidth=self.KDE_bandwidth,
         )
-        local_expression = local_expression / ((local_expression**2).sum(0) ** 0.5)
+        local_expression /= (local_expression**2).sum(0) ** 0.5
         subsample_embedding, subsample_embedding_color = _transform_embeddings(
             local_expression.T.values,
             self.pca_2d,
@@ -782,14 +776,14 @@ class Visualizer:
             A dataframe of molecule coordinates and gene assignments.
         subsample_embedding_color : Optional[pandas.DataFrame]
             A list of rgb values for each molecule.
-        x :
-            The x-coordinate to center the plotting window
-        y :
-            The y-coordinate to center the plotting window
-        window_size : int, optional
-            the sidelength of the window to plot
+        x : float
+            Center x-coordinate for the region-of-interest.
+        y : float
+            Center y-coordinate for the region-of-interest.
+        window_size : float, optional
+            Window size of the region-of-interest.
         rasterized : bool, optional
-            rasterize the plot for faster rendering
+            If True all plots will be rasterized.
         """
         vertical_indices = subsample.z.argsort()
         subsample = subsample.sort_values("z")
@@ -801,13 +795,16 @@ class Visualizer:
             y = (subsample.y.max() + subsample.y.min()) / 2
         if window_size is None:
             window_size = int(1 + (subsample.x.max() - subsample.x.min()) / 2)
+            
+        roi = ((x - window_size, x + window_size), (y - window_size, y + window_size))
 
         fig = plt.figure(figsize=(22, 12))
 
         gs = fig.add_gridspec(2, 3)
 
-        ax1 = fig.add_subplot(gs[0, 2], projection="3d", label="3d_map")
-        ax1.scatter(
+        # 3D map
+        ax_3d = fig.add_subplot(gs[0, 2], projection="3d", label="3d_map")
+        ax_3d.scatter(
             subsample.x,
             subsample.y,
             subsample.z,
@@ -816,13 +813,14 @@ class Visualizer:
             alpha=0.5,
             rasterized=rasterized,
         )
-        ax1.set_zlim(
+        ax_3d.set_zlim(
             np.median(subsample.z) - window_size, np.median(subsample.z) + window_size
         )
-        ax1.set_title("ROI celltype map, 3D")
+        ax_3d.set_title("ROI celltype map, 3D")
 
-        ax2 = fig.add_subplot(gs[0, 0], label="umap")
-        ax2.scatter(
+        # UMAP
+        ax_umap = fig.add_subplot(gs[0, 0], label="umap")
+        ax_umap.scatter(
             self.embedding[:, 0],
             self.embedding[:, 1],
             c=self.colors,
@@ -832,13 +830,14 @@ class Visualizer:
             rasterized=rasterized,
         )
 
-        ax2.set_axis_off()
-        ax2.set_title("UMAP")
+        ax_umap.set_axis_off()
+        ax_umap.set_title("UMAP")
 
-        ax = fig.add_subplot(gs[0, 1], label="celltype_map")
+        # tissue map
+        ax_tissue_whole: Axes = fig.add_subplot(gs[0, 1], label="celltype_map")
         self.plot_tissue(rasterized=rasterized, s=1)
 
-        ax.set_yticks([], [])
+        ax_tissue_whole.set_yticks([], [])
 
         artist = plt.Rectangle(
             (x - window_size, y - window_size),
@@ -848,88 +847,72 @@ class Visualizer:
             edgecolor="k",
             linewidth=2,
         )
-        ax.add_artist(artist)
+        ax_tissue_whole.add_artist(artist)
 
-        artist = plt.Rectangle(
-            (x - window_size, y - window_size),
-            2 * window_size,
-            2 * window_size,
-            fill=False,
-            edgecolor="k",
-            linewidth=2,
+        ax_tissue_whole.set_title("celltype map")
+
+        # top view of ROI
+        roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=40, rasterized=rasterized)
+
+        def _plot_tissue_scatter_roi(ax: Axes, x, y, roi, *, rasterized: bool = False):
+            ax.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
+            ax.set(xlim=roi[0], ylim=roi[1])
+
+        ax_roi_top = fig.add_subplot(gs[1, 0], label="top_map")
+        top_mask = subsample.z > subsample.z_delim
+        subsample_top = subsample[top_mask]
+        self._plot_tissue_scatter(
+            ax_roi_top,
+            subsample_top["x"],
+            subsample_top["y"],
+            subsample_embedding_color[top_mask],
+            title="ROI celltype map, top",
+            **roi_scatter_kwargs,
         )
-        ax.add_artist(artist)
+        _plot_tissue_scatter_roi(ax_roi_top, x, y, roi, rasterized=rasterized)
 
-        ax.set_title("celltype map")
-
-        ax3 = fig.add_subplot(gs[1, 0], label="top_map")
-        # plt.imshow((divergence*hist_sum).T,cmap='Greys', alpha=0.3 )
-        ax3.scatter(
-            subsample[subsample.z > subsample.z_delim].x,
-            subsample[subsample.z > subsample.z_delim].y,
-            c=subsample_embedding_color[subsample.z > subsample.z_delim],
-            marker=".",
-            alpha=0.8,
-            s=40,
-            rasterized=rasterized,
+        ax_roi_bottom = fig.add_subplot(gs[1, 1], label="bottom_map")
+        bottom_mask = subsample.z < subsample.z_delim
+        subsample_bottom = subsample[bottom_mask][::-1]
+        self._plot_tissue_scatter(
+            ax_roi_bottom,
+            subsample_bottom["x"],
+            subsample_bottom["y"],
+            subsample_embedding_color[bottom_mask][::-1],
+            title="ROI celltype map, bottom",
+            **roi_scatter_kwargs,
         )
-        ax3.set_xlim(x - window_size, x + window_size)
-        ax3.set_ylim(y - window_size, y + window_size)
-        ax3.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
-        ax3.set_aspect("equal", adjustable="box")
 
-        ax3.set_title("ROI celltype map ,top")
+        _plot_tissue_scatter_roi(ax_roi_bottom, x, y, roi, rasterized=rasterized)
 
-        ax3 = fig.add_subplot(gs[1, 1], label="bottom_map")
-
-        subsample = subsample[::-1]
-        subsample_embedding_color = subsample_embedding_color[::-1]
-        # plt.imshow(hist_sum.T,cmap='Greys',alpha=0.3 )
-        ax3.scatter(
-            subsample[subsample.z < subsample.z_delim].x,
-            subsample[subsample.z < subsample.z_delim].y,
-            c=subsample_embedding_color[subsample.z < subsample.z_delim],
-            marker=".",
-            alpha=0.8,
-            s=40,
-            rasterized=rasterized,
-        )
-        ax3.set_xlim(x - window_size, x + window_size)
-        ax3.set_ylim(y - window_size, y + window_size)
-        ax3.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
-        ax3.set_aspect("equal", adjustable="box")
-
-        ax3.set_title("ROI celltype map, bottom")
+        # side view of ROI
+        roi_side_scatter_kwargs = dict(s=10, alpha=0.5, rasterized=rasterized)
 
         sub_gs = gs[1, 2].subgridspec(2, 1)
 
-        ax5 = fig.add_subplot(sub_gs[0, 0], label="x_cut")
+        ax_side_x = fig.add_subplot(sub_gs[0, 0], label="x_cut")
         halving_mask = (subsample.y < (y + 4)) & (subsample.y > (y - 4))
 
-        ax5.scatter(
+        self._plot_tissue_scatter(
+            ax_side_x,
             subsample.x[halving_mask],
             subsample.z[halving_mask],
-            c=subsample_embedding_color[halving_mask],
-            s=10,
-            alpha=0.5,
-            rasterized=rasterized,
+            subsample_embedding_color[halving_mask],
+            title="ROI, vertical, x-cut",
+            **roi_side_scatter_kwargs,
         )
-        ax5.set_aspect("equal", adjustable="box")
-        plt.title("ROI, vertical, x-cut")
 
-        ax4 = fig.add_subplot(sub_gs[1, 0], label="y_cut")
+        ax_side_y = fig.add_subplot(sub_gs[1, 0], label="y_cut")
         halving_mask = (subsample.x < (x + 4)) & (subsample.x > (x - 4))
 
-        ax4.scatter(
+        self._plot_tissue_scatter(
+            ax_side_y,
             subsample.y[halving_mask],
             subsample.z[halving_mask],
-            c=subsample_embedding_color[halving_mask],
-            s=10,
-            alpha=0.5,
-            rasterized=rasterized,
+            subsample_embedding_color[halving_mask],
+            title="ROI, vertical, y-cut",
+            **roi_side_scatter_kwargs,
         )
-        ax4.set_aspect("equal", adjustable="box")
-        plt.title("ROI, vertical, y-cut")
 
     def plot_umap(
         self,
@@ -945,7 +928,7 @@ class Visualizer:
         ax : Optional[matplotlib.axes.Axes]
             axis object to plot on.
         rasterized : bool, optional
-            rasterize the scatter plots to reduce file size in vector graphics files.
+            If True the plot will be rasterized.
         kwargs
             Keyword arguments for the matplotlib's scatter plot function.
         """
@@ -966,21 +949,30 @@ class Visualizer:
         Parameters
         ----------
         rasterized : bool, optional
-            rasterize the scatter plots to reduce file size in vector graphics files.
+            If True the plot will be rasterized.
         kwargs
             Keyword arguments for the matplotlib's scatter plot function.
         """
         ax = plt.gca()
-        ax.scatter(
+        self._plot_tissue_scatter(
+            ax,
             self.rois_celltyping_x,
             self.rois_celltyping_y,
-            c=self.colors,
+            self.colors,
             marker=".",
             alpha=1,
             rasterized=rasterized,
             **kwargs,
         )
+
+    @staticmethod
+    def _plot_tissue_scatter(
+        ax: Axes, xs, ys, cs, *, title: Optional[str] = None, **kwargs
+    ):
+        ax.scatter(xs, ys, c=cs, **kwargs)
         ax.set_aspect("equal", adjustable="box")
+        if title is not None:
+            ax.set_title(title)
 
     def plot_fit(self, rasterized: bool = True):
         """
@@ -989,7 +981,7 @@ class Visualizer:
         Parameters
         ----------
         rasterized : bool, optional
-            rasterize the scatter plots to reduce file size in vector graphics files.
+            If True all plots will be rasterized.
         """
 
         plt.figure(figsize=(15, 7))
