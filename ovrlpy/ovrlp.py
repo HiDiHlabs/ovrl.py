@@ -13,6 +13,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 
+from ._ssam2 import sample_expression
 from ._utils import (
     _compute_divergence_patched,
     _create_histogram,
