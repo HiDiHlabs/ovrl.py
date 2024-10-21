@@ -1006,7 +1006,6 @@ class Visualizer:
     def plot_instance(
         self,
         subsample: pd.DataFrame,
-        subsample_embedding,
         subsample_embedding_color,
         x: float,
         y: float,
@@ -1019,8 +1018,6 @@ class Visualizer:
         Parameters
         ----------
         subsample : pandas.DataFrame
-            TODO
-        subsample_embedding : TODO
             TODO
         subsample_embedding_color : Optional[pandas.DataFrame]
             TODO
@@ -1035,7 +1032,6 @@ class Visualizer:
         """
         vertical_indices = subsample.z.argsort()
         subsample = subsample.sort_values("z")
-        subsample_embedding = subsample_embedding[vertical_indices]
         subsample_embedding_color = subsample_embedding_color[vertical_indices]
 
         roi = ((x - window_size, x + window_size), (y - window_size, y + window_size))
