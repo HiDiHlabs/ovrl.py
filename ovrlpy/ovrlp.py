@@ -1,6 +1,8 @@
 """This is a package to detect overlapping cells in a 2D spatial transcriptomics sample."""
 
 import warnings
+from functools import reduce
+from operator import add
 from typing import Collection, Optional, Sequence
 
 import anndata
@@ -134,8 +136,7 @@ def _assign_z_mean_message_passing(
     pixel_coordinate_df = (
         df[["n_pixel", "x_pixel", "y_pixel", delim_column]].groupby("n_pixel").max()
     )
-    elevation_map = np.zeros((df.x_pixel.max() + 1, df.y_pixel.max() + 1))
-    elevation_map.fill(np.nan)
+    elevation_map = np.full((df.x_pixel.max() + 1, df.y_pixel.max() + 1), np.nan)
 
     elevation_map[pixel_coordinate_df.x_pixel, pixel_coordinate_df.y_pixel] = (
         pixel_coordinate_df[delim_column]
@@ -143,25 +144,18 @@ def _assign_z_mean_message_passing(
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        for r in range(rounds):
-            elevation_map_ = (
-                np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=0)], axis=0)
-                / 4
+        for _ in range(rounds):
+            elevation_map = reduce(
+                add,
+                (
+                    np.nanmean(
+                        [elevation_map, np.roll(elevation_map, shift, axis=ax)], axis=0
+                    )
+                    for ax in (0, 1)
+                    for shift in (1, -1)
+                ),
             )
-            elevation_map_ += (
-                np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=1)], axis=0)
-                / 4
-            )
-            elevation_map_ += (
-                np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=0)], axis=0)
-                / 4
-            )
-            elevation_map_ += (
-                np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=1)], axis=0)
-                / 4
-            )
-
-            elevation_map = elevation_map_
+            elevation_map /= 4
 
     df[delim_column] = elevation_map[df.x_pixel, df.y_pixel]
 
