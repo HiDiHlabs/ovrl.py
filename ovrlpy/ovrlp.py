@@ -833,9 +833,11 @@ class Visualizer:
         # determine the center of gravity of each celltype in the embedding:
         self.gene_centers = np.array(
             [
-                np.median(self.embedding[gene_assignments == i, :], axis=0)
-                if (gene_assignments == i).sum() > 0
-                else (np.nan, np.nan)
+                (
+                    np.median(self.embedding[gene_assignments == i, :], axis=0)
+                    if (gene_assignments == i).sum() > 0
+                    else (np.nan, np.nan)
+                )
                 for i in range(len(self.genes))
             ]
         )
