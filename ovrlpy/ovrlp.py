@@ -1,7 +1,7 @@
 """This is a package to detect overlapping cells in a 2D spatial transcriptomics sample."""
 
 import warnings
-from typing import Collection, Optional
+from typing import Collection, Optional, Sequence
 
 import anndata
 import matplotlib.pyplot as plt
@@ -43,7 +43,7 @@ _BIH_CMAP = LinearSegmentedColormap.from_list(
 
 
 def _assign_xy(
-    df: pd.DataFrame, xy_columns: Collection[str] = ["x", "y"], grid_size: int = 1
+    df: pd.DataFrame, xy_columns: Sequence[str] = ["x", "y"], grid_size: int = 1
 ):
     """
     Assigns an x,y coordinate to a pd.DataFrame of coordinates.
@@ -53,7 +53,7 @@ def _assign_xy(
     df : pandas.DataFrame
         A dataframe of coordinates.
     xy_columns : list, optional
-        The names of the columns containing the x,y,z-coordinates.
+        The names of the columns containing the x,y-coordinates.
     grid_size : int, optional
         The size of the grid.
 
