@@ -9,7 +9,7 @@ import tqdm
 from . import _utils
 
 
-def sample_expression(
+def _sample_expression(
     coordinate_dataframe: Optional[pd.DataFrame] = None,
     kde_bandwidth: float = 2.5,
     minimum_expression: int = 2,
