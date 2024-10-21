@@ -583,7 +583,6 @@ def _compute_divergence_patched(
                     }
 
                     for f in as_completed(fs):
-
                         top_, bottom_ = f.result()
 
                         if top_ is not None:
