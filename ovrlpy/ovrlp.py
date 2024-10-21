@@ -90,7 +90,7 @@ def _assign_z_median(df: pd.DataFrame, z_column: str = "z"):
 
     """
     if "n_pixel" not in df.columns:
-        print(
+        ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
     medians = df.groupby("n_pixel")[z_column].median()
@@ -124,7 +124,7 @@ def _assign_z_mean_message_passing(
 
     """
     if "n_pixel" not in df.columns:
-        print(
+        ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
 
@@ -186,7 +186,7 @@ def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
 
     """
     if "n_pixel" not in df.columns:
-        print(
+        ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
     means = df.groupby("n_pixel")[z_column].mean()
