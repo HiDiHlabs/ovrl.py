@@ -23,6 +23,7 @@ dependencies = [
     "scikit-learn",
     "scipy",
     "tqdm",
+    "umap",
 ]
 classifiers = [
     "Intended Audience :: Science/Research",
