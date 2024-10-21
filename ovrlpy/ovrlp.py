@@ -171,6 +171,7 @@ def _assign_z_mean_message_passing(
 def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
     """
     Assigns a z-coordinate to a pd.DataFrame of coordinates.
+
     Parameters
     ----------
     df : pandas.DataFrame
@@ -203,6 +204,7 @@ def get_rois(
 ):
     """
     Returns a list of local maxima in a kde of the data frame.
+
     Parameters
     ----------
     df : pandas.DataFrame

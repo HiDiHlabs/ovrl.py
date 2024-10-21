@@ -52,6 +52,7 @@ def _plot_scalebar(
 def _create_circular_kernel(r):
     """
     Creates a circular kernel of radius r.
+
     Parameters
     ----------
     r : int
@@ -80,6 +81,7 @@ def _get_kl_divergence(p, q):
 def _determine_localmax(distribution, min_distance=3, min_expression=5):
     """
     Returns a list of local maxima in a kde of the data frame.
+
     Parameters
     ----------
     distribution : np.array
@@ -308,6 +310,7 @@ def _create_histogram(
 ):
     """
     Creates a 2d histogram of the data frame's [x,y] coordinates.
+
     Parameters
     ----------
     df : pd.DataFrame
