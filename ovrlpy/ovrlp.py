@@ -816,16 +816,12 @@ class Visualizer:
         self.embedding = self.embedder_2d.fit_transform(factors)
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-
         embedding_color = self.embedder_3d.fit_transform(factors)
 
         embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
-        color_min = embedding_color.min(0)
-        color_max = embedding_color.max(0)
-
         self.colors = _min_to_max(embedding_color.copy())
-        self.colors_min_max = [color_min, color_max]
+        self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
 
         self.fit_signatures(signature_matrix)
 
