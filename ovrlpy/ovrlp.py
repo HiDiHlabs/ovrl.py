@@ -3,7 +3,7 @@
 import warnings
 from functools import reduce
 from operator import add
-from typing import Collection, Optional, Sequence
+from typing import Optional, Sequence
 
 import anndata
 import matplotlib.pyplot as plt
@@ -795,7 +795,7 @@ class Visualizer:
             y = (subsample.y.max() + subsample.y.min()) / 2
         if window_size is None:
             window_size = int(1 + (subsample.x.max() - subsample.x.min()) / 2)
-            
+
         roi = ((x - window_size, x + window_size), (y - window_size, y + window_size))
 
         fig = plt.figure(figsize=(22, 12))
