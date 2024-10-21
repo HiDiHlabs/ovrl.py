@@ -921,7 +921,7 @@ class Visualizer:
             subsample.gene.cat.codes.values,
             bandwidth=self.KDE_bandwidth,
         )
-        local_expression = local_expression / ((local_expression**2).sum(0) ** 0.5)
+        local_expression /= (local_expression**2).sum(0) ** 0.5
         subsample_embedding, subsample_embedding_color = _transform_embeddings(
             local_expression.T.values,
             self.pca_2d,
@@ -997,7 +997,7 @@ class Visualizer:
             subsample.gene.cat.codes.values,
             bandwidth=self.KDE_bandwidth,
         )
-        local_expression = local_expression / ((local_expression**2).sum(0) ** 0.5)
+        local_expression /= (local_expression**2).sum(0) ** 0.5
 
         return subsample, local_expression
 
