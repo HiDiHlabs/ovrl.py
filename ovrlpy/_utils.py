@@ -198,14 +198,15 @@ def _plot_embeddings(
 
     text_artists = []
     for i in range(len(celltypes)):
-        t = ax.text(
-            np.nan_to_num((celltype_centers[i, 0])),
-            np.nan_to_num(celltype_centers[i, 1]),
-            celltypes[i],
-            color="k",
-            fontsize=12,
-        )
-        text_artists.append(t)
+        if not np.isnan(celltype_centers[i, 0]):
+            t = ax.text(
+                np.nan_to_num((celltype_centers[i, 0])),
+                np.nan_to_num(celltype_centers[i, 1]),
+                celltypes[i],
+                color="k",
+                fontsize=12,
+            )
+            text_artists.append(t)
 
     _untangle_text(text_artists, ax)
 
@@ -290,7 +291,9 @@ def _create_knn_graph(coords, k=10):
 
 # get a kernel-weighted average of the expression values of the k nearest neighbors of x,y:
 def _get_knn_expression(distances, neighbor_indices, genes, gene_labels, bandwidth=2.5):
-    weights = np.exp(-distances / bandwidth)
+    weights = (1 / ((2 * np.pi) ** (3 / 2) * bandwidth**3)) * np.exp(
+        -(distances**2) / (2 * bandwidth**2)
+    )
     local_expression = pd.DataFrame(
         index=genes, columns=np.arange(distances.shape[0])
     ).astype(float)
@@ -547,7 +550,9 @@ def _compute_divergence_patched(
                     pbar.update(1)
                     continue
 
-                patch_signal = kde_2d(patch_df[["x", "y"]].values)
+                patch_signal = kde_2d(
+                    patch_df[["x", "y"]].values, bandwidth=KDE_bandwidth
+                )
 
                 patch_signal_mask = patch_signal > min_expression
 
