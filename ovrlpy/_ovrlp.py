@@ -326,7 +326,12 @@ def get_expression_vectors_at_rois(
 
 
 def plot_signal_integrity(
-    integrity, signal, signal_threshold: float = 2.0, cmap="BIH", plot_hist: bool = True
+    integrity,
+    signal,
+    signal_threshold: float = 2.0,
+    cmap="BIH",
+    figure_height: float = 10,
+    plot_hist: bool = True,
 ):
     """
     Plots the determined signal integrity of the tissue sample in a signal integrity map.
@@ -346,7 +351,7 @@ def plot_signal_integrity(
             Whether to plot a histogram of integrity values alongside the map.
     """
 
-    figure_height = int(15 * integrity.shape[0] / integrity.shape[1]) + 1
+    figure_aspect_ratio = integrity.shape[0] / integrity.shape[1]
 
     with plt.style.context("dark_background"):
         if cmap == "BIH":
@@ -354,10 +359,15 @@ def plot_signal_integrity(
 
         if plot_hist:
             fig, ax = plt.subplots(
-                1, 2, figsize=(20, figure_height), gridspec_kw={"width_ratios": [6, 1]}
+                1,
+                2,
+                figsize=(figure_height / figure_aspect_ratio * 1.4, figure_height),
+                gridspec_kw={"width_ratios": [6, 1]},
             )
         else:
-            fig, ax = plt.subplots(1, 1, figsize=(20, figure_height))
+            fig, ax = plt.subplots(
+                1, 1, figsize=(figure_height / figure_aspect_ratio, figure_height)
+            )
             ax = [ax]
 
         img = ax[0].imshow(
@@ -480,6 +490,41 @@ class Visualizer:
             Keyword arguments for 2D UMAP embedding.
         cumap_kwargs : dict, optional
             Keyword arguments for 3D UMAP embedding.
+
+    Attributes
+    ----------
+    KDE_bandwidth : float
+        The bandwidth of the KDE.
+    celltyping_min_expression : int
+        Minimum expression level for cell typing.
+    celltyping_min_distance : int
+        Minimum distance for cell typing.
+    rois_celltyping_x : np.ndarray
+        x-coordinates of cell typing regions of interest obtained through gene expression localmax sampling.
+    rois_celltyping_y : np.ndarray
+        y-coordinates of cell typing regions of interest obtained through gene expression localmax sampling.
+    localmax_celltyping_samples : pd.DataFrame
+        Gene expression matrix of the cell typing regions of interest.
+    signatures : pd.DataFrame
+        A matrix of celltypes x gene signatures to use to annotate the UMAP.
+    celltype_centers : np.ndarray
+        The center of gravity of each celltype in the 2d embedding, used for UMAP annotation.
+    celltype_class_assignments : np.ndarray
+        The class assignments of the cell types.
+    pca_2d : PCA
+        The PCA object used for the 2d embedding.
+    embedder_2d : umap.UMAP
+        The UMAP object used for the 2d embedding.
+    pca_3d : PCA
+        The PCA object used for the 3d RGB embedding.
+    embedder_3d : umap.UMAP
+        The UMAP object used for the 3d RGB embedding.
+    n_components_pca : float
+        Number of components for PCA.
+    umap_kwargs : dict
+        Keyword arguments for 2D UMAP embedding.
+    cumap_kwargs : dict
+
     """
 
     def __init__(
@@ -501,7 +546,6 @@ class Visualizer:
             "random_state": None,
         },
     ) -> None:
-        """TODO: document attributes"""
         self.KDE_bandwidth = KDE_bandwidth
 
         self.celltyping_min_expression = celltyping_min_expression
