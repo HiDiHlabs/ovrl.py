@@ -28,6 +28,12 @@ Installation
 
    This will install the required dependencies and tutorial-specific components of the package.
 
+3. **Start with the Tutorials**
+   To start the tutorial JupyterNotebooks are stored in 
+   .. code-block:: bash
+
+      ovrl.py/docs/source/tutorials/*.ipynb
+
 
 .. toctree::
    :maxdepth: 1

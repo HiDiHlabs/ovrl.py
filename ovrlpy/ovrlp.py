@@ -982,7 +982,7 @@ class Visualizer:
         )
         ax.set_aspect("equal", adjustable="box")
 
-    def plot_fit(self, rasterized: bool = True):
+    def plot_fit(self, rasterized: bool = True, umap_kwargs={"scatter_kwargs": {"s": 1}}, tissue_kwargs={"s": 1}):
         """
         Plots the fitted model.
 
@@ -995,10 +995,10 @@ class Visualizer:
         plt.figure(figsize=(15, 7))
 
         plt.subplot(121)
-        self.plot_umap(rasterized=rasterized, **{"scatter_kwargs": {"s": 1}})
+        self.plot_umap(rasterized=rasterized, **umap_kwargs)
 
         plt.subplot(122)
-        self.plot_tissue(rasterized=rasterized, **{"s": 1})
+        self.plot_tissue(rasterized=rasterized, **tissue_kwargs)
 
     def save(self, path: str):
         """
