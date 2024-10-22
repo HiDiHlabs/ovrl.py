@@ -525,8 +525,6 @@ def _compute_divergence_patched(
     x_patches = np.linspace(0, signal.shape[0], patch_count_x + 1).astype(int)
     y_patches = np.linspace(0, signal.shape[1], patch_count_y + 1).astype(int)
 
-    print((x_patches), (y_patches))
-
     with tqdm.tqdm(total=(len(x_patches) - 1) * (len(y_patches) - 1)) as pbar:
         for i in range(len(x_patches) - 1):
             for j in range(len(y_patches) - 1):
@@ -537,8 +535,6 @@ def _compute_divergence_patched(
 
                 patch_size_x = _x - x_ - patch_padding * 2
                 patch_size_y = _y - y_ - patch_padding * 2
-
-                # print(x_,y_,_x,_y)
 
                 patch_df = df[
                     (df.x >= x_) & (df.x < _x) & (df.y >= y_) & (df.y < _y)
