@@ -51,7 +51,7 @@ Here's a summary of the commands to run for installation:
    cd ovrl.py
 
    # Step 2: Install package in editable mode
-   pip install -e .
+   pip install .
 
    # Step 3: Install Jupyter and other packages for interactive analysis
    pip install jupyter pyarrow fastparquet
