@@ -1,9 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import matplotlib.patheffects as PathEffects
-
-# create circular kernel:
-# draw outlines around artist:
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
