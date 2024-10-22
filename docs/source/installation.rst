@@ -50,7 +50,7 @@ Here's a summary of the commands to run for installation:
    git clone https://github.com/HiDiHlabs/ovrl.py.git
    cd ovrl.py
 
-   # Step 2: Install package in editable mode
+   # Step 2: Install package from source
    pip install .
 
    # Step 3: Install Jupyter and other packages for interactive analysis
