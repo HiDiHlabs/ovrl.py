@@ -347,7 +347,6 @@ def plot_signal_integrity(
     """
 
     figure_height = int(15 * integrity.shape[0] / integrity.shape[1]) + 1
-    print(figure_height)
 
     with plt.style.context("dark_background"):
         if cmap == "BIH":
@@ -1033,7 +1032,6 @@ class Visualizer:
         knn_search_index_3d_pickled = base64.b64encode(
             pickle.dumps(self.embedder_3d._knn_search_index)
         ).decode("ascii")
-        # print(knn_search_index_pickled[:100])
 
         adata.uns["embedder_2d"] = {
             "kwargs": self.umap_kwargs,
@@ -1416,6 +1414,7 @@ def compute_coherence_map(
         cumap_kwargs=cumap_kwargs,
     )
 
+    print("Creating gene expression embeddings for visualization:")
     vis.fit_ssam(df, signature_matrix=signature_matrix)
 
     print("Creating signal integrity map:")

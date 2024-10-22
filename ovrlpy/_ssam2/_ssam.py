@@ -128,12 +128,6 @@ def _sample_expression_nd(
         for c in coord_columns
     ]
 
-    print(
-        f"Searching within x:{bounds[0]}, y:{bounds[1]}, n_molecules:{len(coordinate_dataframe_)}"
-    )
-    print(
-        f"Using bandwidth: {kde_bandwidth}, min_expression: {minimum_expression}, min_pixel_distance: {min_pixel_distance}"
-    )
     # perform a global KDE to determine local maxima:
     vector_field_norm = _utils._kde_nd(
         coordinate_dataframe_[coord_columns].values, bandwidth=1
