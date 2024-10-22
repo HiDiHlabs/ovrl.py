@@ -1165,6 +1165,177 @@ def load_visualizer(path: str) -> Visualizer:
     return vis
 
 
+def plot_instance(
+    x: float,
+    y: float,
+    coordinate_df: pd.DataFrame,
+    visualizer: Visualizer,
+    integrity_map: np.ndarray,
+    signal_map: np.ndarray,
+    window_size: int = 30,
+    signal_plot_threshold: float = 5,
+    rasterized: bool = True,
+):
+    """Plot a comprehensive overview of a zoomed-in region of interest.
+
+    Parameters
+    ----------
+    x (float):
+        x coordinate of the region of interest
+    y (float):
+        y coordinate of the region of interest
+    coordinate_df (pd.DataFrame):
+        DataFrame of gene-annotated molecule coordinates
+    visualizer (Visualizer):
+        Visualizer object containing the fitted model
+    integrity_map (np.ndarray):
+        Coherence map of the tissue
+    signal_map (np.ndarray):
+        Signal map of the tissue
+    window_size (int, optional):
+        Size of the window to display. Defaults to 30.
+    signal_plot_threshold (float, optional):
+        Threshold for the signal plot. Defaults to 5.
+    rasterized (bool, optional):
+        If True all plots will be rasterized. Defaults to True.
+    """
+
+    # first, create and color-embed the subsample of the region of interest:
+    subsample = visualizer.subsample_df(x, y, coordinate_df, window_size=window_size)
+    subsample_embedding, subsample_embedding_color = visualizer.transform(subsample)
+
+    vertical_indices = subsample.z.argsort()
+    subsample = subsample.sort_values("z")
+    subsample_embedding_color = subsample_embedding_color[vertical_indices]
+
+    if x is None:
+        x = (subsample.x.max() + subsample.x.min()) / 2
+    if y is None:
+        y = (subsample.y.max() + subsample.y.min()) / 2
+    if window_size is None:
+        window_size = int(1 + (subsample.x.max() - subsample.x.min()) / 2)
+
+    roi = ((x - window_size, x + window_size), (y - window_size, y + window_size))
+
+    fig = plt.figure(figsize=(22, 12))
+
+    gs = fig.add_gridspec(2, 3)
+
+    # integrity map
+    ax_integrity = fig.add_subplot(gs[0, 2], label="signal_integrity", facecolor="k")
+
+    handler = ax_integrity.imshow(
+        integrity_map,
+        cmap=_BIH_CMAP,
+        alpha=(signal_map / signal_plot_threshold).clip(0, 1),
+        vmin=0,
+        vmax=1,
+    )
+
+    ax_integrity.set_title("signal integrity")
+    ax_integrity.invert_yaxis()
+    plt.colorbar(handler)
+
+    ax_integrity.set_xlim(x - window_size, x + window_size)
+    ax_integrity.set_ylim(y - window_size, y + window_size)
+
+    # UMAP
+    ax_umap = fig.add_subplot(gs[0, 0], label="umap")
+    ax_umap.scatter(
+        visualizer.embedding[:, 0],
+        visualizer.embedding[:, 1],
+        c=visualizer.colors,
+        alpha=0.5,
+        marker=".",
+        s=1,
+        rasterized=rasterized,
+    )
+
+    ax_umap.set_axis_off()
+    ax_umap.set_title("UMAP")
+
+    # tissue map
+    ax_tissue_whole: Axes = fig.add_subplot(gs[0, 1], label="celltype_map")
+    visualizer.plot_tissue(rasterized=rasterized, s=1)
+
+    ax_tissue_whole.set_yticks([], [])
+
+    artist = plt.Rectangle(
+        (x - window_size, y - window_size),
+        2 * window_size,
+        2 * window_size,
+        fill=False,
+        edgecolor="k",
+        linewidth=2,
+    )
+    ax_tissue_whole.add_artist(artist)
+
+    ax_tissue_whole.set_title("celltype map")
+
+    # top view of ROI
+    roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=40, rasterized=rasterized)
+
+    def _plot_tissue_scatter_roi(ax: Axes, x, y, roi, *, rasterized: bool = False):
+        ax.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
+        ax.set(xlim=roi[0], ylim=roi[1])
+
+    ax_roi_top = fig.add_subplot(gs[1, 0], label="top_map")
+    top_mask = subsample.z > subsample.z_delim
+    subsample_top = subsample[top_mask]
+    visualizer._plot_tissue_scatter(
+        ax_roi_top,
+        subsample_top["x"],
+        subsample_top["y"],
+        subsample_embedding_color[top_mask],
+        title="ROI celltype map, top",
+        **roi_scatter_kwargs,
+    )
+    _plot_tissue_scatter_roi(ax_roi_top, x, y, roi, rasterized=rasterized)
+
+    ax_roi_bottom = fig.add_subplot(gs[1, 1], label="bottom_map")
+    bottom_mask = subsample.z < subsample.z_delim
+    subsample_bottom = subsample[bottom_mask][::-1]
+    visualizer._plot_tissue_scatter(
+        ax_roi_bottom,
+        subsample_bottom["x"],
+        subsample_bottom["y"],
+        subsample_embedding_color[bottom_mask][::-1],
+        title="ROI celltype map, bottom",
+        **roi_scatter_kwargs,
+    )
+
+    _plot_tissue_scatter_roi(ax_roi_bottom, x, y, roi, rasterized=rasterized)
+
+    # side view of ROI
+    roi_side_scatter_kwargs = dict(s=10, alpha=0.5, rasterized=rasterized)
+
+    sub_gs = gs[1, 2].subgridspec(2, 1)
+
+    ax_side_x = fig.add_subplot(sub_gs[0, 0], label="x_cut")
+    halving_mask = (subsample.y < (y + 4)) & (subsample.y > (y - 4))
+
+    visualizer._plot_tissue_scatter(
+        ax_side_x,
+        subsample.x[halving_mask],
+        subsample.z[halving_mask],
+        subsample_embedding_color[halving_mask],
+        title="ROI, vertical, x-cut",
+        **roi_side_scatter_kwargs,
+    )
+
+    ax_side_y = fig.add_subplot(sub_gs[1, 0], label="y_cut")
+    halving_mask = (subsample.x < (x + 4)) & (subsample.x > (x - 4))
+
+    visualizer._plot_tissue_scatter(
+        ax_side_y,
+        subsample.y[halving_mask],
+        subsample.z[halving_mask],
+        subsample_embedding_color[halving_mask],
+        title="ROI, vertical, y-cut",
+        **roi_side_scatter_kwargs,
+    )
+
+
 def compute_coherence_map(
     df: pd.DataFrame,
     n_expected_celltypes=None,
