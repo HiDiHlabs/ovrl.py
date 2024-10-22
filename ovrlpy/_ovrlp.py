@@ -235,7 +235,7 @@ def pre_process_coordinates(
     return coordinate_df
 
 
-def get_rois(
+def get_pseudocell_locations(
     df: pd.DataFrame,
     genes=None,
     min_distance: int = 10,
@@ -243,7 +243,8 @@ def get_rois(
     min_expression: float = 5,
 ):
     """
-    Returns a list of local maxima in a kde of the data frame.
+    Returns a list of local maxima in a kde of the data frame,
+    interpreted as locations with high likelyhood to contain a cell.
 
     Parameters
     ----------
@@ -261,7 +262,7 @@ def get_rois(
 
     Returns
     -------
-    rois : list
+    pseudocell_locations : list
         A list of local maxima in a KDE of the data frame.
 
     """
@@ -273,15 +274,20 @@ def get_rois(
         df, genes=genes, min_expression=min_expression, KDE_bandwidth=KDE_bandwidth
     )
 
-    rois_x, rois_y, _ = _determine_localmax(
+    pseudocell_locations_x, pseudocells_y, _ = _determine_localmax(
         hist, min_distance=min_distance, min_expression=min_expression
     )
 
-    return rois_x, rois_y
+    return pseudocell_locations_x, pseudocells_y
 
 
-def get_expression_vectors_at_rois(
-    df, rois_x, rois_y, genes=None, KDE_bandwidth=1, min_expression: float = 0
+def sample_expression_at_xy(
+    df,
+    sampling_points_x,
+    sampling_points_y,
+    genes=None,
+    KDE_bandwidth=1,
+    min_expression: float = 0,
 ) -> pd.DataFrame:
     """
     Returns a matrix of gene expression vectors at each local maximum.
@@ -290,9 +296,9 @@ def get_expression_vectors_at_rois(
     ----------
     df : pandas.DataFrame
         A dataframe of coordinates that will be sampled for gene expression.
-    rois_x : list
+    sampling_points_x : list
         x-coordinates to sample gene expression at.
-    rois_y : list
+    sampling_points_y : list
         y-coordinates to sample gene expression at.
     genes : list, optional
         list of genes to sample expression for.
@@ -310,7 +316,7 @@ def get_expression_vectors_at_rois(
     if genes is None:
         genes = sorted(df.gene.unique())
 
-    rois_n_pixel = rois_x + rois_y * df.x_pixel.max()
+    rois_n_pixel = sampling_points_x + sampling_points_y * df.x_pixel.max()
 
     expressions = pd.DataFrame(index=genes, columns=rois_n_pixel, dtype=float)
     expressions[:] = 0
@@ -320,7 +326,7 @@ def get_expression_vectors_at_rois(
             df, genes=[gene], min_expression=min_expression, KDE_bandwidth=KDE_bandwidth
         )
 
-        expressions.loc[gene] = hist[rois_x, rois_y]
+        expressions.loc[gene] = hist[sampling_points_x, sampling_points_y]
 
     return expressions
 
@@ -406,41 +412,41 @@ def plot_signal_integrity(
 
 
 def detect_doublets(
-    coherence,
-    signal,
+    integrity_map,
+    signal_map,
     min_distance=10,
-    max_incoherence=0.4,
-    signal_cutoff=3,
-    coherence_sigma=None,
+    integrity_threshold=0.7,
+    minimum_signal_strength=3,
+    integrity_sigma=None,
 ) -> pd.DataFrame:
     """
-    This function is used to find individual peaks of signal incoherence in the tissue
+    This function is used to find individual low peaks of signal integrity in the tissue
     map as an indicator of single occurrences overlapping cells.
 
     Parameters
     ----------
-        coherence : np.ndarray
-            Coherence map obtained from ovrlpy analysis
-        signal : np.ndarray
-            Signal map from ovrlpy analysis
+        integrity_map : np.ndarray
+            Pixel map of signal integrity obtained from ovrlpy analysis
+        signal_map : np.ndarray
+            Signal strength map from ovrlpy analysis
         min_distance : int, optional
             Minimum distance between reported peaks
-        max_incoherence : float, optional
-            Maximum incoherence value for a peak to be considered
-        signal_cutoff : float, optional
+        integrity_threshold : float, optional
+            Threhold of signal integrity value. A peak with an signal integrity > integrity_threshold is not considered.
+        minimum_signal_strength : float, optional
             Minimum signal value for a peak to be considered
-        coherence_sigma : float, optional
-            Optional sigma value for gaussian filtering of the coherence map,
+        integrity_sigma : float, optional
+            Optional sigma value for gaussian filtering of the integrity map,
             which leads to the detection of overlap regions with larger spatial extent.
     """
 
-    if coherence_sigma is not None:
-        coherence = gaussian_filter(coherence, coherence_sigma)
+    if integrity_sigma is not None:
+        integrity_map = gaussian_filter(integrity_map, integrity_sigma)
 
     dist_x, dist_y, dist_t = _determine_localmax(
-        (1 - coherence) * (signal > signal_cutoff),
+        (1 - integrity_map) * (signal_map > minimum_signal_strength),
         min_distance=min_distance,
-        min_expression=max_incoherence,
+        min_expression=integrity_threshold,
     )
 
     arg_idcs = np.argsort(dist_t)[::-1]
@@ -451,7 +457,7 @@ def detect_doublets(
             "x": dist_y,
             "y": dist_x,
             "integrity": dist_t,
-            "signal": signal[dist_x, dist_y],
+            "signal": signal_map[dist_x, dist_y],
         }
     )
 
@@ -499,11 +505,11 @@ class Visualizer:
         Minimum expression level for cell typing.
     celltyping_min_distance : int
         Minimum distance for cell typing.
-    rois_celltyping_x : np.ndarray
+    pseudocell_locations_x : np.ndarray
         x-coordinates of cell typing regions of interest obtained through gene expression localmax sampling.
-    rois_celltyping_y : np.ndarray
+    pseudocell_locations_y : np.ndarray
         y-coordinates of cell typing regions of interest obtained through gene expression localmax sampling.
-    localmax_celltyping_samples : pd.DataFrame
+    pseudocell_expression_samples : pd.DataFrame
         Gene expression matrix of the cell typing regions of interest.
     signatures : pd.DataFrame
         A matrix of celltypes x gene signatures to use to annotate the UMAP.
@@ -528,13 +534,13 @@ class Visualizer:
     genes : list
         A list of genes to utilize in the model.
     embedding : np.ndarray
-        The 2d embedding of localmax gene expression regions-of-interest.
+        The 2d embedding of pseudocell gene expression .
     colors : np.ndarray
         The RGB embedding.
     colors_min_max : list
         The minimum and maximum values of the RGB embedding, necessary for normalization of the transform method.
-    coherence_map : np.ndarray
-        The coherence map of the tissue.
+    integrity_map : np.ndarray
+        The integrity map of the tissue.
     signal_map : np.ndarray
         A pixel map of overall signal strength in the tissue, used to mask out low-signal regions that are difficult to interpret.
     """
@@ -562,8 +568,8 @@ class Visualizer:
 
         self.celltyping_min_expression = celltyping_min_expression
         self.celltyping_min_distance = celltyping_min_distance
-        self.rois_celltyping_x, self.rois_celltyping_y = None, None
-        self.localmax_celltyping_samples = None
+        self.pseudocell_locations_x, self.pseudocell_locations_y = None, None
+        self.pseudocell_expression_samples = None
         self.signatures = None
         self.celltype_centers = None
         self.celltype_class_assignments = None
@@ -583,7 +589,7 @@ class Visualizer:
         self.colors = None
         self.colors_min_max = [None, None]
 
-        self.coherence_map = None
+        self.integrity_map = None
         self.signal_map = None
 
     def fit_ssam(
@@ -646,17 +652,19 @@ class Visualizer:
             min_pixel_distance=self.celltyping_min_distance,
         )
 
-        self.rois_celltyping_x, self.rois_celltyping_y, _ = adata_ssam.obsm["spatial"].T
+        self.pseudocell_locations_x, self.pseudocell_locations_y, _ = adata_ssam.obsm[
+            "spatial"
+        ].T
 
-        self.localmax_celltyping_samples = pd.DataFrame(
+        self.pseudocell_expression_samples = pd.DataFrame(
             adata_ssam.X.T, columns=adata_ssam.obs_names, index=adata_ssam.var_names
         )
         self.pca_2d = PCA(
             n_components=min(
-                self.n_components_pca, self.localmax_celltyping_samples.shape[0] // 2
+                self.n_components_pca, self.pseudocell_expression_samples.shape[0] // 2
             )
         )
-        factors = self.pca_2d.fit_transform(self.localmax_celltyping_samples.T)
+        factors = self.pca_2d.fit_transform(self.pseudocell_expression_samples.T)
 
         print(f"Modeling {factors.shape[1]} pseudo-celltype clusters")
 
@@ -674,7 +682,7 @@ class Visualizer:
         self.fit_signatures(signature_matrix)
 
         gene_assignments = _determine_celltype_class_assignments(
-            self.localmax_celltyping_samples,
+            self.pseudocell_expression_samples,
             pd.DataFrame(np.eye(len(genes)), index=genes, columns=genes).astype(float),
         )
 
@@ -711,7 +719,7 @@ class Visualizer:
         celltypes = sorted(signature_matrix.columns)
 
         self.celltype_class_assignments = _determine_celltype_class_assignments(
-            self.localmax_celltyping_samples, signature_matrix
+            self.pseudocell_expression_samples, signature_matrix
         )
 
         # determine the center of gravity of each celltype in the embedding:
@@ -792,7 +800,7 @@ class Visualizer:
 
         return subsample_embedding, subsample_embedding_color
 
-    def roi_df(self) -> pd.DataFrame:
+    def pseudocell_df(self) -> pd.DataFrame:
         """
         Returns a pandas.DataFrame containing the gene-count matrix of the fitted
         tissue's determined pseudo-cells.
@@ -801,19 +809,21 @@ class Visualizer:
         ----------
         pandas.DataFrame
         """
-        roi_df = pd.DataFrame(
-            {"x": self.rois_celltyping_x, "y": self.rois_celltyping_y}
+        pseudocell_df = pd.DataFrame(
+            {"x": self.pseudocell_locations_x, "y": self.pseudocell_locations_y}
         )
 
         if self.signal_map is not None:
-            roi_df["signal"] = self.signal_map[roi_df.x, roi_df.y]
+            pseudocell_df["signal"] = self.signal_map[pseudocell_df.x, pseudocell_df.y]
 
-        if self.coherence_map is not None:
-            roi_df["coherence"] = self.coherence_map[roi_df.x, roi_df.y]
+        if self.integrity_map is not None:
+            pseudocell_df["integrity"] = self.integrity_map[
+                pseudocell_df.x, pseudocell_df.y
+            ]
 
-        return roi_df
+        return pseudocell_df
 
-    def plot_instance(
+    def plot_region_of_interest(
         self,
         subsample,
         subsample_embedding_color,
@@ -1011,8 +1021,8 @@ class Visualizer:
         ax = plt.gca()
         self._plot_tissue_scatter(
             ax,
-            self.rois_celltyping_x,
-            self.rois_celltyping_y,
+            self.pseudocell_locations_x,
+            self.pseudocell_locations_y,
             self.colors,
             marker=".",
             alpha=1,
@@ -1061,11 +1071,11 @@ class Visualizer:
         import pickle
 
         adata = anndata.AnnData(
-            X=self.localmax_celltyping_samples.T.values,
-            obs=pd.DataFrame(index=range(self.localmax_celltyping_samples.shape[1])),
-            var=pd.DataFrame(index=self.localmax_celltyping_samples.index),
+            X=self.pseudocell_expression_samples.T.values,
+            obs=pd.DataFrame(index=range(self.pseudocell_expression_samples.shape[1])),
+            var=pd.DataFrame(index=self.pseudocell_expression_samples.index),
         )
-        adata.obs["localmax_id"] = self.localmax_celltyping_samples.columns
+        adata.obs["pseudocell_id"] = self.pseudocell_expression_samples.columns
 
         adata.uns["celltype_centers"] = self.celltype_centers
         adata.uns["args"] = {
@@ -1125,10 +1135,10 @@ class Visualizer:
         adata.uns["colors_min_max"] = self.colors_min_max
         adata.uns["colors"] = self.colors
         adata.uns["embedding"] = self.embedding
-        adata.uns["coherence_map"] = self.coherence_map
+        adata.uns["integrity_map"] = self.integrity_map
         adata.uns["signal_map"] = self.signal_map
-        adata.uns["rois_celltyping_x"] = self.rois_celltyping_x
-        adata.uns["rois_celltyping_y"] = self.rois_celltyping_y
+        adata.uns["pseudocell_locations_x"] = self.pseudocell_locations_x
+        adata.uns["pseudocell_locations_y"] = self.pseudocell_locations_y
 
         adata.write_h5ad(path)
 
@@ -1154,8 +1164,8 @@ def load_visualizer(path: str) -> Visualizer:
 
     vis = Visualizer(**adata.uns["args"])
 
-    vis.localmax_celltyping_samples = pd.DataFrame(
-        adata.X.T, columns=adata.obs["localmax_id"], index=adata.var.index
+    vis.pseudocell_expression_samples = pd.DataFrame(
+        adata.X.T, columns=adata.obs["pseudocell_id"], index=adata.var.index
     )
     vis.celltype_centers = adata.uns["celltype_centers"]
     vis.celltype_class_assignments = adata.obsm["celltype_class_assignments"]
@@ -1205,21 +1215,21 @@ def load_visualizer(path: str) -> Visualizer:
     vis.colors_min_max = adata.uns["colors_min_max"]
     vis.colors = adata.uns["colors"]
     vis.embedding = adata.uns["embedding"]
-    if "coherence_map" in adata.uns.keys():
-        vis.coherence_map = adata.uns["coherence_map"]
+    if "integrity_map" in adata.uns.keys():
+        vis.integrity_map = adata.uns["integrity_map"]
     else:
-        vis.coherence_map = None
+        vis.integrity_map = None
     if "signal_map" in adata.uns.keys():
         vis.signal_map = adata.uns["signal_map"]
     else:
         vis.signal_map = None
-    vis.rois_celltyping_x = adata.uns["rois_celltyping_x"]
-    vis.rois_celltyping_y = adata.uns["rois_celltyping_y"]
+    vis.pseudocell_locations_x = adata.uns["pseudocell_locations_x"]
+    vis.pseudocell_locations_y = adata.uns["pseudocell_locations_y"]
 
     return vis
 
 
-def plot_instance(
+def plot_region_of_interest(
     x: float,
     y: float,
     coordinate_df: pd.DataFrame,
@@ -1227,7 +1237,7 @@ def plot_instance(
     integrity_map: np.ndarray,
     signal_map: np.ndarray,
     window_size: int = 30,
-    signal_plot_threshold: float = 5,
+    signal_plot_threshold: float = 5.0,
     rasterized: bool = True,
 ):
     """Plot a comprehensive overview of a zoomed-in region of interest.
@@ -1243,7 +1253,7 @@ def plot_instance(
     visualizer (Visualizer):
         Visualizer object containing the fitted model
     integrity_map (np.ndarray):
-        Coherence map of the tissue
+        integrity map of the tissue
     signal_map (np.ndarray):
         Signal map of the tissue
     window_size (int, optional):
@@ -1390,7 +1400,7 @@ def plot_instance(
     )
 
 
-def compute_coherence_map(
+def run(
     df: pd.DataFrame,
     n_expected_celltypes=None,
     cell_diameter=10,
@@ -1412,9 +1422,9 @@ def compute_coherence_map(
     },
 ):
     """
-    This is a wrapper function that computes the coherence map for a given spatial
+    This is a wrapper function that computes the integrity map for a given spatial
     transcriptomics dataset.
-    It includes the entire ovrlpy pipeline, returning a coherence map and a signal
+    It includes the entire ovrlpy pipeline, returning a integrity map and a signal
     strength map and produces a visualizer object that can be used to plot the results.
 
     Parameters
@@ -1442,13 +1452,13 @@ def compute_coherence_map(
 
     Returns
     -------
-    coherence_map : np.ndarray
-        A coherence pixel map of the spatial transcriptomics dataset.
+    integrity_map : np.ndarray
+        A integrity pixel map of the spatial transcriptomics dataset.
     signal_map : np.ndarray
         A pixel map of the spatial transcriptomics dataset containing the detected signal.
     vis : Visualizer
         A visualizer object that can be used to plot the
-        results of the coherence map
+        results of the integrity map
     """
 
     KDE_bandwidth = cell_diameter / 5
@@ -1474,7 +1484,7 @@ def compute_coherence_map(
     vis.fit_ssam(df, signature_matrix=signature_matrix)
 
     print("Creating signal integrity map:")
-    coherence_, signal_ = _compute_divergence_patched(
+    integrity_, signal_ = _compute_divergence_patched(
         df,
         vis.genes,
         vis.pca_2d.components_,
@@ -1482,7 +1492,7 @@ def compute_coherence_map(
         min_expression=1,
     )
 
-    vis.coherence_map = coherence_.T
+    vis.integrity_map = integrity_.T
     vis.signal_map = signal_.T
 
-    return coherence_.T, signal_.T, vis
+    return integrity_.T, signal_.T, vis
