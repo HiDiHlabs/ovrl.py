@@ -22,13 +22,13 @@ Steps for Installation
 
 2. **Install the Package in Editable Mode**
 
-   To install the project in "editable" mode, allowing for live updates when changes are made to the source files, execute the following command:
+   To install the ovrlpy package, execute the following command:
 
    .. code-block:: bash
 
-      pip install -e .
+      pip install .
 
-   This ensures that any modifications to the code will automatically be reflected without needing to reinstall the package.
+   This installs the package based on the current state of the source files.
 
 3. **Set Up for Interactive Analysis (Optional)**
 
