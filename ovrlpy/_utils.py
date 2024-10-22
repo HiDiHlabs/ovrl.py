@@ -1,20 +1,22 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import matplotlib.patheffects as PathEffects
+
 # create circular kernel:
 # draw outlines around artist:
-import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tqdm
-from scipy.ndimage import gaussian_filter, maximum_filter
+from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
-from ._ssam2 import kde_2d
+from ._ssam2 import find_local_maxima, kde_2d
 
 
-def _draw_outline(ax, artist, lw=2, color="black"):
+def _draw_outline(artist, lw=2, color="black"):
+    "Draws outlines around the (text) artists for better legibility."
     _ = artist.set_path_effects(
         [PathEffects.withStroke(linewidth=lw, foreground=color), PathEffects.Normal()]
     )
@@ -43,31 +45,10 @@ def _plot_scalebar(
     )
 
     if edge_color is not None:
-        _draw_outline(ax, plot_artist[0], lw=5, color=edge_color)
-        _draw_outline(ax, text_artist, lw=5, color=edge_color)
+        _draw_outline(plot_artist[0], lw=5, color=edge_color)
+        _draw_outline(text_artist, lw=5, color=edge_color)
 
     return plot_artist, text_artist
-
-
-def _create_circular_kernel(r):
-    """
-    Creates a circular kernel of radius r.
-
-    Parameters
-    ----------
-    r : int
-        The radius of the kernel.
-
-    Returns
-    -------
-    kernel : np.array
-        A 2d array of the circular kernel.
-
-    """
-
-    span = np.linspace(-1, 1, r * 2)
-    X, Y = np.meshgrid(span, span)
-    return (X**2 + Y**2) ** 0.5 <= 1
 
 
 def _get_kl_divergence(p, q):
@@ -78,7 +59,7 @@ def _get_kl_divergence(p, q):
     return output
 
 
-def _determine_localmax(distribution, min_distance=3, min_expression=5):
+def _determine_localmax_and_sample(distribution, min_distance=3, min_expression=5):
     """
     Returns a list of local maxima in a kde of the data frame.
 
@@ -99,12 +80,8 @@ def _determine_localmax(distribution, min_distance=3, min_expression=5):
         A list of y coordinates of local maxima.
 
     """
-    localmax_kernel = _create_circular_kernel(min_distance)
-    localmax_projection = distribution == maximum_filter(
-        distribution, footprint=localmax_kernel
-    )
 
-    rois_x, rois_y = np.where((distribution > min_expression) & localmax_projection)
+    rois_x, rois_y = find_local_maxima(distribution, min_distance, min_expression)
 
     return rois_x, rois_y, distribution[rois_x, rois_y]
 
@@ -148,15 +125,15 @@ def _min_to_max(arr, arr_min=None, arr_max=None):
 
 # define a function that fits expression data to into the umap embeddings:
 def _transform_embeddings(
-    expression, pca, embedder_2d, embedder_3d, colors_min_max=[None, None]
+    expression,
+    pca,
+    embedder_2d,
+    embedder_3d,
 ):
     factors = pca.transform(expression)
 
     embedding = embedder_2d.transform(factors)
     embedding_color = embedder_3d.transform(factors)
-    # embedding_color = embedder_3d.transform(embedding)
-
-    # embedding_color = _min_to_max(embedding_color,colors_min_max[0],colors_min_max[1])
 
     return embedding, embedding_color
 
@@ -192,12 +169,12 @@ def _plot_embeddings(
     )
 
     text_artists = []
-    for i in range(len(celltypes)):
+    for i, celltype in enumerate(celltypes):
         if not np.isnan(celltype_centers[i, 0]):
             t = ax.text(
                 np.nan_to_num((celltype_centers[i, 0])),
                 np.nan_to_num(celltype_centers[i, 1]),
-                celltypes[i],
+                celltype,
                 color="k",
                 fontsize=12,
             )
@@ -364,6 +341,9 @@ def _compute_divergence_embedded(
     metric="cosine_similarity",
     pca_divergence=0.8,
 ):
+    """This is a legacy function, replaced by _compute_divergence_patched. It contains other similarity measures than cosine similarity.
+    To be integrated into the patch-based divergence computation later.
+    """
     signal = _create_histogram(
         df,
         genes,
@@ -380,9 +360,6 @@ def _compute_divergence_embedded(
 
     df_top = df[df.z_delim < df.z]
     df_bot = df[df.z_delim > df.z]
-
-    # dr_bottom = np.zeros((df_bottom.shape[0],df_bottom.shape[1], pca.components_.shape[0]))
-    # dr_top = np.zeros((df_bottom.shape[0],df_bottom.shape[1], pca.components_.shape[0]))
 
     hists_top = np.zeros((mask.sum(), pca.components_.shape[0]))
     hists_bot = np.zeros((mask.sum(), pca.components_.shape[0]))
@@ -481,8 +458,6 @@ def _compute_divergence_embedded(
 
 
 def _compute_embedding_vectors(subset_df, signal_mask, factor):
-    # for i,g in tqdm.tqdm(enumerate(genes),total=len(genes)):
-
     if len(subset_df) < 2:
         return None, None
 

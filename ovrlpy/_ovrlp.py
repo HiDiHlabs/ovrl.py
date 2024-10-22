@@ -20,7 +20,7 @@ from ._utils import (
     _compute_divergence_patched,
     _create_histogram,
     _create_knn_graph,
-    _determine_localmax,
+    _determine_localmax_and_sample,
     _fill_color_axes,
     _get_knn_expression,
     _get_spatial_subsample_mask,
@@ -274,7 +274,7 @@ def get_pseudocell_locations(
         df, genes=genes, min_expression=min_expression, KDE_bandwidth=KDE_bandwidth
     )
 
-    pseudocell_locations_x, pseudocells_y, _ = _determine_localmax(
+    pseudocell_locations_x, pseudocells_y, _ = _determine_localmax_and_sample(
         hist, min_distance=min_distance, min_expression=min_expression
     )
 
@@ -443,7 +443,7 @@ def detect_doublets(
     if integrity_sigma is not None:
         integrity_map = gaussian_filter(integrity_map, integrity_sigma)
 
-    dist_x, dist_y, dist_t = _determine_localmax(
+    dist_x, dist_y, dist_t = _determine_localmax_and_sample(
         (1 - integrity_map) * (signal_map > minimum_signal_strength),
         min_distance=min_distance,
         min_expression=integrity_threshold,
@@ -787,7 +787,6 @@ class Visualizer:
             self.pca_2d,
             embedder_2d=self.embedder_2d,
             embedder_3d=self.embedder_3d,
-            colors_min_max=self.colors_min_max,
         )
         subsample_embedding_color, _ = _fill_color_axes(
             subsample_embedding_color, self.pca_3d
@@ -825,8 +824,8 @@ class Visualizer:
 
     def plot_region_of_interest(
         self,
-        subsample,
-        subsample_embedding_color,
+        subsample: pd.DataFrame,
+        subsample_embedding_color: np.ndarray,
         x: float = None,
         y: float = None,
         window_size: int = None,
@@ -839,7 +838,7 @@ class Visualizer:
         ----------
         subsample : pandas.DataFrame
             A dataframe of molecule coordinates and gene assignments.
-        subsample_embedding_color : Optional[pandas.DataFrame]
+        subsample_embedding_color : pandas.DataFrame
             A list of rgb values for each molecule.
         x : float
             Center x-coordinate for the region-of-interest.
