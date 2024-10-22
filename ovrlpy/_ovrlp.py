@@ -522,9 +522,21 @@ class Visualizer:
     n_components_pca : float
         Number of components for PCA.
     umap_kwargs : dict
-        Keyword arguments for 2D UMAP embedding.
+        Keyword arguments for 2D UMAP embedding object.
     cumap_kwargs : dict
-
+        Keyword arguments for 3D UMAP RGB embedding object.
+    genes : list
+        A list of genes to utilize in the model.
+    embedding : np.ndarray
+        The 2d embedding of localmax gene expression regions-of-interest.
+    colors : np.ndarray
+        The RGB embedding.
+    colors_min_max : list
+        The minimum and maximum values of the RGB embedding, necessary for normalization of the transform method.
+    coherence_map : np.ndarray
+        The coherence map of the tissue.
+    signal_map : np.ndarray
+        A pixel map of overall signal strength in the tissue, used to mask out low-signal regions that are difficult to interpret.
     """
 
     def __init__(
