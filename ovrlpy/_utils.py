@@ -78,7 +78,10 @@ def _determine_localmax_and_sample(distribution, min_distance=3, min_expression=
 
     """
 
-    rois_x, rois_y = find_local_maxima(distribution, min_distance, min_expression)
+    rois = find_local_maxima(distribution, min_distance, min_expression)
+
+    rois_x = rois[:, 0]
+    rois_y = rois[:, 1]
 
     return rois_x, rois_y, distribution[rois_x, rois_y]
 

@@ -1468,7 +1468,7 @@ def run(
 
     print("Running vertical adjustment")
     _assign_xy(df)
-    _assign_z_mean_message_passing(df, rounds=4)
+    _assign_z_mean_message_passing(df, rounds=20)
 
     vis = Visualizer(
         KDE_bandwidth=KDE_bandwidth,
