@@ -563,7 +563,7 @@ class Visualizer:
             "n_components": 3,
             "min_dist": 0.0,
             "metric": "euclidean",
-            "n_neighbors": 10,
+            "n_neighbors": 20,
             "random_state": 42,            
             "n_jobs": 1,
         },
@@ -596,7 +596,7 @@ class Visualizer:
         self.integrity_map = None
         self.signal_map = None
 
-    def fit_ssam(
+    def fit(
         self,
         coordinate_df: Optional[pd.DataFrame] = None,
         adata: Optional[anndata.AnnData] = None,
@@ -1093,6 +1093,7 @@ class Visualizer:
         adata.uns["pca_2d"] = {
             "components_": self.pca_2d.components_,
             "mean_": self.pca_2d.mean_,
+            "explained_variance_": self.pca_2d.explained_variance_,
         }
 
         knn_search_index_2d_pickled = base64.b64encode(
@@ -1119,6 +1120,7 @@ class Visualizer:
         adata.uns["pca_3d"] = {
             "components_": self.pca_3d.components_,
             "mean_": self.pca_3d.mean_,
+            "explained_variance_": self.pca_3d.explained_variance_,
         }
 
         adata.uns["embedder_3d"] = {
@@ -1178,6 +1180,7 @@ def load_visualizer(path: str) -> Visualizer:
     vis.pca_2d = PCA(n_components=adata.uns["pca_2d"]["components_"].shape[0])
     vis.pca_2d.components_ = adata.uns["pca_2d"]["components_"]
     vis.pca_2d.mean_ = adata.uns["pca_2d"]["mean_"]
+    vis.pca_2d.explained_variance_ = adata.uns["pca_2d"]["explained_variance_"]
 
     vis.embedder_2d = umap.UMAP(**adata.uns["embedder_2d"]["kwargs"])
     vis.embedder_2d._raw_data = adata.uns["embedder_2d"]["_raw_data"]
@@ -1198,6 +1201,7 @@ def load_visualizer(path: str) -> Visualizer:
     vis.pca_3d = PCA(n_components=adata.uns["pca_3d"]["components_"].shape[0])
     vis.pca_3d.components_ = adata.uns["pca_3d"]["components_"]
     vis.pca_3d.mean_ = adata.uns["pca_3d"]["mean_"]
+    vis.pca_3d.explained_variance_ = adata.uns["pca_3d"]["explained_variance_"]
 
     vis.embedder_3d = umap.UMAP(**adata.uns["embedder_3d"]["kwargs"])
     vis.embedder_3d._raw_data = adata.uns["embedder_3d"]["_raw_data"]
@@ -1340,7 +1344,7 @@ def plot_region_of_interest(
     ax_tissue_whole.set_title("celltype map")
 
     # top view of ROI
-    roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=2e5/window_size**2, rasterized=rasterized)
+    roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=1.5e5/window_size**2, rasterized=rasterized)
 
     def _plot_tissue_scatter_roi(ax: Axes, x, y, roi, *, rasterized: bool = False):
         ax.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
@@ -1484,7 +1488,7 @@ def run(
     )
 
     print("Creating gene expression embeddings for visualization:")
-    vis.fit_ssam(df, signature_matrix=signature_matrix)
+    vis.fit(df, signature_matrix=signature_matrix)
 
     print("Creating signal integrity map:")
     integrity_, signal_ = _compute_divergence_patched(
