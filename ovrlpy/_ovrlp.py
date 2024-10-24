@@ -13,6 +13,7 @@ import umap
 from matplotlib.axes import Axes
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
+from scipy.linalg import norm
 from sklearn.decomposition import PCA
 
 from ._ssam2 import _sample_expression
@@ -555,13 +556,16 @@ class Visualizer:
             "n_components": 2,
             "min_dist": 0.0,
             "n_neighbors": 20,
-            "random_state": None,
+            "random_state": 42,
+            "n_jobs": 1,
         },
         cumap_kwargs={
             "n_components": 3,
-            "min_dist": 0.001,
-            "n_neighbors": 50,
-            "random_state": None,
+            "min_dist": 0.0,
+            "metric": "euclidean",
+            "n_neighbors": 10,
+            "random_state": 42,            
+            "n_jobs": 1,
         },
     ) -> None:
         self.KDE_bandwidth = KDE_bandwidth
@@ -666,13 +670,13 @@ class Visualizer:
         )
         factors = self.pca_2d.fit_transform(self.pseudocell_expression_samples.T)
 
-        print(f"Modeling {factors.shape[1]} pseudo-celltype clusters")
+        print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
 
         self.embedder_2d = umap.UMAP(**self.umap_kwargs)
         self.embedding = self.embedder_2d.fit_transform(factors)
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-        embedding_color = self.embedder_3d.fit_transform(factors)
+        embedding_color = self.embedder_3d.fit_transform(factors/norm(factors, axis=1)[..., None])
 
         embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
@@ -1336,7 +1340,7 @@ def plot_region_of_interest(
     ax_tissue_whole.set_title("celltype map")
 
     # top view of ROI
-    roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=40, rasterized=rasterized)
+    roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=2e5/window_size**2, rasterized=rasterized)
 
     def _plot_tissue_scatter_roi(ax: Axes, x, y, roi, *, rasterized: bool = False):
         ax.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
