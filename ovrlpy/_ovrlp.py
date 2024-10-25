@@ -596,7 +596,7 @@ class Visualizer:
         self.integrity_map = None
         self.signal_map = None
 
-    def fit(
+    def fit_transcripts(
         self,
         coordinate_df: Optional[pd.DataFrame] = None,
         adata: Optional[anndata.AnnData] = None,
@@ -701,6 +701,43 @@ class Visualizer:
                 for i in range(len(self.genes))
             ]
         )
+        
+    def fit_pseudocells(self, pseudocell_expression_samples: pd.DataFrame, genes: list=None):
+        """fits the visualizer to a given pseudocell expression sample.
+
+        Args:
+            pseudocell_expression_samples (pandas.DataFrame): A gene x cell matrix of gene expression
+            genes (list, optional): A list of genes to utilize in the model. Defaults to None.
+        """
+        
+        self.pseudocell_expression_samples = pseudocell_expression_samples
+        
+        if genes is None:
+            genes = pseudocell_expression_samples.index
+        self.genes = genes
+        
+        self.pca_2d = PCA(
+            n_components=min(
+                self.n_components_pca, pseudocell_expression_samples.shape[0] // 2
+            )
+        )
+        factors = self.pca_2d.fit_transform(pseudocell_expression_samples.T)
+
+        print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
+
+        self.embedder_2d = umap.UMAP(**self.umap_kwargs)
+        self.embedding = self.embedder_2d.fit_transform(factors)
+
+        self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
+        embedding_color = self.embedder_3d.fit_transform(factors/norm(factors, axis=1)[..., None])
+
+        embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
+
+        self.colors = _min_to_max(embedding_color.copy())
+        self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
+        
+        self.fit_signatures()
+
 
     def fit_signatures(self, signature_matrix=None):
         """
@@ -761,7 +798,7 @@ class Visualizer:
 
         return subsample
 
-    def transform(self, coordinate_df: pd.DataFrame):
+    def transform_transcripts(self, coordinate_df: pd.DataFrame):
         """
         Transforms the coordinate dataframe to the visualizers 2d and 3d embedding space.
 
@@ -802,6 +839,32 @@ class Visualizer:
         subsample_embedding_color = np.clip(subsample_embedding_color, 0, 1)
 
         return subsample_embedding, subsample_embedding_color
+    
+    def transform_pseudocells(self, pseudocell_expression_samples:pd.DataFrame):
+        """Transforms a matrix of gene expression to the visualizer's 2d and 3d embedding space.
+
+        Args:
+            pseudocell_expression_samples (pd.DataFrame): A gene x cell matrix of gene expression
+        """
+        
+        print(pseudocell_expression_samples)
+        subsample_embedding, subsample_embedding_color = _transform_embeddings(
+            pseudocell_expression_samples.T.values,
+            self.pca_2d,
+            embedder_2d=self.embedder_2d,
+            embedder_3d=self.embedder_3d,
+        )
+        subsample_embedding_color, _ = _fill_color_axes(
+            subsample_embedding_color, self.pca_3d
+        )
+        color_min, color_max = self.colors_min_max
+        subsample_embedding_color = (subsample_embedding_color - color_min) / (
+            color_max - color_min
+        )
+        subsample_embedding_color = np.clip(subsample_embedding_color, 0, 1)
+
+        return subsample_embedding, subsample_embedding_color
+        
 
     def pseudocell_df(self) -> pd.DataFrame:
         """
@@ -1273,7 +1336,7 @@ def plot_region_of_interest(
 
     # first, create and color-embed the subsample of the region of interest:
     subsample = visualizer.subsample_df(x, y, coordinate_df, window_size=window_size)
-    subsample_embedding, subsample_embedding_color = visualizer.transform(subsample)
+    subsample_embedding, subsample_embedding_color = visualizer.transform_transcripts(subsample)
 
     vertical_indices = subsample.z.argsort()
     subsample = subsample.sort_values("z")
@@ -1488,7 +1551,7 @@ def run(
     )
 
     print("Creating gene expression embeddings for visualization:")
-    vis.fit(df, signature_matrix=signature_matrix)
+    vis.fit_transcripts(df, signature_matrix=signature_matrix)
 
     print("Creating signal integrity map:")
     integrity_, signal_ = _compute_divergence_patched(
