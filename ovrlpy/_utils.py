@@ -1,20 +1,19 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# create circular kernel:
-# draw outlines around artist:
 import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tqdm
-from scipy.ndimage import gaussian_filter, maximum_filter
+from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
-from ._ssam2 import kde_2d
+from ._ssam2 import find_local_maxima, kde_2d
 
 
-def _draw_outline(ax, artist, lw=2, color="black"):
+def _draw_outline(artist, lw=2, color="black"):
+    "Draws outlines around the (text) artists for better legibility."
     _ = artist.set_path_effects(
         [PathEffects.withStroke(linewidth=lw, foreground=color), PathEffects.Normal()]
     )
@@ -43,30 +42,10 @@ def _plot_scalebar(
     )
 
     if edge_color is not None:
-        _draw_outline(ax, plot_artist[0], lw=5, color=edge_color)
-        _draw_outline(ax, text_artist, lw=5, color=edge_color)
+        _draw_outline(plot_artist[0], lw=5, color=edge_color)
+        _draw_outline(text_artist, lw=5, color=edge_color)
 
     return plot_artist, text_artist
-
-
-def _create_circular_kernel(r):
-    """
-    Creates a circular kernel of radius r.
-    Parameters
-    ----------
-    r : int
-        The radius of the kernel.
-
-    Returns
-    -------
-    kernel : np.array
-        A 2d array of the circular kernel.
-
-    """
-
-    span = np.linspace(-1, 1, r * 2)
-    X, Y = np.meshgrid(span, span)
-    return (X**2 + Y**2) ** 0.5 <= 1
 
 
 def _get_kl_divergence(p, q):
@@ -77,9 +56,10 @@ def _get_kl_divergence(p, q):
     return output
 
 
-def _determine_localmax(distribution, min_distance=3, min_expression=5):
+def _determine_localmax_and_sample(distribution, min_distance=3, min_expression=5):
     """
     Returns a list of local maxima in a kde of the data frame.
+
     Parameters
     ----------
     distribution : np.array
@@ -97,12 +77,11 @@ def _determine_localmax(distribution, min_distance=3, min_expression=5):
         A list of y coordinates of local maxima.
 
     """
-    localmax_kernel = _create_circular_kernel(min_distance)
-    localmax_projection = distribution == maximum_filter(
-        distribution, footprint=localmax_kernel
-    )
 
-    rois_x, rois_y = np.where((distribution > min_expression) & localmax_projection)
+    rois = find_local_maxima(distribution, min_distance, min_expression)
+
+    rois_x = rois[:, 0]
+    rois_y = rois[:, 1]
 
     return rois_x, rois_y, distribution[rois_x, rois_y]
 
@@ -146,15 +125,15 @@ def _min_to_max(arr, arr_min=None, arr_max=None):
 
 # define a function that fits expression data to into the umap embeddings:
 def _transform_embeddings(
-    expression, pca, embedder_2d, embedder_3d, colors_min_max=[None, None]
+    expression,
+    pca,
+    embedder_2d,
+    embedder_3d,
 ):
     factors = pca.transform(expression)
 
     embedding = embedder_2d.transform(factors)
     embedding_color = embedder_3d.transform(factors)
-    # embedding_color = embedder_3d.transform(embedding)
-
-    # embedding_color = _min_to_max(embedding_color,colors_min_max[0],colors_min_max[1])
 
     return embedding, embedding_color
 
@@ -174,17 +153,10 @@ def _plot_embeddings(
     if ax is None:
         ax = plt.gca()
 
-    if "alpha" not in scatter_kwargs:
-        alpha = 0.1
-    else:
-        alpha = scatter_kwargs["alpha"]
-        scatter_kwargs.pop("alpha")
+    ax.axis("off")
 
-    if "marker" not in scatter_kwargs:
-        marker = "."
-    else:
-        marker = scatter_kwargs["marker"]
-        scatter_kwargs.pop("marker")
+    alpha = 0.1 if "alpha" not in scatter_kwargs else scatter_kwargs.pop("alpha")
+    marker = "." if "marker" not in scatter_kwargs else scatter_kwargs.pop("marker")
 
     ax.scatter(
         embedding[:, 0],
@@ -197,15 +169,16 @@ def _plot_embeddings(
     )
 
     text_artists = []
-    for i in range(len(celltypes)):
-        t = ax.text(
-            np.nan_to_num((celltype_centers[i, 0])),
-            np.nan_to_num(celltype_centers[i, 1]),
-            celltypes[i],
-            color="k",
-            fontsize=12,
-        )
-        text_artists.append(t)
+    for i, celltype in enumerate(celltypes):
+        if not np.isnan(celltype_centers[i, 0]):
+            t = ax.text(
+                np.nan_to_num((celltype_centers[i, 0])),
+                np.nan_to_num(celltype_centers[i, 1]),
+                celltype,
+                color="k",
+                fontsize=12,
+            )
+            text_artists.append(t)
 
     _untangle_text(text_artists, ax)
 
@@ -290,7 +263,9 @@ def _create_knn_graph(coords, k=10):
 
 # get a kernel-weighted average of the expression values of the k nearest neighbors of x,y:
 def _get_knn_expression(distances, neighbor_indices, genes, gene_labels, bandwidth=2.5):
-    weights = np.exp(-distances / bandwidth)
+    weights = (1 / ((2 * np.pi) ** (3 / 2) * bandwidth**3)) * np.exp(
+        -(distances**2) / (2 * bandwidth**2)
+    )
     local_expression = pd.DataFrame(
         index=genes, columns=np.arange(distances.shape[0])
     ).astype(float)
@@ -304,22 +279,30 @@ def _get_knn_expression(distances, neighbor_indices, genes, gene_labels, bandwid
 
 
 def _create_histogram(
-    df, genes=None, min_expression=0, KDE_bandwidth=None, x_max=None, y_max=None
+    df,
+    genes=None,
+    min_expression: float = 0,
+    KDE_bandwidth=None,
+    x_max=None,
+    y_max=None,
 ):
     """
     Creates a 2d histogram of the data frame's [x,y] coordinates.
+
     Parameters
     ----------
     df : pd.DataFrame
         A dataframe of coordinates.
     genes : list, optional
         A list of genes to include in the histogram. The default is None.
-    min_expression : int, optional
-        The minimum expression level to include in the histogram. The default is 5.
+    min_expression : float, optional
+        The minimum expression level to include in the histogram.
     KDE_bandwidth : int, optional
-        The bandwidth of the gaussian blur applied to the histogram. The default is 1.
-    grid_size : int, optional
-        The size of the grid. The default is 1.
+        The bandwidth of the gaussian blur applied to the histogram.
+    x_max :
+        TODO
+    y_max :
+        TODO
 
     Returns
     -------
@@ -337,7 +320,7 @@ def _create_histogram(
 
     df = df[df["gene"].isin(genes)].copy()
 
-    hist, xedges, yedges = np.histogram2d(
+    hist, *_ = np.histogram2d(
         df["x_pixel"], df["y_pixel"], bins=[np.arange(x_max + 2), np.arange(y_max + 2)]
     )
 
@@ -358,6 +341,9 @@ def _compute_divergence_embedded(
     metric="cosine_similarity",
     pca_divergence=0.8,
 ):
+    """This is a legacy function, replaced by _compute_divergence_patched. It contains other similarity measures than cosine similarity.
+    To be integrated into the patch-based divergence computation later.
+    """
     signal = _create_histogram(
         df,
         genes,
@@ -374,9 +360,6 @@ def _compute_divergence_embedded(
 
     df_top = df[df.z_delim < df.z]
     df_bot = df[df.z_delim > df.z]
-
-    # dr_bottom = np.zeros((df_bottom.shape[0],df_bottom.shape[1], pca.components_.shape[0]))
-    # dr_top = np.zeros((df_bottom.shape[0],df_bottom.shape[1], pca.components_.shape[0]))
 
     hists_top = np.zeros((mask.sum(), pca.components_.shape[0]))
     hists_bot = np.zeros((mask.sum(), pca.components_.shape[0]))
@@ -475,8 +458,6 @@ def _compute_divergence_embedded(
 
 
 def _compute_embedding_vectors(subset_df, signal_mask, factor):
-    # for i,g in tqdm.tqdm(enumerate(genes),total=len(genes)):
-
     if len(subset_df) < 2:
         return None, None
 
@@ -521,8 +502,6 @@ def _compute_divergence_patched(
     x_patches = np.linspace(0, signal.shape[0], patch_count_x + 1).astype(int)
     y_patches = np.linspace(0, signal.shape[1], patch_count_y + 1).astype(int)
 
-    print((x_patches), (y_patches))
-
     with tqdm.tqdm(total=(len(x_patches) - 1) * (len(y_patches) - 1)) as pbar:
         for i in range(len(x_patches) - 1):
             for j in range(len(y_patches) - 1):
@@ -533,8 +512,6 @@ def _compute_divergence_patched(
 
                 patch_size_x = _x - x_ - patch_padding * 2
                 patch_size_y = _y - y_ - patch_padding * 2
-
-                # print(x_,y_,_x,_y)
 
                 patch_df = df[
                     (df.x >= x_) & (df.x < _x) & (df.y >= y_) & (df.y < _y)
@@ -547,7 +524,9 @@ def _compute_divergence_patched(
                     pbar.update(1)
                     continue
 
-                patch_signal = kde_2d(patch_df[["x", "y"]].values)
+                patch_signal = kde_2d(
+                    patch_df[["x", "y"]].values, bandwidth=KDE_bandwidth
+                )
 
                 patch_signal_mask = patch_signal > min_expression
 
@@ -582,15 +561,12 @@ def _compute_divergence_patched(
                     }
 
                     for f in as_completed(fs):
-                        # try:
                         top_, bottom_ = f.result()
-                        # print(top_.shape)
+
                         if top_ is not None:
+                            assert bottom_ is not None
                             patch_embedding_top += top_
                             patch_embedding_bottom += bottom_
-
-                        # except Exception as exc:
-                        # print('%r generated an exception: %s' % (gene, exc))
 
                 patch_norm_top = np.linalg.norm(patch_embedding_top, axis=1)
                 patch_norm_bottom = np.linalg.norm(patch_embedding_bottom, axis=1)

@@ -23,6 +23,7 @@ dependencies = [
     "scikit-learn",
     "scipy",
     "tqdm",
+    "umap-learn",
 ]
 classifiers = [
     "Intended Audience :: Science/Research",
@@ -33,7 +34,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-tutorial = ["pandas[parquet]", "scanpy"]
+tutorial = ["pandas[parquet]"]
 docs = [
     "sphinx",
     "sphinx-autoapi>=3.1",

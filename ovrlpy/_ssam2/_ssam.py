@@ -128,12 +128,6 @@ def _sample_expression_nd(
         for c in coord_columns
     ]
 
-    print(
-        f"Searching within x:{bounds[0]}, y:{bounds[1]}, n_molecules:{len(coordinate_dataframe_)}"
-    )
-    print(
-        f"Using bandwidth: {kde_bandwidth}, min_expression: {minimum_expression}, min_pixel_distance: {min_pixel_distance}"
-    )
     # perform a global KDE to determine local maxima:
     vector_field_norm = _utils._kde_nd(
         coordinate_dataframe_[coord_columns].values, bandwidth=1
@@ -152,11 +146,10 @@ def _sample_expression_nd(
 
     # store in anndata object:
     adata_ssam = anndata.AnnData(
+        X=np.zeros((len(local_maximum_coordinates), len(gene_list))),
         var=pd.DataFrame(index=gene_list),
-        obs=pd.DataFrame(index=range(len(local_maximum_coordinates))),
+        obsm={"spatial": local_maximum_coordinates * kde_bandwidth},
     )
-
-    adata_ssam.obsm["spatial"] = local_maximum_coordinates * kde_bandwidth
 
     ssam_params = {
         "kde_bandwidth": kde_bandwidth,
@@ -172,25 +165,19 @@ def _sample_expression_nd(
 
     adata_ssam.uns["ssam"] = ssam_params
 
-    adata_ssam.X = np.zeros((len(local_maximum_coordinates), len(gene_list)))
-
-    df_gene_grouped = coordinate_dataframe_.groupby(gene_column, observed=False).apply(
-        lambda x: x[coord_columns].values
-    )
-
-    df_gene_grouped = df_gene_grouped[df_gene_grouped.apply(lambda x: x.shape[0] > 0)]
+    gene_coord_dict = {
+        gene: df[coord_columns].to_numpy()
+        for gene, df in coordinate_dataframe_.groupby(gene_column, observed=True)
+    }
 
     print("sampling expression:")
-    with tqdm.tqdm(total=len(gene_list)) as pbar:
+    with tqdm.tqdm(total=len(gene_coord_dict)) as pbar:
         with ThreadPoolExecutor(max_workers=n_workers) as executor:
             fs = {
                 executor.submit(
-                    _utils.kde_and_sample,
-                    df_gene_grouped.loc[gene],
-                    local_maximum_coordinates,
-                    size=size,
+                    _utils.kde_and_sample, coords, local_maximum_coordinates, size=size
                 ): gene
-                for gene in gene_list
+                for gene, coords in gene_coord_dict.items()
             }
             for f in as_completed(fs):
                 gene = fs[f]

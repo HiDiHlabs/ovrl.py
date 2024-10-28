@@ -1,7 +1,9 @@
 """This is a package to detect overlapping cells in a 2D spatial transcriptomics sample."""
 
 import warnings
-from typing import Collection, Optional
+from functools import reduce
+from operator import add
+from typing import Optional, Sequence
 
 import anndata
 import matplotlib.pyplot as plt
@@ -18,7 +20,7 @@ from ._utils import (
     _compute_divergence_patched,
     _create_histogram,
     _create_knn_graph,
-    _determine_localmax,
+    _determine_localmax_and_sample,
     _fill_color_axes,
     _get_knn_expression,
     _get_spatial_subsample_mask,
@@ -42,7 +44,7 @@ _BIH_CMAP = LinearSegmentedColormap.from_list(
 
 
 def _assign_xy(
-    df: pd.DataFrame, xy_columns: Collection[str] = ["x", "y"], grid_size: int = 1
+    df: pd.DataFrame, xy_columns: Sequence[str] = ["x", "y"], grid_size: int = 1
 ):
     """
     Assigns an x,y coordinate to a pd.DataFrame of coordinates.
@@ -52,7 +54,7 @@ def _assign_xy(
     df : pandas.DataFrame
         A dataframe of coordinates.
     xy_columns : list, optional
-        The names of the columns containing the x,y,z-coordinates.
+        The names of the columns containing the x,y-coordinates.
     grid_size : int, optional
         The size of the grid.
 
@@ -89,7 +91,7 @@ def _assign_z_median(df: pd.DataFrame, z_column: str = "z"):
 
     """
     if "n_pixel" not in df.columns:
-        print(
+        ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
     medians = df.groupby("n_pixel")[z_column].median()
@@ -123,7 +125,7 @@ def _assign_z_mean_message_passing(
 
     """
     if "n_pixel" not in df.columns:
-        print(
+        ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
 
@@ -133,8 +135,7 @@ def _assign_z_mean_message_passing(
     pixel_coordinate_df = (
         df[["n_pixel", "x_pixel", "y_pixel", delim_column]].groupby("n_pixel").max()
     )
-    elevation_map = np.zeros((df.x_pixel.max() + 1, df.y_pixel.max() + 1))
-    elevation_map.fill(np.nan)
+    elevation_map = np.full((df.x_pixel.max() + 1, df.y_pixel.max() + 1), np.nan)
 
     elevation_map[pixel_coordinate_df.x_pixel, pixel_coordinate_df.y_pixel] = (
         pixel_coordinate_df[delim_column]
@@ -142,25 +143,18 @@ def _assign_z_mean_message_passing(
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        for r in range(rounds):
-            elevation_map_ = (
-                np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=0)], axis=0)
-                / 4
+        for _ in range(rounds):
+            elevation_map = reduce(
+                add,
+                (
+                    np.nanmean(
+                        [elevation_map, np.roll(elevation_map, shift, axis=ax)], axis=0
+                    )
+                    for ax in (0, 1)
+                    for shift in (1, -1)
+                ),
             )
-            elevation_map_ += (
-                np.nanmean([elevation_map, np.roll(elevation_map, 1, axis=1)], axis=0)
-                / 4
-            )
-            elevation_map_ += (
-                np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=0)], axis=0)
-                / 4
-            )
-            elevation_map_ += (
-                np.nanmean([elevation_map, np.roll(elevation_map, -1, axis=1)], axis=0)
-                / 4
-            )
-
-            elevation_map = elevation_map_
+            elevation_map /= 4
 
     df[delim_column] = elevation_map[df.x_pixel, df.y_pixel]
 
@@ -170,6 +164,7 @@ def _assign_z_mean_message_passing(
 def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
     """
     Assigns a z-coordinate to a pd.DataFrame of coordinates.
+
     Parameters
     ----------
     df : pandas.DataFrame
@@ -184,7 +179,7 @@ def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
 
     """
     if "n_pixel" not in df.columns:
-        print(
+        ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
     means = df.groupby("n_pixel")[z_column].mean()
@@ -240,7 +235,7 @@ def pre_process_coordinates(
     return coordinate_df
 
 
-def get_rois(
+def get_pseudocell_locations(
     df: pd.DataFrame,
     genes=None,
     min_distance: int = 10,
@@ -248,7 +243,9 @@ def get_rois(
     min_expression: float = 5,
 ):
     """
-    Returns a list of local maxima in a kde of the data frame.
+    Returns a list of local maxima in a kde of the data frame,
+    interpreted as locations with high likelyhood to contain a cell.
+
     Parameters
     ----------
     df : pandas.DataFrame
@@ -265,7 +262,7 @@ def get_rois(
 
     Returns
     -------
-    rois : list
+    pseudocell_locations : list
         A list of local maxima in a KDE of the data frame.
 
     """
@@ -277,15 +274,20 @@ def get_rois(
         df, genes=genes, min_expression=min_expression, KDE_bandwidth=KDE_bandwidth
     )
 
-    rois_x, rois_y, _ = _determine_localmax(
+    pseudocell_locations_x, pseudocells_y, _ = _determine_localmax_and_sample(
         hist, min_distance=min_distance, min_expression=min_expression
     )
 
-    return rois_x, rois_y
+    return pseudocell_locations_x, pseudocells_y
 
 
-def get_expression_vectors_at_rois(
-    df, rois_x, rois_y, genes=None, KDE_bandwidth=1, min_expression: float = 0
+def sample_expression_at_xy(
+    df,
+    sampling_points_x,
+    sampling_points_y,
+    genes=None,
+    KDE_bandwidth=1,
+    min_expression: float = 0,
 ) -> pd.DataFrame:
     """
     Returns a matrix of gene expression vectors at each local maximum.
@@ -294,9 +296,9 @@ def get_expression_vectors_at_rois(
     ----------
     df : pandas.DataFrame
         A dataframe of coordinates that will be sampled for gene expression.
-    rois_x : list
+    sampling_points_x : list
         x-coordinates to sample gene expression at.
-    rois_y : list
+    sampling_points_y : list
         y-coordinates to sample gene expression at.
     genes : list, optional
         list of genes to sample expression for.
@@ -314,7 +316,7 @@ def get_expression_vectors_at_rois(
     if genes is None:
         genes = sorted(df.gene.unique())
 
-    rois_n_pixel = rois_x + rois_y * df.x_pixel.max()
+    rois_n_pixel = sampling_points_x + sampling_points_y * df.x_pixel.max()
 
     expressions = pd.DataFrame(index=genes, columns=rois_n_pixel, dtype=float)
     expressions[:] = 0
@@ -324,13 +326,18 @@ def get_expression_vectors_at_rois(
             df, genes=[gene], min_expression=min_expression, KDE_bandwidth=KDE_bandwidth
         )
 
-        expressions.loc[gene] = hist[rois_x, rois_y]
+        expressions.loc[gene] = hist[sampling_points_x, sampling_points_y]
 
     return expressions
 
 
 def plot_signal_integrity(
-    integrity, signal, signal_threshold: float = 2.0, cmap="BIH", plot_hist: bool = True
+    integrity,
+    signal,
+    signal_threshold: float = 2.0,
+    cmap="BIH",
+    figure_height: float = 10,
+    plot_hist: bool = True,
 ):
     """
     Plots the determined signal integrity of the tissue sample in a signal integrity map.
@@ -350,8 +357,7 @@ def plot_signal_integrity(
             Whether to plot a histogram of integrity values alongside the map.
     """
 
-    figure_height = int(15 * integrity.shape[0] / integrity.shape[1]) + 1
-    print(figure_height)
+    figure_aspect_ratio = integrity.shape[0] / integrity.shape[1]
 
     with plt.style.context("dark_background"):
         if cmap == "BIH":
@@ -359,10 +365,15 @@ def plot_signal_integrity(
 
         if plot_hist:
             fig, ax = plt.subplots(
-                1, 2, figsize=(20, figure_height), gridspec_kw={"width_ratios": [6, 1]}
+                1,
+                2,
+                figsize=(figure_height / figure_aspect_ratio * 1.4, figure_height),
+                gridspec_kw={"width_ratios": [6, 1]},
             )
         else:
-            fig, ax = plt.subplots(1, 1, figsize=(20, figure_height))
+            fig, ax = plt.subplots(
+                1, 1, figsize=(figure_height / figure_aspect_ratio, figure_height)
+            )
             ax = [ax]
 
         img = ax[0].imshow(
@@ -401,41 +412,41 @@ def plot_signal_integrity(
 
 
 def detect_doublets(
-    coherence,
-    signal,
+    integrity_map,
+    signal_map,
     min_distance=10,
-    max_incoherence=0.4,
-    signal_cutoff=3,
-    coherence_sigma=None,
+    integrity_threshold=0.7,
+    minimum_signal_strength=3,
+    integrity_sigma=None,
 ) -> pd.DataFrame:
     """
-    This function is used to find individual peaks of signal incoherence in the tissue
+    This function is used to find individual low peaks of signal integrity in the tissue
     map as an indicator of single occurrences overlapping cells.
 
     Parameters
     ----------
-        coherence : np.ndarray
-            Coherence map obtained from ovrlpy analysis
-        signal : np.ndarray
-            Signal map from ovrlpy analysis
+        integrity_map : np.ndarray
+            Pixel map of signal integrity obtained from ovrlpy analysis
+        signal_map : np.ndarray
+            Signal strength map from ovrlpy analysis
         min_distance : int, optional
             Minimum distance between reported peaks
-        max_incoherence : float, optional
-            Maximum incoherence value for a peak to be considered
-        signal_cutoff : float, optional
+        integrity_threshold : float, optional
+            Threhold of signal integrity value. A peak with an signal integrity > integrity_threshold is not considered.
+        minimum_signal_strength : float, optional
             Minimum signal value for a peak to be considered
-        coherence_sigma : float, optional
-            Optional sigma value for gaussian filtering of the coherence map,
+        integrity_sigma : float, optional
+            Optional sigma value for gaussian filtering of the integrity map,
             which leads to the detection of overlap regions with larger spatial extent.
     """
 
-    if coherence_sigma is not None:
-        coherence = gaussian_filter(coherence, coherence_sigma)
+    if integrity_sigma is not None:
+        integrity_map = gaussian_filter(integrity_map, integrity_sigma)
 
-    dist_x, dist_y, dist_t = _determine_localmax(
-        (1 - coherence) * (signal > signal_cutoff),
+    dist_x, dist_y, dist_t = _determine_localmax_and_sample(
+        (1 - integrity_map) * (signal_map > minimum_signal_strength),
         min_distance=min_distance,
-        min_expression=max_incoherence,
+        min_expression=integrity_threshold,
     )
 
     arg_idcs = np.argsort(dist_t)[::-1]
@@ -446,7 +457,7 @@ def detect_doublets(
             "x": dist_y,
             "y": dist_x,
             "integrity": dist_t,
-            "signal": signal[dist_x, dist_y],
+            "signal": signal_map[dist_x, dist_y],
         }
     )
 
@@ -485,6 +496,53 @@ class Visualizer:
             Keyword arguments for 2D UMAP embedding.
         cumap_kwargs : dict, optional
             Keyword arguments for 3D UMAP embedding.
+
+    Attributes
+    ----------
+    KDE_bandwidth : float
+        The bandwidth of the KDE.
+    celltyping_min_expression : int
+        Minimum expression level for cell typing.
+    celltyping_min_distance : int
+        Minimum distance for cell typing.
+    pseudocell_locations_x : np.ndarray
+        x-coordinates of cell typing regions of interest obtained through gene expression localmax sampling.
+    pseudocell_locations_y : np.ndarray
+        y-coordinates of cell typing regions of interest obtained through gene expression localmax sampling.
+    pseudocell_expression_samples : pd.DataFrame
+        Gene expression matrix of the cell typing regions of interest.
+    signatures : pd.DataFrame
+        A matrix of celltypes x gene signatures to use to annotate the UMAP.
+    celltype_centers : np.ndarray
+        The center of gravity of each celltype in the 2d embedding, used for UMAP annotation.
+    celltype_class_assignments : np.ndarray
+        The class assignments of the cell types.
+    pca_2d : PCA
+        The PCA object used for the 2d embedding.
+    embedder_2d : umap.UMAP
+        The UMAP object used for the 2d embedding.
+    pca_3d : PCA
+        The PCA object used for the 3d RGB embedding.
+    embedder_3d : umap.UMAP
+        The UMAP object used for the 3d RGB embedding.
+    n_components_pca : float
+        Number of components for PCA.
+    umap_kwargs : dict
+        Keyword arguments for 2D UMAP embedding object.
+    cumap_kwargs : dict
+        Keyword arguments for 3D UMAP RGB embedding object.
+    genes : list
+        A list of genes to utilize in the model.
+    embedding : np.ndarray
+        The 2d embedding of pseudocell gene expression .
+    colors : np.ndarray
+        The RGB embedding.
+    colors_min_max : list
+        The minimum and maximum values of the RGB embedding, necessary for normalization of the transform method.
+    integrity_map : np.ndarray
+        The integrity map of the tissue.
+    signal_map : np.ndarray
+        A pixel map of overall signal strength in the tissue, used to mask out low-signal regions that are difficult to interpret.
     """
 
     def __init__(
@@ -506,13 +564,12 @@ class Visualizer:
             "random_state": None,
         },
     ) -> None:
-        """TODO: document attributes"""
         self.KDE_bandwidth = KDE_bandwidth
 
         self.celltyping_min_expression = celltyping_min_expression
         self.celltyping_min_distance = celltyping_min_distance
-        self.rois_celltyping_x, self.rois_celltyping_y = None, None
-        self.localmax_celltyping_samples = None
+        self.pseudocell_locations_x, self.pseudocell_locations_y = None, None
+        self.pseudocell_expression_samples = None
         self.signatures = None
         self.celltype_centers = None
         self.celltype_class_assignments = None
@@ -532,7 +589,7 @@ class Visualizer:
         self.colors = None
         self.colors_min_max = [None, None]
 
-        self.coherence_map = None
+        self.integrity_map = None
         self.signal_map = None
 
     def fit_ssam(
@@ -595,17 +652,19 @@ class Visualizer:
             min_pixel_distance=self.celltyping_min_distance,
         )
 
-        self.rois_celltyping_x, self.rois_celltyping_y, _ = adata_ssam.obsm["spatial"].T
+        self.pseudocell_locations_x, self.pseudocell_locations_y, _ = adata_ssam.obsm[
+            "spatial"
+        ].T
 
-        self.localmax_celltyping_samples = pd.DataFrame(
+        self.pseudocell_expression_samples = pd.DataFrame(
             adata_ssam.X.T, columns=adata_ssam.obs_names, index=adata_ssam.var_names
         )
         self.pca_2d = PCA(
             n_components=min(
-                self.n_components_pca, self.localmax_celltyping_samples.shape[0] // 2
+                self.n_components_pca, self.pseudocell_expression_samples.shape[0] // 2
             )
         )
-        factors = self.pca_2d.fit_transform(self.localmax_celltyping_samples.T)
+        factors = self.pca_2d.fit_transform(self.pseudocell_expression_samples.T)
 
         print(f"Modeling {factors.shape[1]} pseudo-celltype clusters")
 
@@ -613,30 +672,28 @@ class Visualizer:
         self.embedding = self.embedder_2d.fit_transform(factors)
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-
         embedding_color = self.embedder_3d.fit_transform(factors)
 
         embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
-        color_min = embedding_color.min(0)
-        color_max = embedding_color.max(0)
-
         self.colors = _min_to_max(embedding_color.copy())
-        self.colors_min_max = [color_min, color_max]
+        self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
 
         self.fit_signatures(signature_matrix)
 
         gene_assignments = _determine_celltype_class_assignments(
-            self.localmax_celltyping_samples,
+            self.pseudocell_expression_samples,
             pd.DataFrame(np.eye(len(genes)), index=genes, columns=genes).astype(float),
         )
 
         # determine the center of gravity of each celltype in the embedding:
         self.gene_centers = np.array(
             [
-                np.median(self.embedding[gene_assignments == i, :], axis=0)
-                if (gene_assignments == i).sum() > 0
-                else (np.nan, np.nan)
+                (
+                    np.median(self.embedding[gene_assignments == i, :], axis=0)
+                    if (gene_assignments == i).sum() > 0
+                    else (np.nan, np.nan)
+                )
                 for i in range(len(self.genes))
             ]
         )
@@ -662,7 +719,7 @@ class Visualizer:
         celltypes = sorted(signature_matrix.columns)
 
         self.celltype_class_assignments = _determine_celltype_class_assignments(
-            self.localmax_celltyping_samples, signature_matrix
+            self.pseudocell_expression_samples, signature_matrix
         )
 
         # determine the center of gravity of each celltype in the embedding:
@@ -724,13 +781,12 @@ class Visualizer:
             subsample.gene.cat.codes.values,
             bandwidth=self.KDE_bandwidth,
         )
-        local_expression = local_expression / ((local_expression**2).sum(0) ** 0.5)
+        local_expression /= (local_expression**2).sum(0) ** 0.5
         subsample_embedding, subsample_embedding_color = _transform_embeddings(
             local_expression.T.values,
             self.pca_2d,
             embedder_2d=self.embedder_2d,
             embedder_3d=self.embedder_3d,
-            colors_min_max=self.colors_min_max,
         )
         subsample_embedding_color, _ = _fill_color_axes(
             subsample_embedding_color, self.pca_3d
@@ -743,7 +799,7 @@ class Visualizer:
 
         return subsample_embedding, subsample_embedding_color
 
-    def roi_df(self) -> pd.DataFrame:
+    def pseudocell_df(self) -> pd.DataFrame:
         """
         Returns a pandas.DataFrame containing the gene-count matrix of the fitted
         tissue's determined pseudo-cells.
@@ -752,22 +808,24 @@ class Visualizer:
         ----------
         pandas.DataFrame
         """
-        roi_df = pd.DataFrame(
-            {"x": self.rois_celltyping_x, "y": self.rois_celltyping_y}
+        pseudocell_df = pd.DataFrame(
+            {"x": self.pseudocell_locations_x, "y": self.pseudocell_locations_y}
         )
 
         if self.signal_map is not None:
-            roi_df["signal"] = self.signal_map[roi_df.x, roi_df.y]
+            pseudocell_df["signal"] = self.signal_map[pseudocell_df.x, pseudocell_df.y]
 
-        if self.coherence_map is not None:
-            roi_df["coherence"] = self.coherence_map[roi_df.x, roi_df.y]
+        if self.integrity_map is not None:
+            pseudocell_df["integrity"] = self.integrity_map[
+                pseudocell_df.x, pseudocell_df.y
+            ]
 
-        return roi_df
+        return pseudocell_df
 
-    def plot_instance(
+    def plot_region_of_interest(
         self,
-        subsample,
-        subsample_embedding_color,
+        subsample: pd.DataFrame,
+        subsample_embedding_color: np.ndarray,
         x: float = None,
         y: float = None,
         window_size: int = None,
@@ -780,16 +838,16 @@ class Visualizer:
         ----------
         subsample : pandas.DataFrame
             A dataframe of molecule coordinates and gene assignments.
-        subsample_embedding_color : Optional[pandas.DataFrame]
+        subsample_embedding_color : pandas.DataFrame
             A list of rgb values for each molecule.
-        x :
-            The x-coordinate to center the plotting window
-        y :
-            The y-coordinate to center the plotting window
-        window_size : int, optional
-            the sidelength of the window to plot
+        x : float
+            Center x-coordinate for the region-of-interest.
+        y : float
+            Center y-coordinate for the region-of-interest.
+        window_size : float, optional
+            Window size of the region-of-interest.
         rasterized : bool, optional
-            rasterize the plot for faster rendering
+            If True all plots will be rasterized.
         """
         vertical_indices = subsample.z.argsort()
         subsample = subsample.sort_values("z")
@@ -802,12 +860,15 @@ class Visualizer:
         if window_size is None:
             window_size = int(1 + (subsample.x.max() - subsample.x.min()) / 2)
 
+        roi = ((x - window_size, x + window_size), (y - window_size, y + window_size))
+
         fig = plt.figure(figsize=(22, 12))
 
         gs = fig.add_gridspec(2, 3)
 
-        ax1 = fig.add_subplot(gs[0, 2], projection="3d", label="3d_map")
-        ax1.scatter(
+        # 3D map
+        ax_3d = fig.add_subplot(gs[0, 2], projection="3d", label="3d_map")
+        ax_3d.scatter(
             subsample.x,
             subsample.y,
             subsample.z,
@@ -816,13 +877,14 @@ class Visualizer:
             alpha=0.5,
             rasterized=rasterized,
         )
-        ax1.set_zlim(
+        ax_3d.set_zlim(
             np.median(subsample.z) - window_size, np.median(subsample.z) + window_size
         )
-        ax1.set_title("ROI celltype map, 3D")
+        ax_3d.set_title("ROI celltype map, 3D")
 
-        ax2 = fig.add_subplot(gs[0, 0], label="umap")
-        ax2.scatter(
+        # UMAP
+        ax_umap = fig.add_subplot(gs[0, 0], label="umap")
+        ax_umap.scatter(
             self.embedding[:, 0],
             self.embedding[:, 1],
             c=self.colors,
@@ -832,13 +894,14 @@ class Visualizer:
             rasterized=rasterized,
         )
 
-        ax2.set_axis_off()
-        ax2.set_title("UMAP")
+        ax_umap.set_axis_off()
+        ax_umap.set_title("UMAP")
 
-        ax = fig.add_subplot(gs[0, 1], label="celltype_map")
+        # tissue map
+        ax_tissue_whole: Axes = fig.add_subplot(gs[0, 1], label="celltype_map")
         self.plot_tissue(rasterized=rasterized, s=1)
 
-        ax.set_yticks([], [])
+        ax_tissue_whole.set_yticks([], [])
 
         artist = plt.Rectangle(
             (x - window_size, y - window_size),
@@ -848,88 +911,72 @@ class Visualizer:
             edgecolor="k",
             linewidth=2,
         )
-        ax.add_artist(artist)
+        ax_tissue_whole.add_artist(artist)
 
-        artist = plt.Rectangle(
-            (x - window_size, y - window_size),
-            2 * window_size,
-            2 * window_size,
-            fill=False,
-            edgecolor="k",
-            linewidth=2,
+        ax_tissue_whole.set_title("celltype map")
+
+        # top view of ROI
+        roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=40, rasterized=rasterized)
+
+        def _plot_tissue_scatter_roi(ax: Axes, x, y, roi, *, rasterized: bool = False):
+            ax.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
+            ax.set(xlim=roi[0], ylim=roi[1])
+
+        ax_roi_top = fig.add_subplot(gs[1, 0], label="top_map")
+        top_mask = subsample.z > subsample.z_delim
+        subsample_top = subsample[top_mask]
+        self._plot_tissue_scatter(
+            ax_roi_top,
+            subsample_top["x"],
+            subsample_top["y"],
+            subsample_embedding_color[top_mask],
+            title="ROI celltype map, top",
+            **roi_scatter_kwargs,
         )
-        ax.add_artist(artist)
+        _plot_tissue_scatter_roi(ax_roi_top, x, y, roi, rasterized=rasterized)
 
-        ax.set_title("celltype map")
-
-        ax3 = fig.add_subplot(gs[1, 0], label="top_map")
-        # plt.imshow((divergence*hist_sum).T,cmap='Greys', alpha=0.3 )
-        ax3.scatter(
-            subsample[subsample.z > subsample.z_delim].x,
-            subsample[subsample.z > subsample.z_delim].y,
-            c=subsample_embedding_color[subsample.z > subsample.z_delim],
-            marker=".",
-            alpha=0.8,
-            s=40,
-            rasterized=rasterized,
+        ax_roi_bottom = fig.add_subplot(gs[1, 1], label="bottom_map")
+        bottom_mask = subsample.z < subsample.z_delim
+        subsample_bottom = subsample[bottom_mask][::-1]
+        self._plot_tissue_scatter(
+            ax_roi_bottom,
+            subsample_bottom["x"],
+            subsample_bottom["y"],
+            subsample_embedding_color[bottom_mask][::-1],
+            title="ROI celltype map, bottom",
+            **roi_scatter_kwargs,
         )
-        ax3.set_xlim(x - window_size, x + window_size)
-        ax3.set_ylim(y - window_size, y + window_size)
-        ax3.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
-        ax3.set_aspect("equal", adjustable="box")
 
-        ax3.set_title("ROI celltype map ,top")
+        _plot_tissue_scatter_roi(ax_roi_bottom, x, y, roi, rasterized=rasterized)
 
-        ax3 = fig.add_subplot(gs[1, 1], label="bottom_map")
-
-        subsample = subsample[::-1]
-        subsample_embedding_color = subsample_embedding_color[::-1]
-        # plt.imshow(hist_sum.T,cmap='Greys',alpha=0.3 )
-        ax3.scatter(
-            subsample[subsample.z < subsample.z_delim].x,
-            subsample[subsample.z < subsample.z_delim].y,
-            c=subsample_embedding_color[subsample.z < subsample.z_delim],
-            marker=".",
-            alpha=0.8,
-            s=40,
-            rasterized=rasterized,
-        )
-        ax3.set_xlim(x - window_size, x + window_size)
-        ax3.set_ylim(y - window_size, y + window_size)
-        ax3.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
-        ax3.set_aspect("equal", adjustable="box")
-
-        ax3.set_title("ROI celltype map, bottom")
+        # side view of ROI
+        roi_side_scatter_kwargs = dict(s=10, alpha=0.5, rasterized=rasterized)
 
         sub_gs = gs[1, 2].subgridspec(2, 1)
 
-        ax5 = fig.add_subplot(sub_gs[0, 0], label="x_cut")
+        ax_side_x = fig.add_subplot(sub_gs[0, 0], label="x_cut")
         halving_mask = (subsample.y < (y + 4)) & (subsample.y > (y - 4))
 
-        ax5.scatter(
+        self._plot_tissue_scatter(
+            ax_side_x,
             subsample.x[halving_mask],
             subsample.z[halving_mask],
-            c=subsample_embedding_color[halving_mask],
-            s=10,
-            alpha=0.5,
-            rasterized=rasterized,
+            subsample_embedding_color[halving_mask],
+            title="ROI, vertical, x-cut",
+            **roi_side_scatter_kwargs,
         )
-        ax5.set_aspect("equal", adjustable="box")
-        plt.title("ROI, vertical, x-cut")
 
-        ax4 = fig.add_subplot(sub_gs[1, 0], label="y_cut")
+        ax_side_y = fig.add_subplot(sub_gs[1, 0], label="y_cut")
         halving_mask = (subsample.x < (x + 4)) & (subsample.x > (x - 4))
 
-        ax4.scatter(
+        self._plot_tissue_scatter(
+            ax_side_y,
             subsample.y[halving_mask],
             subsample.z[halving_mask],
-            c=subsample_embedding_color[halving_mask],
-            s=10,
-            alpha=0.5,
-            rasterized=rasterized,
+            subsample_embedding_color[halving_mask],
+            title="ROI, vertical, y-cut",
+            **roi_side_scatter_kwargs,
         )
-        ax4.set_aspect("equal", adjustable="box")
-        plt.title("ROI, vertical, y-cut")
 
     def plot_umap(
         self,
@@ -945,7 +992,7 @@ class Visualizer:
         ax : Optional[matplotlib.axes.Axes]
             axis object to plot on.
         rasterized : bool, optional
-            rasterize the scatter plots to reduce file size in vector graphics files.
+            If True the plot will be rasterized.
         kwargs
             Keyword arguments for the matplotlib's scatter plot function.
         """
@@ -966,21 +1013,30 @@ class Visualizer:
         Parameters
         ----------
         rasterized : bool, optional
-            rasterize the scatter plots to reduce file size in vector graphics files.
+            If True the plot will be rasterized.
         kwargs
             Keyword arguments for the matplotlib's scatter plot function.
         """
         ax = plt.gca()
-        ax.scatter(
-            self.rois_celltyping_x,
-            self.rois_celltyping_y,
-            c=self.colors,
+        self._plot_tissue_scatter(
+            ax,
+            self.pseudocell_locations_x,
+            self.pseudocell_locations_y,
+            self.colors,
             marker=".",
             alpha=1,
             rasterized=rasterized,
             **kwargs,
         )
+
+    @staticmethod
+    def _plot_tissue_scatter(
+        ax: Axes, xs, ys, cs, *, title: Optional[str] = None, **kwargs
+    ):
+        ax.scatter(xs, ys, c=cs, **kwargs)
         ax.set_aspect("equal", adjustable="box")
+        if title is not None:
+            ax.set_title(title)
 
     def plot_fit(self, rasterized: bool = True, umap_kwargs={"scatter_kwargs": {"s": 1}}, tissue_kwargs={"s": 1}):
         """
@@ -989,7 +1045,7 @@ class Visualizer:
         Parameters
         ----------
         rasterized : bool, optional
-            rasterize the scatter plots to reduce file size in vector graphics files.
+            If True all plots will be rasterized.
         """
 
         plt.figure(figsize=(15, 7))
@@ -1014,11 +1070,11 @@ class Visualizer:
         import pickle
 
         adata = anndata.AnnData(
-            X=self.localmax_celltyping_samples.T.values,
-            obs=pd.DataFrame(index=range(self.localmax_celltyping_samples.shape[1])),
-            var=pd.DataFrame(index=self.localmax_celltyping_samples.index),
+            X=self.pseudocell_expression_samples.T.values,
+            obs=pd.DataFrame(index=range(self.pseudocell_expression_samples.shape[1])),
+            var=pd.DataFrame(index=self.pseudocell_expression_samples.index),
         )
-        adata.obs["localmax_id"] = self.localmax_celltyping_samples.columns
+        adata.obs["pseudocell_id"] = self.pseudocell_expression_samples.columns
 
         adata.uns["celltype_centers"] = self.celltype_centers
         adata.uns["args"] = {
@@ -1041,7 +1097,6 @@ class Visualizer:
         knn_search_index_3d_pickled = base64.b64encode(
             pickle.dumps(self.embedder_3d._knn_search_index)
         ).decode("ascii")
-        # print(knn_search_index_pickled[:100])
 
         adata.uns["embedder_2d"] = {
             "kwargs": self.umap_kwargs,
@@ -1079,10 +1134,10 @@ class Visualizer:
         adata.uns["colors_min_max"] = self.colors_min_max
         adata.uns["colors"] = self.colors
         adata.uns["embedding"] = self.embedding
-        adata.uns["coherence_map"] = self.coherence_map
+        adata.uns["integrity_map"] = self.integrity_map
         adata.uns["signal_map"] = self.signal_map
-        adata.uns["rois_celltyping_x"] = self.rois_celltyping_x
-        adata.uns["rois_celltyping_y"] = self.rois_celltyping_y
+        adata.uns["pseudocell_locations_x"] = self.pseudocell_locations_x
+        adata.uns["pseudocell_locations_y"] = self.pseudocell_locations_y
 
         adata.write_h5ad(path)
 
@@ -1108,8 +1163,8 @@ def load_visualizer(path: str) -> Visualizer:
 
     vis = Visualizer(**adata.uns["args"])
 
-    vis.localmax_celltyping_samples = pd.DataFrame(
-        adata.X.T, columns=adata.obs["localmax_id"], index=adata.var.index
+    vis.pseudocell_expression_samples = pd.DataFrame(
+        adata.X.T, columns=adata.obs["pseudocell_id"], index=adata.var.index
     )
     vis.celltype_centers = adata.uns["celltype_centers"]
     vis.celltype_class_assignments = adata.obsm["celltype_class_assignments"]
@@ -1159,21 +1214,192 @@ def load_visualizer(path: str) -> Visualizer:
     vis.colors_min_max = adata.uns["colors_min_max"]
     vis.colors = adata.uns["colors"]
     vis.embedding = adata.uns["embedding"]
-    if "coherence_map" in adata.uns.keys():
-        vis.coherence_map = adata.uns["coherence_map"]
+    if "integrity_map" in adata.uns.keys():
+        vis.integrity_map = adata.uns["integrity_map"]
     else:
-        vis.coherence_map = None
+        vis.integrity_map = None
     if "signal_map" in adata.uns.keys():
         vis.signal_map = adata.uns["signal_map"]
     else:
         vis.signal_map = None
-    vis.rois_celltyping_x = adata.uns["rois_celltyping_x"]
-    vis.rois_celltyping_y = adata.uns["rois_celltyping_y"]
+    vis.pseudocell_locations_x = adata.uns["pseudocell_locations_x"]
+    vis.pseudocell_locations_y = adata.uns["pseudocell_locations_y"]
 
     return vis
 
 
-def compute_coherence_map(
+def plot_region_of_interest(
+    x: float,
+    y: float,
+    coordinate_df: pd.DataFrame,
+    visualizer: Visualizer,
+    integrity_map: np.ndarray,
+    signal_map: np.ndarray,
+    window_size: int = 30,
+    signal_plot_threshold: float = 5.0,
+    rasterized: bool = True,
+):
+    """Plot a comprehensive overview of a zoomed-in region of interest.
+
+    Parameters
+    ----------
+    x (float):
+        x coordinate of the region of interest
+    y (float):
+        y coordinate of the region of interest
+    coordinate_df (pd.DataFrame):
+        DataFrame of gene-annotated molecule coordinates
+    visualizer (Visualizer):
+        Visualizer object containing the fitted model
+    integrity_map (np.ndarray):
+        integrity map of the tissue
+    signal_map (np.ndarray):
+        Signal map of the tissue
+    window_size (int, optional):
+        Size of the window to display. Defaults to 30.
+    signal_plot_threshold (float, optional):
+        Threshold for the signal plot. Defaults to 5.
+    rasterized (bool, optional):
+        If True all plots will be rasterized. Defaults to True.
+    """
+
+    # first, create and color-embed the subsample of the region of interest:
+    subsample = visualizer.subsample_df(x, y, coordinate_df, window_size=window_size)
+    subsample_embedding, subsample_embedding_color = visualizer.transform(subsample)
+
+    vertical_indices = subsample.z.argsort()
+    subsample = subsample.sort_values("z")
+    subsample_embedding_color = subsample_embedding_color[vertical_indices]
+
+    if x is None:
+        x = (subsample.x.max() + subsample.x.min()) / 2
+    if y is None:
+        y = (subsample.y.max() + subsample.y.min()) / 2
+    if window_size is None:
+        window_size = int(1 + (subsample.x.max() - subsample.x.min()) / 2)
+
+    roi = ((x - window_size, x + window_size), (y - window_size, y + window_size))
+
+    fig = plt.figure(figsize=(22, 12))
+
+    gs = fig.add_gridspec(2, 3)
+
+    # integrity map
+    ax_integrity = fig.add_subplot(gs[0, 2], label="signal_integrity", facecolor="k")
+
+    handler = ax_integrity.imshow(
+        integrity_map,
+        cmap=_BIH_CMAP,
+        alpha=(signal_map / signal_plot_threshold).clip(0, 1),
+        vmin=0,
+        vmax=1,
+    )
+
+    ax_integrity.set_title("signal integrity")
+    ax_integrity.invert_yaxis()
+    plt.colorbar(handler)
+
+    ax_integrity.set_xlim(x - window_size, x + window_size)
+    ax_integrity.set_ylim(y - window_size, y + window_size)
+
+    # UMAP
+    ax_umap = fig.add_subplot(gs[0, 0], label="umap")
+    ax_umap.scatter(
+        visualizer.embedding[:, 0],
+        visualizer.embedding[:, 1],
+        c=visualizer.colors,
+        alpha=0.5,
+        marker=".",
+        s=1,
+        rasterized=rasterized,
+    )
+
+    ax_umap.set_axis_off()
+    ax_umap.set_title("UMAP")
+
+    # tissue map
+    ax_tissue_whole: Axes = fig.add_subplot(gs[0, 1], label="celltype_map")
+    visualizer.plot_tissue(rasterized=rasterized, s=1)
+
+    ax_tissue_whole.set_yticks([], [])
+
+    artist = plt.Rectangle(
+        (x - window_size, y - window_size),
+        2 * window_size,
+        2 * window_size,
+        fill=False,
+        edgecolor="k",
+        linewidth=2,
+    )
+    ax_tissue_whole.add_artist(artist)
+
+    ax_tissue_whole.set_title("celltype map")
+
+    # top view of ROI
+    roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=40, rasterized=rasterized)
+
+    def _plot_tissue_scatter_roi(ax: Axes, x, y, roi, *, rasterized: bool = False):
+        ax.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
+        ax.set(xlim=roi[0], ylim=roi[1])
+
+    ax_roi_top = fig.add_subplot(gs[1, 0], label="top_map")
+    top_mask = subsample.z > subsample.z_delim
+    subsample_top = subsample[top_mask]
+    visualizer._plot_tissue_scatter(
+        ax_roi_top,
+        subsample_top["x"],
+        subsample_top["y"],
+        subsample_embedding_color[top_mask],
+        title="ROI celltype map, top",
+        **roi_scatter_kwargs,
+    )
+    _plot_tissue_scatter_roi(ax_roi_top, x, y, roi, rasterized=rasterized)
+
+    ax_roi_bottom = fig.add_subplot(gs[1, 1], label="bottom_map")
+    bottom_mask = subsample.z < subsample.z_delim
+    subsample_bottom = subsample[bottom_mask][::-1]
+    visualizer._plot_tissue_scatter(
+        ax_roi_bottom,
+        subsample_bottom["x"],
+        subsample_bottom["y"],
+        subsample_embedding_color[bottom_mask][::-1],
+        title="ROI celltype map, bottom",
+        **roi_scatter_kwargs,
+    )
+
+    _plot_tissue_scatter_roi(ax_roi_bottom, x, y, roi, rasterized=rasterized)
+
+    # side view of ROI
+    roi_side_scatter_kwargs = dict(s=10, alpha=0.5, rasterized=rasterized)
+
+    sub_gs = gs[1, 2].subgridspec(2, 1)
+
+    ax_side_x = fig.add_subplot(sub_gs[0, 0], label="x_cut")
+    halving_mask = (subsample.y < (y + 4)) & (subsample.y > (y - 4))
+
+    visualizer._plot_tissue_scatter(
+        ax_side_x,
+        subsample.x[halving_mask],
+        subsample.z[halving_mask],
+        subsample_embedding_color[halving_mask],
+        title="ROI, vertical, x-cut",
+        **roi_side_scatter_kwargs,
+    )
+
+    ax_side_y = fig.add_subplot(sub_gs[1, 0], label="y_cut")
+    halving_mask = (subsample.x < (x + 4)) & (subsample.x > (x - 4))
+
+    visualizer._plot_tissue_scatter(
+        ax_side_y,
+        subsample.y[halving_mask],
+        subsample.z[halving_mask],
+        subsample_embedding_color[halving_mask],
+        title="ROI, vertical, y-cut",
+        **roi_side_scatter_kwargs,
+    )
+
+
+def run(
     df: pd.DataFrame,
     n_expected_celltypes=None,
     cell_diameter=10,
@@ -1195,9 +1421,9 @@ def compute_coherence_map(
     },
 ):
     """
-    This is a wrapper function that computes the coherence map for a given spatial
+    This is a wrapper function that computes the integrity map for a given spatial
     transcriptomics dataset.
-    It includes the entire ovrlpy pipeline, returning a coherence map and a signal
+    It includes the entire ovrlpy pipeline, returning a integrity map and a signal
     strength map and produces a visualizer object that can be used to plot the results.
 
     Parameters
@@ -1225,13 +1451,13 @@ def compute_coherence_map(
 
     Returns
     -------
-    coherence_map : np.ndarray
-        A coherence pixel map of the spatial transcriptomics dataset.
+    integrity_map : np.ndarray
+        A integrity pixel map of the spatial transcriptomics dataset.
     signal_map : np.ndarray
         A pixel map of the spatial transcriptomics dataset containing the detected signal.
     vis : Visualizer
         A visualizer object that can be used to plot the
-        results of the coherence map
+        results of the integrity map
     """
 
     KDE_bandwidth = cell_diameter / 5
@@ -1242,7 +1468,7 @@ def compute_coherence_map(
 
     print("Running vertical adjustment")
     _assign_xy(df)
-    _assign_z_mean_message_passing(df, rounds=4)
+    _assign_z_mean_message_passing(df, rounds=20)
 
     vis = Visualizer(
         KDE_bandwidth=KDE_bandwidth,
@@ -1253,10 +1479,11 @@ def compute_coherence_map(
         cumap_kwargs=cumap_kwargs,
     )
 
+    print("Creating gene expression embeddings for visualization:")
     vis.fit_ssam(df, signature_matrix=signature_matrix)
 
     print("Creating signal integrity map:")
-    coherence_, signal_ = _compute_divergence_patched(
+    integrity_, signal_ = _compute_divergence_patched(
         df,
         vis.genes,
         vis.pca_2d.components_,
@@ -1264,7 +1491,7 @@ def compute_coherence_map(
         min_expression=1,
     )
 
-    vis.coherence_map = coherence_.T
+    vis.integrity_map = integrity_.T
     vis.signal_map = signal_.T
 
-    return coherence_.T, signal_.T, vis
+    return integrity_.T, signal_.T, vis
