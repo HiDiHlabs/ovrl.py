@@ -880,11 +880,11 @@ class Visualizer:
         )
 
         if self.signal_map is not None:
-            pseudocell_df["signal"] = self.signal_map[pseudocell_df.x, pseudocell_df.y]
-
+            pseudocell_df["signal"] = self.signal_map[pseudocell_df.y.astype(int), pseudocell_df.x.astype(int)]
+        
         if self.integrity_map is not None:
             pseudocell_df["integrity"] = self.integrity_map[
-                pseudocell_df.x, pseudocell_df.y
+                pseudocell_df.y.astype(int), pseudocell_df.x.astype(int)
             ]
 
         return pseudocell_df
@@ -1469,6 +1469,7 @@ def plot_region_of_interest(
         **roi_side_scatter_kwargs,
     )
 
+    return fig, [[ax_umap, ax_tissue_whole, ax_integrity], [ax_roi_top, ax_roi_bottom, [ax_side_x, ax_side_y]]]
 
 def run(
     df: pd.DataFrame,
