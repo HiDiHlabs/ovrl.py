@@ -13,6 +13,7 @@ import umap
 from matplotlib.axes import Axes
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.ndimage import gaussian_filter
+from scipy.linalg import norm
 from sklearn.decomposition import PCA
 
 from ._ssam2 import _sample_expression
@@ -555,13 +556,16 @@ class Visualizer:
             "n_components": 2,
             "min_dist": 0.0,
             "n_neighbors": 20,
-            "random_state": None,
+            "random_state": 42,
+            "n_jobs": 1,
         },
         cumap_kwargs={
             "n_components": 3,
-            "min_dist": 0.001,
-            "n_neighbors": 50,
-            "random_state": None,
+            "min_dist": 0.0,
+            "metric": "euclidean",
+            "n_neighbors": 20,
+            "random_state": 42,            
+            "n_jobs": 1,
         },
     ) -> None:
         self.KDE_bandwidth = KDE_bandwidth
@@ -592,7 +596,7 @@ class Visualizer:
         self.integrity_map = None
         self.signal_map = None
 
-    def fit_ssam(
+    def fit_transcripts(
         self,
         coordinate_df: Optional[pd.DataFrame] = None,
         adata: Optional[anndata.AnnData] = None,
@@ -666,13 +670,13 @@ class Visualizer:
         )
         factors = self.pca_2d.fit_transform(self.pseudocell_expression_samples.T)
 
-        print(f"Modeling {factors.shape[1]} pseudo-celltype clusters")
+        print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
 
         self.embedder_2d = umap.UMAP(**self.umap_kwargs)
         self.embedding = self.embedder_2d.fit_transform(factors)
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-        embedding_color = self.embedder_3d.fit_transform(factors)
+        embedding_color = self.embedder_3d.fit_transform(factors/norm(factors, axis=1)[..., None])
 
         embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
@@ -697,6 +701,43 @@ class Visualizer:
                 for i in range(len(self.genes))
             ]
         )
+        
+    def fit_pseudocells(self, pseudocell_expression_samples: pd.DataFrame, genes: list=None):
+        """fits the visualizer to a given pseudocell expression sample.
+
+        Args:
+            pseudocell_expression_samples (pandas.DataFrame): A gene x cell matrix of gene expression
+            genes (list, optional): A list of genes to utilize in the model. Defaults to None.
+        """
+        
+        self.pseudocell_expression_samples = pseudocell_expression_samples
+        
+        if genes is None:
+            genes = pseudocell_expression_samples.index
+        self.genes = genes
+        
+        self.pca_2d = PCA(
+            n_components=min(
+                self.n_components_pca, pseudocell_expression_samples.shape[0] // 2
+            )
+        )
+        factors = self.pca_2d.fit_transform(pseudocell_expression_samples.T)
+
+        print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
+
+        self.embedder_2d = umap.UMAP(**self.umap_kwargs)
+        self.embedding = self.embedder_2d.fit_transform(factors)
+
+        self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
+        embedding_color = self.embedder_3d.fit_transform(factors/norm(factors, axis=1)[..., None])
+
+        embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
+
+        self.colors = _min_to_max(embedding_color.copy())
+        self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
+        
+        self.fit_signatures()
+
 
     def fit_signatures(self, signature_matrix=None):
         """
@@ -757,7 +798,7 @@ class Visualizer:
 
         return subsample
 
-    def transform(self, coordinate_df: pd.DataFrame):
+    def transform_transcripts(self, coordinate_df: pd.DataFrame):
         """
         Transforms the coordinate dataframe to the visualizers 2d and 3d embedding space.
 
@@ -798,6 +839,32 @@ class Visualizer:
         subsample_embedding_color = np.clip(subsample_embedding_color, 0, 1)
 
         return subsample_embedding, subsample_embedding_color
+    
+    def transform_pseudocells(self, pseudocell_expression_samples:pd.DataFrame):
+        """Transforms a matrix of gene expression to the visualizer's 2d and 3d embedding space.
+
+        Args:
+            pseudocell_expression_samples (pd.DataFrame): A gene x cell matrix of gene expression
+        """
+        
+        print(pseudocell_expression_samples)
+        subsample_embedding, subsample_embedding_color = _transform_embeddings(
+            pseudocell_expression_samples.T.values,
+            self.pca_2d,
+            embedder_2d=self.embedder_2d,
+            embedder_3d=self.embedder_3d,
+        )
+        subsample_embedding_color, _ = _fill_color_axes(
+            subsample_embedding_color, self.pca_3d
+        )
+        color_min, color_max = self.colors_min_max
+        subsample_embedding_color = (subsample_embedding_color - color_min) / (
+            color_max - color_min
+        )
+        subsample_embedding_color = np.clip(subsample_embedding_color, 0, 1)
+
+        return subsample_embedding, subsample_embedding_color
+        
 
     def pseudocell_df(self) -> pd.DataFrame:
         """
@@ -813,11 +880,11 @@ class Visualizer:
         )
 
         if self.signal_map is not None:
-            pseudocell_df["signal"] = self.signal_map[pseudocell_df.x, pseudocell_df.y]
-
+            pseudocell_df["signal"] = self.signal_map[pseudocell_df.y.astype(int), pseudocell_df.x.astype(int)]
+        
         if self.integrity_map is not None:
             pseudocell_df["integrity"] = self.integrity_map[
-                pseudocell_df.x, pseudocell_df.y
+                pseudocell_df.y.astype(int), pseudocell_df.x.astype(int)
             ]
 
         return pseudocell_df
@@ -1089,6 +1156,7 @@ class Visualizer:
         adata.uns["pca_2d"] = {
             "components_": self.pca_2d.components_,
             "mean_": self.pca_2d.mean_,
+            "explained_variance_": self.pca_2d.explained_variance_,
         }
 
         knn_search_index_2d_pickled = base64.b64encode(
@@ -1115,6 +1183,7 @@ class Visualizer:
         adata.uns["pca_3d"] = {
             "components_": self.pca_3d.components_,
             "mean_": self.pca_3d.mean_,
+            "explained_variance_": self.pca_3d.explained_variance_,
         }
 
         adata.uns["embedder_3d"] = {
@@ -1174,6 +1243,7 @@ def load_visualizer(path: str) -> Visualizer:
     vis.pca_2d = PCA(n_components=adata.uns["pca_2d"]["components_"].shape[0])
     vis.pca_2d.components_ = adata.uns["pca_2d"]["components_"]
     vis.pca_2d.mean_ = adata.uns["pca_2d"]["mean_"]
+    vis.pca_2d.explained_variance_ = adata.uns["pca_2d"]["explained_variance_"]
 
     vis.embedder_2d = umap.UMAP(**adata.uns["embedder_2d"]["kwargs"])
     vis.embedder_2d._raw_data = adata.uns["embedder_2d"]["_raw_data"]
@@ -1194,6 +1264,7 @@ def load_visualizer(path: str) -> Visualizer:
     vis.pca_3d = PCA(n_components=adata.uns["pca_3d"]["components_"].shape[0])
     vis.pca_3d.components_ = adata.uns["pca_3d"]["components_"]
     vis.pca_3d.mean_ = adata.uns["pca_3d"]["mean_"]
+    vis.pca_3d.explained_variance_ = adata.uns["pca_3d"]["explained_variance_"]
 
     vis.embedder_3d = umap.UMAP(**adata.uns["embedder_3d"]["kwargs"])
     vis.embedder_3d._raw_data = adata.uns["embedder_3d"]["_raw_data"]
@@ -1265,7 +1336,7 @@ def plot_region_of_interest(
 
     # first, create and color-embed the subsample of the region of interest:
     subsample = visualizer.subsample_df(x, y, coordinate_df, window_size=window_size)
-    subsample_embedding, subsample_embedding_color = visualizer.transform(subsample)
+    subsample_embedding, subsample_embedding_color = visualizer.transform_transcripts(subsample)
 
     vertical_indices = subsample.z.argsort()
     subsample = subsample.sort_values("z")
@@ -1336,7 +1407,7 @@ def plot_region_of_interest(
     ax_tissue_whole.set_title("celltype map")
 
     # top view of ROI
-    roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=40, rasterized=rasterized)
+    roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=1.5e5/window_size**2, rasterized=rasterized)
 
     def _plot_tissue_scatter_roi(ax: Axes, x, y, roi, *, rasterized: bool = False):
         ax.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
@@ -1398,6 +1469,7 @@ def plot_region_of_interest(
         **roi_side_scatter_kwargs,
     )
 
+    return fig, [[ax_umap, ax_tissue_whole, ax_integrity], [ax_roi_top, ax_roi_bottom, [ax_side_x, ax_side_y]]]
 
 def run(
     df: pd.DataFrame,
@@ -1480,7 +1552,7 @@ def run(
     )
 
     print("Creating gene expression embeddings for visualization:")
-    vis.fit_ssam(df, signature_matrix=signature_matrix)
+    vis.fit_transcripts(df, signature_matrix=signature_matrix)
 
     print("Creating signal integrity map:")
     integrity_, signal_ = _compute_divergence_patched(
