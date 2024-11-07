@@ -12,12 +12,13 @@ import pandas as pd
 import umap
 from matplotlib.axes import Axes
 from matplotlib.colors import LinearSegmentedColormap
-from scipy.ndimage import gaussian_filter
 from scipy.linalg import norm
+from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 
 from ._ssam2 import _sample_expression
 from ._utils import (
+    SCALEBAR_PARAMS,
     _compute_divergence_patched,
     _create_histogram,
     _create_knn_graph,
@@ -27,6 +28,7 @@ from ._utils import (
     _get_spatial_subsample_mask,
     _min_to_max,
     _plot_embeddings,
+    _plot_scalebar,
     _transform_embeddings,
 )
 
@@ -339,6 +341,7 @@ def plot_signal_integrity(
     cmap="BIH",
     figure_height: float = 10,
     plot_hist: bool = True,
+    scalebar: dict | None = SCALEBAR_PARAMS,
 ):
     """
     Plots the determined signal integrity of the tissue sample in a signal integrity map.
@@ -356,6 +359,9 @@ def plot_signal_integrity(
             Colormap for display.
         plot_hist : bool, optional
             Whether to plot a histogram of integrity values alongside the map.
+        scalebar : dict[str, typing.Any] | None
+            If `None` no scalebar will be plotted. Otherwise a dictionary with
+            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``
     """
 
     figure_aspect_ratio = integrity.shape[0] / integrity.shape[1]
@@ -386,6 +392,9 @@ def plot_signal_integrity(
         )
         ax[0].invert_yaxis()
         ax[0].spines[["top", "right"]].set_visible(False)
+
+        if scalebar is not None:
+            _plot_scalebar(ax[0], **SCALEBAR_PARAMS)
 
         if plot_hist:
             vals, bins = np.histogram(
@@ -564,7 +573,7 @@ class Visualizer:
             "min_dist": 0.0,
             "metric": "euclidean",
             "n_neighbors": 20,
-            "random_state": 42,            
+            "random_state": 42,
             "n_jobs": 1,
         },
     ) -> None:
@@ -676,7 +685,9 @@ class Visualizer:
         self.embedding = self.embedder_2d.fit_transform(factors)
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-        embedding_color = self.embedder_3d.fit_transform(factors/norm(factors, axis=1)[..., None])
+        embedding_color = self.embedder_3d.fit_transform(
+            factors / norm(factors, axis=1)[..., None]
+        )
 
         embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
@@ -701,21 +712,23 @@ class Visualizer:
                 for i in range(len(self.genes))
             ]
         )
-        
-    def fit_pseudocells(self, pseudocell_expression_samples: pd.DataFrame, genes: list=None):
+
+    def fit_pseudocells(
+        self, pseudocell_expression_samples: pd.DataFrame, genes: list = None
+    ):
         """fits the visualizer to a given pseudocell expression sample.
 
         Args:
             pseudocell_expression_samples (pandas.DataFrame): A gene x cell matrix of gene expression
             genes (list, optional): A list of genes to utilize in the model. Defaults to None.
         """
-        
+
         self.pseudocell_expression_samples = pseudocell_expression_samples
-        
+
         if genes is None:
             genes = pseudocell_expression_samples.index
         self.genes = genes
-        
+
         self.pca_2d = PCA(
             n_components=min(
                 self.n_components_pca, pseudocell_expression_samples.shape[0] // 2
@@ -729,15 +742,16 @@ class Visualizer:
         self.embedding = self.embedder_2d.fit_transform(factors)
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-        embedding_color = self.embedder_3d.fit_transform(factors/norm(factors, axis=1)[..., None])
+        embedding_color = self.embedder_3d.fit_transform(
+            factors / norm(factors, axis=1)[..., None]
+        )
 
         embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
         self.colors = _min_to_max(embedding_color.copy())
         self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
-        
-        self.fit_signatures()
 
+        self.fit_signatures()
 
     def fit_signatures(self, signature_matrix=None):
         """
@@ -839,14 +853,14 @@ class Visualizer:
         subsample_embedding_color = np.clip(subsample_embedding_color, 0, 1)
 
         return subsample_embedding, subsample_embedding_color
-    
-    def transform_pseudocells(self, pseudocell_expression_samples:pd.DataFrame):
+
+    def transform_pseudocells(self, pseudocell_expression_samples: pd.DataFrame):
         """Transforms a matrix of gene expression to the visualizer's 2d and 3d embedding space.
 
         Args:
             pseudocell_expression_samples (pd.DataFrame): A gene x cell matrix of gene expression
         """
-        
+
         print(pseudocell_expression_samples)
         subsample_embedding, subsample_embedding_color = _transform_embeddings(
             pseudocell_expression_samples.T.values,
@@ -864,7 +878,6 @@ class Visualizer:
         subsample_embedding_color = np.clip(subsample_embedding_color, 0, 1)
 
         return subsample_embedding, subsample_embedding_color
-        
 
     def pseudocell_df(self) -> pd.DataFrame:
         """
@@ -880,8 +893,10 @@ class Visualizer:
         )
 
         if self.signal_map is not None:
-            pseudocell_df["signal"] = self.signal_map[pseudocell_df.y.astype(int), pseudocell_df.x.astype(int)]
-        
+            pseudocell_df["signal"] = self.signal_map[
+                pseudocell_df.y.astype(int), pseudocell_df.x.astype(int)
+            ]
+
         if self.integrity_map is not None:
             pseudocell_df["integrity"] = self.integrity_map[
                 pseudocell_df.y.astype(int), pseudocell_df.x.astype(int)
@@ -897,6 +912,7 @@ class Visualizer:
         y: float = None,
         window_size: int = None,
         rasterized: bool = True,
+        scalebar: dict | None = SCALEBAR_PARAMS,
     ):
         """
         Plots an instance of the visualized data.
@@ -915,6 +931,9 @@ class Visualizer:
             Window size of the region-of-interest.
         rasterized : bool, optional
             If True all plots will be rasterized.
+        scalebar : dict[str, typing.Any] | None
+            If `None` no scalebar will be plotted. Otherwise a dictionary with
+            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``
         """
         vertical_indices = subsample.z.argsort()
         subsample = subsample.sort_values("z")
@@ -1045,6 +1064,11 @@ class Visualizer:
             **roi_side_scatter_kwargs,
         )
 
+        if scalebar is not None:
+            _plot_scalebar(ax_tissue_whole, **SCALEBAR_PARAMS)
+            _plot_scalebar(ax_roi_top, **SCALEBAR_PARAMS)
+            _plot_scalebar(ax_roi_bottom, **SCALEBAR_PARAMS)
+
     def plot_umap(
         self,
         ax: Optional[Axes] = None,
@@ -1073,7 +1097,12 @@ class Visualizer:
             **kwargs,
         )
 
-    def plot_tissue(self, rasterized: bool = False, **kwargs):
+    def plot_tissue(
+        self,
+        rasterized: bool = False,
+        scalebar: dict | None = SCALEBAR_PARAMS,
+        **kwargs,
+    ):
         """
         Plots the tissue embedding.
 
@@ -1081,6 +1110,9 @@ class Visualizer:
         ----------
         rasterized : bool, optional
             If True the plot will be rasterized.
+        scalebar : dict[str, typing.Any] | None
+            If `None` no scalebar will be plotted. Otherwise a dictionary with
+            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``
         kwargs
             Keyword arguments for the matplotlib's scatter plot function.
         """
@@ -1096,6 +1128,9 @@ class Visualizer:
             **kwargs,
         )
 
+        if scalebar is not None:
+            _plot_scalebar(ax, **SCALEBAR_PARAMS)
+
     @staticmethod
     def _plot_tissue_scatter(
         ax: Axes, xs, ys, cs, *, title: Optional[str] = None, **kwargs
@@ -1105,7 +1140,12 @@ class Visualizer:
         if title is not None:
             ax.set_title(title)
 
-    def plot_fit(self, rasterized: bool = True, umap_kwargs={"scatter_kwargs": {"s": 1}}, tissue_kwargs={"s": 1}):
+    def plot_fit(
+        self,
+        rasterized: bool = True,
+        umap_kwargs={"scatter_kwargs": {"s": 1}},
+        tissue_kwargs={"s": 1},
+    ):
         """
         Plots the fitted model.
 
@@ -1309,6 +1349,7 @@ def plot_region_of_interest(
     window_size: int = 30,
     signal_plot_threshold: float = 5.0,
     rasterized: bool = True,
+    scalebar: dict | None = SCALEBAR_PARAMS,
 ):
     """Plot a comprehensive overview of a zoomed-in region of interest.
 
@@ -1332,11 +1373,16 @@ def plot_region_of_interest(
         Threshold for the signal plot. Defaults to 5.
     rasterized (bool, optional):
         If True all plots will be rasterized. Defaults to True.
+    scalebar : dict[str, typing.Any] | None
+        If `None` no scalebar will be plotted. Otherwise a dictionary with
+        additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``
     """
 
     # first, create and color-embed the subsample of the region of interest:
     subsample = visualizer.subsample_df(x, y, coordinate_df, window_size=window_size)
-    subsample_embedding, subsample_embedding_color = visualizer.transform_transcripts(subsample)
+    subsample_embedding, subsample_embedding_color = visualizer.transform_transcripts(
+        subsample
+    )
 
     vertical_indices = subsample.z.argsort()
     subsample = subsample.sort_values("z")
@@ -1407,7 +1453,9 @@ def plot_region_of_interest(
     ax_tissue_whole.set_title("celltype map")
 
     # top view of ROI
-    roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=1.5e5/window_size**2, rasterized=rasterized)
+    roi_scatter_kwargs = dict(
+        marker=".", alpha=0.8, s=1.5e5 / window_size**2, rasterized=rasterized
+    )
 
     def _plot_tissue_scatter_roi(ax: Axes, x, y, roi, *, rasterized: bool = False):
         ax.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
@@ -1440,6 +1488,12 @@ def plot_region_of_interest(
 
     _plot_tissue_scatter_roi(ax_roi_bottom, x, y, roi, rasterized=rasterized)
 
+    if scalebar is not None:
+        _plot_scalebar(ax_integrity, **SCALEBAR_PARAMS)
+        _plot_scalebar(ax_tissue_whole, **SCALEBAR_PARAMS)
+        _plot_scalebar(ax_roi_top, **SCALEBAR_PARAMS)
+        _plot_scalebar(ax_roi_bottom, **SCALEBAR_PARAMS)
+
     # side view of ROI
     roi_side_scatter_kwargs = dict(s=10, alpha=0.5, rasterized=rasterized)
 
@@ -1469,7 +1523,11 @@ def plot_region_of_interest(
         **roi_side_scatter_kwargs,
     )
 
-    return fig, [[ax_umap, ax_tissue_whole, ax_integrity], [ax_roi_top, ax_roi_bottom, [ax_side_x, ax_side_y]]]
+    return fig, [
+        [ax_umap, ax_tissue_whole, ax_integrity],
+        [ax_roi_top, ax_roi_bottom, [ax_side_x, ax_side_y]],
+    ]
+
 
 def run(
     df: pd.DataFrame,

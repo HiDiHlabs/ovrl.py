@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name            = "ovrlpy"
-description     = "A quality control tool for spatial transcriptomics data"
+description     = "A python tool to investigate cell overlaps in imaging-based spatial transcriptomics data."
 readme          = { file = "README.md", content-type = "text/markdown" }
 license         = { file = "LICENSE" }
 requires-python = ">=3.6, <3.13"
@@ -17,6 +17,7 @@ authors = [
 dependencies = [
     "anndata",
     "matplotlib",
+    "matplotlib-scalebar",
     "numpy",
     "pandas",
     "scikit-image >= 0.18",

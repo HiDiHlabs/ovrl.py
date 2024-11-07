@@ -1,12 +1,15 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
 
 import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tqdm
-from scipy.ndimage import gaussian_filter
+from matplotlib.axes import Axes
+from matplotlib_scalebar.scalebar import ScaleBar
 from scipy.linalg import norm
+from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
@@ -20,33 +23,12 @@ def _draw_outline(artist, lw=2, color="black"):
     )
 
 
-def _plot_scalebar(
-    ax,
-    x,
-    y,
-    length=100,
-    fontsize=10,
-    text="100um",
-    color="k",
-    text_offset=0,
-    edge_color=None,
-):
-    plot_artist = ax.plot([x, x + length], [y, y], c=color, lw=2)
-    text_artist = ax.text(
-        x + length / 2,
-        y + text_offset,
-        text,
-        fontsize=fontsize,
-        ha="center",
-        va="bottom",
-        c=color,
-    )
+SCALEBAR_PARAMS: dict[str, Any] = {"dx": 1, "units": "um", "box_alpha": 0, "color": "w"}
+"""Default scalebar parameters"""
 
-    if edge_color is not None:
-        _draw_outline(plot_artist[0], lw=5, color=edge_color)
-        _draw_outline(text_artist, lw=5, color=edge_color)
 
-    return plot_artist, text_artist
+def _plot_scalebar(ax: Axes, dx: float = 1, units="um", **kwargs):
+    ax.add_artist(ScaleBar(dx, units=units, **kwargs))
 
 
 def _get_kl_divergence(p, q):
@@ -134,7 +116,7 @@ def _transform_embeddings(
     factors = pca.transform(expression)
 
     embedding = embedder_2d.transform(factors)
-    embedding_color = embedder_3d.transform(factors/norm(factors, axis=1)[..., None])
+    embedding_color = embedder_3d.transform(factors / norm(factors, axis=1)[..., None])
 
     return embedding, embedding_color
 
