@@ -1,8 +1,8 @@
-Tutorials 
+Tutorials
 ==========================
 
 We will demonstrate an example usage of ovrlpy on 3 different datasets (`Xenium Brain <https://www.10xgenomics.com/products/xenium-in-situ/mouse-brain-dataset-explorer>`_,
-`Vizgen liver <https://info.vizgen.com/mouse-liver-data>`_, `Vizgen receptor <https://info.vizgen.com/mouse-brain-map>`_  ). 
+`Vizgen liver <https://info.vizgen.com/mouse-liver-data>`_, `Vizgen receptor <https://info.vizgen.com/mouse-brain-map>`_  ).
 
 
 Installation
@@ -23,13 +23,13 @@ Installation
 
    .. code-block:: bash
 
-      pip install ovrlpy[tutorial] 
+      pip install ovrlpy[tutorial]
 
 
    This will install the required dependencies and tutorial-specific components of the package.
 
 3. **Start with the Tutorials**
-   To start the tutorial JupyterNotebooks are stored in 
+   To start the tutorial JupyterNotebooks are stored in
    .. code-block:: bash
 
       ovrl.py/docs/source/tutorials/*.ipynb
