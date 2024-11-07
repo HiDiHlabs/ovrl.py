@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tqdm
-from scipy.ndimage import gaussian_filter
 from scipy.linalg import norm
+from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
@@ -134,7 +134,7 @@ def _transform_embeddings(
     factors = pca.transform(expression)
 
     embedding = embedder_2d.transform(factors)
-    embedding_color = embedder_3d.transform(factors/norm(factors, axis=1)[..., None])
+    embedding_color = embedder_3d.transform(factors / norm(factors, axis=1)[..., None])
 
     return embedding, embedding_color
 

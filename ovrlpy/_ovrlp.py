@@ -12,8 +12,8 @@ import pandas as pd
 import umap
 from matplotlib.axes import Axes
 from matplotlib.colors import LinearSegmentedColormap
-from scipy.ndimage import gaussian_filter
 from scipy.linalg import norm
+from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 
 from ._ssam2 import _sample_expression
@@ -564,7 +564,7 @@ class Visualizer:
             "min_dist": 0.0,
             "metric": "euclidean",
             "n_neighbors": 20,
-            "random_state": 42,            
+            "random_state": 42,
             "n_jobs": 1,
         },
     ) -> None:
@@ -676,7 +676,9 @@ class Visualizer:
         self.embedding = self.embedder_2d.fit_transform(factors)
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-        embedding_color = self.embedder_3d.fit_transform(factors/norm(factors, axis=1)[..., None])
+        embedding_color = self.embedder_3d.fit_transform(
+            factors / norm(factors, axis=1)[..., None]
+        )
 
         embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
@@ -701,21 +703,23 @@ class Visualizer:
                 for i in range(len(self.genes))
             ]
         )
-        
-    def fit_pseudocells(self, pseudocell_expression_samples: pd.DataFrame, genes: list=None):
+
+    def fit_pseudocells(
+        self, pseudocell_expression_samples: pd.DataFrame, genes: list = None
+    ):
         """fits the visualizer to a given pseudocell expression sample.
 
         Args:
             pseudocell_expression_samples (pandas.DataFrame): A gene x cell matrix of gene expression
             genes (list, optional): A list of genes to utilize in the model. Defaults to None.
         """
-        
+
         self.pseudocell_expression_samples = pseudocell_expression_samples
-        
+
         if genes is None:
             genes = pseudocell_expression_samples.index
         self.genes = genes
-        
+
         self.pca_2d = PCA(
             n_components=min(
                 self.n_components_pca, pseudocell_expression_samples.shape[0] // 2
@@ -729,15 +733,16 @@ class Visualizer:
         self.embedding = self.embedder_2d.fit_transform(factors)
 
         self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-        embedding_color = self.embedder_3d.fit_transform(factors/norm(factors, axis=1)[..., None])
+        embedding_color = self.embedder_3d.fit_transform(
+            factors / norm(factors, axis=1)[..., None]
+        )
 
         embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
         self.colors = _min_to_max(embedding_color.copy())
         self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
-        
-        self.fit_signatures()
 
+        self.fit_signatures()
 
     def fit_signatures(self, signature_matrix=None):
         """
@@ -839,14 +844,14 @@ class Visualizer:
         subsample_embedding_color = np.clip(subsample_embedding_color, 0, 1)
 
         return subsample_embedding, subsample_embedding_color
-    
-    def transform_pseudocells(self, pseudocell_expression_samples:pd.DataFrame):
+
+    def transform_pseudocells(self, pseudocell_expression_samples: pd.DataFrame):
         """Transforms a matrix of gene expression to the visualizer's 2d and 3d embedding space.
 
         Args:
             pseudocell_expression_samples (pd.DataFrame): A gene x cell matrix of gene expression
         """
-        
+
         print(pseudocell_expression_samples)
         subsample_embedding, subsample_embedding_color = _transform_embeddings(
             pseudocell_expression_samples.T.values,
@@ -864,7 +869,6 @@ class Visualizer:
         subsample_embedding_color = np.clip(subsample_embedding_color, 0, 1)
 
         return subsample_embedding, subsample_embedding_color
-        
 
     def pseudocell_df(self) -> pd.DataFrame:
         """
@@ -880,8 +884,10 @@ class Visualizer:
         )
 
         if self.signal_map is not None:
-            pseudocell_df["signal"] = self.signal_map[pseudocell_df.y.astype(int), pseudocell_df.x.astype(int)]
-        
+            pseudocell_df["signal"] = self.signal_map[
+                pseudocell_df.y.astype(int), pseudocell_df.x.astype(int)
+            ]
+
         if self.integrity_map is not None:
             pseudocell_df["integrity"] = self.integrity_map[
                 pseudocell_df.y.astype(int), pseudocell_df.x.astype(int)
@@ -1105,7 +1111,12 @@ class Visualizer:
         if title is not None:
             ax.set_title(title)
 
-    def plot_fit(self, rasterized: bool = True, umap_kwargs={"scatter_kwargs": {"s": 1}}, tissue_kwargs={"s": 1}):
+    def plot_fit(
+        self,
+        rasterized: bool = True,
+        umap_kwargs={"scatter_kwargs": {"s": 1}},
+        tissue_kwargs={"s": 1},
+    ):
         """
         Plots the fitted model.
 
@@ -1336,7 +1347,9 @@ def plot_region_of_interest(
 
     # first, create and color-embed the subsample of the region of interest:
     subsample = visualizer.subsample_df(x, y, coordinate_df, window_size=window_size)
-    subsample_embedding, subsample_embedding_color = visualizer.transform_transcripts(subsample)
+    subsample_embedding, subsample_embedding_color = visualizer.transform_transcripts(
+        subsample
+    )
 
     vertical_indices = subsample.z.argsort()
     subsample = subsample.sort_values("z")
@@ -1407,7 +1420,9 @@ def plot_region_of_interest(
     ax_tissue_whole.set_title("celltype map")
 
     # top view of ROI
-    roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=1.5e5/window_size**2, rasterized=rasterized)
+    roi_scatter_kwargs = dict(
+        marker=".", alpha=0.8, s=1.5e5 / window_size**2, rasterized=rasterized
+    )
 
     def _plot_tissue_scatter_roi(ax: Axes, x, y, roi, *, rasterized: bool = False):
         ax.scatter(x, y, c="k", marker="+", s=100, rasterized=rasterized)
@@ -1469,7 +1484,11 @@ def plot_region_of_interest(
         **roi_side_scatter_kwargs,
     )
 
-    return fig, [[ax_umap, ax_tissue_whole, ax_integrity], [ax_roi_top, ax_roi_bottom, [ax_side_x, ax_side_y]]]
+    return fig, [
+        [ax_umap, ax_tissue_whole, ax_integrity],
+        [ax_roi_top, ax_roi_bottom, [ax_side_x, ax_side_y]],
+    ]
+
 
 def run(
     df: pd.DataFrame,
