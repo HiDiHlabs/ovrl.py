@@ -12,7 +12,7 @@ Much of spatial biology uses microscopic tissue slices to study the spatial dist
 
 
 
-Ovrl.py is a quality-control tool for spatial transcriptomics data that can help analysts find sources of vertical signal inconsistency in their data.
+**Ovrl.py** is a quality-control tool for spatial transcriptomics data that can help analysts find sources of vertical signal inconsistency in their data.
 It is works with imaging-based spatial transcriptomics data, such as 10x genomics' Xenium or vizgen's MERFISH platforms.
 The main feature of the tool is the production of 'signal integrity maps' that can help analysts identify sources of signal inconsistency in their data.
 Users can also use the built-in 3D visualisation tool to explore regions of signal inconsistency in their data on a molecular level.
@@ -57,27 +57,12 @@ Steps for Installation
       pip install jupyter pyarrow fastparquet
 
     ````
-Summary of Commands
--------------------
 
-Here's a summary of the commands to run for installation:
 
-    ````bash
-
-   # Step 1: Clone the repository
-   git clone https://github.com/HiDiHlabs/ovrl.py.git
-   cd ovrl.py
-
-   # Step 2: Install package from source
-   pip install .
-
-   # Step 3: Install Jupyter and other packages for interactive analysis
-   pip install jupyter pyarrow fastparquet
-   
-    ````
 ## Quickstart
 -----------------------
 The simplest use case of ovrlpy is the creation of a signal integrity map from a spatial transcriptomics dataset.
+
 1. **Set Parameters & Load Data**
 
 Define parameters and load your data.
