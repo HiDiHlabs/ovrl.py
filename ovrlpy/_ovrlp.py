@@ -361,7 +361,8 @@ def plot_signal_integrity(
             Whether to plot a histogram of integrity values alongside the map.
         scalebar : dict[str, typing.Any] | None
             If `None` no scalebar will be plotted. Otherwise a dictionary with
-            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``
+            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
+            By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
     """
 
     figure_aspect_ratio = integrity.shape[0] / integrity.shape[1]
@@ -456,7 +457,7 @@ def detect_doublets(
     dist_x, dist_y, dist_t = _determine_localmax_and_sample(
         (1 - integrity_map) * (signal_map > minimum_signal_strength),
         min_distance=min_distance,
-        min_expression=1-integrity_threshold,
+        min_expression=1 - integrity_threshold,
     )
 
     arg_idcs = np.argsort(dist_t)[::-1]
@@ -466,7 +467,7 @@ def detect_doublets(
         {
             "x": dist_y,
             "y": dist_x,
-            "integrity": 1-dist_t,
+            "integrity": 1 - dist_t,
             "signal": signal_map[dist_x, dist_y],
         }
     )
@@ -933,7 +934,8 @@ class Visualizer:
             If True all plots will be rasterized.
         scalebar : dict[str, typing.Any] | None
             If `None` no scalebar will be plotted. Otherwise a dictionary with
-            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``
+            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
+            By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
         """
         vertical_indices = subsample.z.argsort()
         subsample = subsample.sort_values("z")
@@ -1112,7 +1114,8 @@ class Visualizer:
             If True the plot will be rasterized.
         scalebar : dict[str, typing.Any] | None
             If `None` no scalebar will be plotted. Otherwise a dictionary with
-            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``
+            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
+            By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
         kwargs
             Keyword arguments for the matplotlib's scatter plot function.
         """
@@ -1375,7 +1378,8 @@ def plot_region_of_interest(
         If True all plots will be rasterized. Defaults to True.
     scalebar : dict[str, typing.Any] | None
         If `None` no scalebar will be plotted. Otherwise a dictionary with
-        additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``
+        additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
+            By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
     """
 
     # first, create and color-embed the subsample of the region of interest:
