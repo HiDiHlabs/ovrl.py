@@ -21,8 +21,8 @@ Users can also use the built-in 3D visualisation tool to explore regions of sign
 
 To install the necessary tools and dependencies for this project, follow the steps outlined below. These instructions will guide you through setting up the environment for both standard use and interactive analysis with Jupyter notebooks.
 
-.. note::
-   Make sure you have Python and pip installed on your machine before proceeding.
+
+> Make sure you have Python and pip installed on your machine before proceeding.
 
 Steps for Installation
 -----------------------
@@ -42,27 +42,27 @@ Steps for Installation
 
    To install the ovrlpy package, execute the following command:
 
-   .. code-block:: bash
+   ````bash
 
       pip install .
-
+    ````
    This installs the package based on the current state of the source files.
 
 3. **Set Up for Interactive Analysis (Optional)**
 
    If you plan to use Jupyter notebooks for interactive analysis or the project's tutorials, you'll need to install some additional packages: **Jupyter**, **pyarrow**, and **fastparquet**. Install them using:
 
-   .. code-block:: bash
+   ````bash
 
       pip install jupyter pyarrow fastparquet
 
-
+    ````
 Summary of Commands
 -------------------
 
 Here's a summary of the commands to run for installation:
 
-.. code-block:: bash
+    ````bash
 
    # Step 1: Clone the repository
    git clone https://github.com/HiDiHlabs/ovrl.py.git
@@ -74,13 +74,14 @@ Here's a summary of the commands to run for installation:
    # Step 3: Install Jupyter and other packages for interactive analysis
    pip install jupyter pyarrow fastparquet
 
-
+    ````
 ## Quickstart
 -----------------------
 The simplest use case of ovrlpy is the creation of a signal integrity map from a spatial transcriptomics dataset.
 1. **Set Parameters & Load Data**
 
 Define parameters and load your data.
+
 ```python
 import pandas as pd
 import ovrlpy
