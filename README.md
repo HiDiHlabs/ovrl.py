@@ -22,7 +22,7 @@ Users can also use the built-in 3D visualisation tool to explore regions of sign
 To install the necessary tools and dependencies for this project, follow the steps outlined below. These instructions will guide you through setting up the environment for both standard use and interactive analysis with Jupyter notebooks.
 
 
-> Make sure you have Python and pip installed on your machine before proceeding.
+> Ensure that Python (>= 3.6 and < 3.13) and pip are installed on your machine before proceeding.
 
 Steps for Installation
 -----------------------
