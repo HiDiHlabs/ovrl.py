@@ -4,7 +4,7 @@
 
 A python tool to investigate vertical signal properties of imaging-based spatial transcriptomics data.
 
-## introduction
+## Introduction
 
 Much of spatial biology uses microscopic tissue slices to study the spatial distribution of cells and molecules. In the process, tissue slices are often interpreted as 2D representations of 3D biological structures - which can introduce artefacts and inconsistencies in the data whenever structures overlap in the thin vertical dimension of the slice:
 
@@ -31,11 +31,12 @@ Steps for Installation
 
    First, ensure that you have cloned the repository to your local machine. If you haven't already done so, use the following commands:
 
-   .. code-block:: bash
+   ````bash
 
       git clone https://github.com/HiDiHlabs/ovrl.py.git
       cd ovrl.py
 
+    ````
 
 2. **Install the Package in Editable Mode**
 
@@ -75,7 +76,7 @@ Here's a summary of the commands to run for installation:
 
 
 ## Quickstart
-
+-----------------------
 The simplest use case of ovrlpy is the creation of a signal integrity map from a spatial transcriptomics dataset.
 1. **Set Parameters & Load Data**
 
@@ -110,6 +111,7 @@ integrity, signal, visualizer = ovrlp.compute_coherence_map(
 ```
 
 3. **Visualize Model Fit**
+
 ```python
 visualizer.plot_fit()
 ```
