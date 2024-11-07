@@ -81,7 +81,7 @@ coordinate_df = pd.read_csv('path/to/coordinate_file.csv')
 coordinate_df.head()
 ```
 
-2. **Fit the model** 
+2. **Fit the model**
 
 Fit the ovrlpy model to create a signal integrity map.
 
@@ -115,8 +115,8 @@ fig, ax = ovrlp.plot_signal_integrity(integrity,signal,signal_threshold=4.0)
 ```python
 import matplotlib.pyplot as plt
 doublet_df = ovrlp.detect_doublets(
-    integrity, 
-    signal, 
+    integrity,
+    signal,
     signal_cutoff=4,
     coherence_sigma=1
 )
