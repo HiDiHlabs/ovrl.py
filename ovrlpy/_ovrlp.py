@@ -447,7 +447,7 @@ def detect_doublets(
     dist_x, dist_y, dist_t = _determine_localmax_and_sample(
         (1 - integrity_map) * (signal_map > minimum_signal_strength),
         min_distance=min_distance,
-        min_expression=integrity_threshold,
+        min_expression=1-integrity_threshold,
     )
 
     arg_idcs = np.argsort(dist_t)[::-1]
@@ -457,7 +457,7 @@ def detect_doublets(
         {
             "x": dist_y,
             "y": dist_x,
-            "integrity": dist_t,
+            "integrity": 1-dist_t,
             "signal": signal_map[dist_x, dist_y],
         }
     )
@@ -1392,7 +1392,7 @@ def plot_region_of_interest(
     ax_tissue_whole: Axes = fig.add_subplot(gs[0, 1], label="celltype_map")
     visualizer.plot_tissue(rasterized=rasterized, s=1)
 
-    ax_tissue_whole.set_yticks([], [])
+    # ax_tissue_whole.set_yticks([], [])
 
     artist = plt.Rectangle(
         (x - window_size, y - window_size),
