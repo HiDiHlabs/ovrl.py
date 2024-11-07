@@ -103,6 +103,7 @@ visualizer.plot_fit()
 ```
 
 4. **Plot Signal Integrity Map**
+
 Plot the signal integrity map with a threshold for signal coherence.
 
 ```python
@@ -124,6 +125,7 @@ doublet_df.head()
 ```
 
 6. **3D Visualization of Overlap Event**
+
 This visualization shows a 3D representation of the spatial overlap event, giving more insight into the structure and coherence of the signals.
 
 ```python
