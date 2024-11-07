@@ -18,6 +18,7 @@ from sklearn.decomposition import PCA
 
 from ._ssam2 import _sample_expression
 from ._utils import (
+    SCALEBAR_PARAMS,
     _compute_divergence_patched,
     _create_histogram,
     _create_knn_graph,
@@ -27,6 +28,7 @@ from ._utils import (
     _get_spatial_subsample_mask,
     _min_to_max,
     _plot_embeddings,
+    _plot_scalebar,
     _transform_embeddings,
 )
 
@@ -339,6 +341,7 @@ def plot_signal_integrity(
     cmap="BIH",
     figure_height: float = 10,
     plot_hist: bool = True,
+    scalebar: dict | None = SCALEBAR_PARAMS,
 ):
     """
     Plots the determined signal integrity of the tissue sample in a signal integrity map.
@@ -356,6 +359,9 @@ def plot_signal_integrity(
             Colormap for display.
         plot_hist : bool, optional
             Whether to plot a histogram of integrity values alongside the map.
+        scalebar : dict[str, typing.Any] | None
+            If `None` no scalebar will be plotted. Otherwise a dictionary with
+            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``
     """
 
     figure_aspect_ratio = integrity.shape[0] / integrity.shape[1]
@@ -386,6 +392,9 @@ def plot_signal_integrity(
         )
         ax[0].invert_yaxis()
         ax[0].spines[["top", "right"]].set_visible(False)
+
+        if scalebar is not None:
+            _plot_scalebar(ax[0], **SCALEBAR_PARAMS)
 
         if plot_hist:
             vals, bins = np.histogram(
@@ -903,6 +912,7 @@ class Visualizer:
         y: float = None,
         window_size: int = None,
         rasterized: bool = True,
+        scalebar: dict | None = SCALEBAR_PARAMS,
     ):
         """
         Plots an instance of the visualized data.
@@ -921,6 +931,9 @@ class Visualizer:
             Window size of the region-of-interest.
         rasterized : bool, optional
             If True all plots will be rasterized.
+        scalebar : dict[str, typing.Any] | None
+            If `None` no scalebar will be plotted. Otherwise a dictionary with
+            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``
         """
         vertical_indices = subsample.z.argsort()
         subsample = subsample.sort_values("z")
@@ -1051,6 +1064,11 @@ class Visualizer:
             **roi_side_scatter_kwargs,
         )
 
+        if scalebar is not None:
+            _plot_scalebar(ax_tissue_whole, **SCALEBAR_PARAMS)
+            _plot_scalebar(ax_roi_top, **SCALEBAR_PARAMS)
+            _plot_scalebar(ax_roi_bottom, **SCALEBAR_PARAMS)
+
     def plot_umap(
         self,
         ax: Optional[Axes] = None,
@@ -1079,7 +1097,12 @@ class Visualizer:
             **kwargs,
         )
 
-    def plot_tissue(self, rasterized: bool = False, **kwargs):
+    def plot_tissue(
+        self,
+        rasterized: bool = False,
+        scalebar: dict | None = SCALEBAR_PARAMS,
+        **kwargs,
+    ):
         """
         Plots the tissue embedding.
 
@@ -1087,6 +1110,9 @@ class Visualizer:
         ----------
         rasterized : bool, optional
             If True the plot will be rasterized.
+        scalebar : dict[str, typing.Any] | None
+            If `None` no scalebar will be plotted. Otherwise a dictionary with
+            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``
         kwargs
             Keyword arguments for the matplotlib's scatter plot function.
         """
@@ -1101,6 +1127,9 @@ class Visualizer:
             rasterized=rasterized,
             **kwargs,
         )
+
+        if scalebar is not None:
+            _plot_scalebar(ax, **SCALEBAR_PARAMS)
 
     @staticmethod
     def _plot_tissue_scatter(
@@ -1320,6 +1349,7 @@ def plot_region_of_interest(
     window_size: int = 30,
     signal_plot_threshold: float = 5.0,
     rasterized: bool = True,
+    scalebar: dict | None = SCALEBAR_PARAMS,
 ):
     """Plot a comprehensive overview of a zoomed-in region of interest.
 
@@ -1343,6 +1373,9 @@ def plot_region_of_interest(
         Threshold for the signal plot. Defaults to 5.
     rasterized (bool, optional):
         If True all plots will be rasterized. Defaults to True.
+    scalebar : dict[str, typing.Any] | None
+        If `None` no scalebar will be plotted. Otherwise a dictionary with
+        additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``
     """
 
     # first, create and color-embed the subsample of the region of interest:
@@ -1454,6 +1487,12 @@ def plot_region_of_interest(
     )
 
     _plot_tissue_scatter_roi(ax_roi_bottom, x, y, roi, rasterized=rasterized)
+
+    if scalebar is not None:
+        _plot_scalebar(ax_integrity, **SCALEBAR_PARAMS)
+        _plot_scalebar(ax_tissue_whole, **SCALEBAR_PARAMS)
+        _plot_scalebar(ax_roi_top, **SCALEBAR_PARAMS)
+        _plot_scalebar(ax_roi_bottom, **SCALEBAR_PARAMS)
 
     # side view of ROI
     roi_side_scatter_kwargs = dict(s=10, alpha=0.5, rasterized=rasterized)
