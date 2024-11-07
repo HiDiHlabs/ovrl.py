@@ -17,6 +17,7 @@ authors = [
 dependencies = [
     "anndata",
     "matplotlib",
+    "matplotlib-scalebar",
     "numpy",
     "pandas",
     "scikit-image >= 0.18",
