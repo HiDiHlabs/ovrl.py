@@ -23,7 +23,7 @@ def _draw_outline(artist, lw=2, color="black"):
     )
 
 
-SCALEBAR_PARAMS: dict[str, Any] = {"dx": 1, "units": "um", "box_alpha": 0, "color": "w"}
+SCALEBAR_PARAMS: dict[str, Any] = {"dx": 1, "units": "um"}
 """Default scalebar parameters"""
 
 

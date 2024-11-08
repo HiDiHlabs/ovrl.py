@@ -83,8 +83,8 @@ Identify overlapping signals (doublets) in the tissue and visualize them.
 
    # Detect doublet events (overlapping signals) in the dataset
    doublet_df = ovrlp.detect_doublets(
-       integrity, 
-       signal, 
+       integrity,
+       signal,
        signal_cutoff=4,  # Threshold for signal strength
        coherence_sigma=1  # Controls the coherence of the signals
    )
@@ -122,4 +122,3 @@ Visualize a specific overlap event (doublet) in 3D to see how it looks in the ti
    )
 
 This visualization shows a 3D representation of the spatial overlap event, giving more insight into the structure and coherence of the signals.
-
