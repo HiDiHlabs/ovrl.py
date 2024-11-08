@@ -39,7 +39,7 @@ Steps for Installation
 
    .. code-block:: bash
 
-      pip install jupyter 
+      pip install jupyter
 
 
 Summary of Commands

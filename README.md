@@ -54,7 +54,7 @@ Steps for Installation
 
    ````bash
 
-      pip install jupyter 
+      pip install jupyter
 
     ````
 
