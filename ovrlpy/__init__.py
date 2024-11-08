@@ -11,6 +11,7 @@ from ._ovrlp import (
     run,
     sample_expression_at_xy,
 )
+from ._utils import SCALEBAR_PARAMS
 
 try:
     __version__ = version("ovrlpy")
@@ -30,4 +31,5 @@ __all__ = [
     "pre_process_coordinates",
     "Visualizer",
     "run",
+    "SCALEBAR_PARAMS",
 ]

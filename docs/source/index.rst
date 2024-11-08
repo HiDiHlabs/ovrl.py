@@ -1,4 +1,4 @@
-Ovrlpy 
+Ovrlpy
 ==========================
 **ovrlpy** is a python tool to investigate cell overlaps in imaging-based spatial transcriptomics data.
 
@@ -18,12 +18,12 @@ Users can also use the built-in 3D visualisation tool to explore regions of sign
    :align: center
    :width: 600px
 
-Citation 
+Citation
 ---------
 
-If you are using `ovrlpy` for your research please cite 
+If you are using `ovrlpy` for your research please cite
 
- 
+
 
 
 .. toctree::

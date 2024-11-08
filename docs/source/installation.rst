@@ -20,9 +20,12 @@ Steps for Installation
       cd ovrl.py
 
 
-2. **Install the Package in Editable Mode**
+2. **Install the Package**
 
    To install the ovrlpy package, execute the following command:
+   .. note::
+
+   Ensure that Python (>= 3.6 and < 3.13) and pip are installed on your machine before proceeding.
 
    .. code-block:: bash
 
@@ -32,11 +35,11 @@ Steps for Installation
 
 3. **Set Up for Interactive Analysis (Optional)**
 
-   If you plan to use Jupyter notebooks for interactive analysis or the project's tutorials, you'll need to install some additional packages: **Jupyter**, **pyarrow**, and **fastparquet**. Install them using:
+   If you plan to use Jupyter notebooks for interactive analysis or the project's tutorials, you'll need to install some additional packages: **Jupyter**. Install them using:
 
    .. code-block:: bash
 
-      pip install jupyter pyarrow fastparquet
+      pip install jupyter
 
 
 Summary of Commands
@@ -55,4 +58,3 @@ Here's a summary of the commands to run for installation:
 
    # Step 3: Install Jupyter and other packages for interactive analysis
    pip install jupyter pyarrow fastparquet
-
