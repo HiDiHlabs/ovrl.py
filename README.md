@@ -2,20 +2,20 @@
 <!-- include image 'documentation/resources/ovrlpy-logo.png -->
 ![ovrlpy logo](docs/resources/ovrlpy-logo.png)
 
-A python tool to investigate vertical signal properties of imaging-based spatial transcriptomics data.
+A python tool to investigate vertical signal properties (e.g. overlapping cells) of imaging-based spatial transcriptomics data.
 
 ## Introduction
 
-Much of spatial biology uses microscopic tissue slices to study the spatial distribution of cells and molecules. In the process, tissue slices are often interpreted as 2D representations of 3D biological structures - which can introduce artefacts and inconsistencies in the data whenever structures overlap in the thin vertical dimension of the slice:
+Much of spatial biology uses microscopic tissue slices to study the spatial distribution of cells and molecules. In the process, tissue slices are often interpreted as 2D representations of 3D biological structures - which can introduce artefacts and inconsistencies in the data whenever structures (e.g. individual cells, blood vessels) overlap in the thin vertical dimension of the tissue slice:
 
 ![3D slice visualization](docs/resources/cell_overlap_visualization.jpg)
 
 
 
-**Ovrl.py** is a quality-control tool for spatial transcriptomics data that can help analysts find sources of vertical signal inconsistency in their data.
-It is works with imaging-based spatial transcriptomics data, such as 10x genomics' Xenium or vizgen's MERFISH platforms.
-The main feature of the tool is the production of 'signal integrity maps' that can help analysts identify sources of signal inconsistency in their data.
-Users can also use the built-in 3D visualisation tool to explore regions of signal inconsistency in their data on a molecular level.
+**Ovrl.py** is a quality-control tool for spatial transcriptomics data that can help analysts find sources of vertical signal inconsistency usch as overlapping cell or tissue folds in their data. We describe these overlaps as "vertical doublets", similar to the doublet concept in single cell transcriptomics.
+It works with imaging-based spatial transcriptomics data, such as 10x Genomics' Xenium or Vizgen's MERFISH platforms where the z-location of transcripts is reported.
+The main feature of the tool is the production of 'signal integrity maps' that can help analysts identify the sources of signal inconsistency and localise vertical doublets in their data.
+Users can also use the built-in 3D visualization tool to explore regions of signal inconsistency in their data on a molecular level.
 
 ## Installation
 
