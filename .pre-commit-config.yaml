@@ -15,7 +15,7 @@ repos:
       - id: no-commit-to-branch
         args: [--branch=main]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+    rev: v0.8.6
     hooks:
       # Linter
       - id: ruff
