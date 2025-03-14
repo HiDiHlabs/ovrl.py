@@ -1,7 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -15,28 +14,12 @@ from sklearn.neighbors import NearestNeighbors
 
 from ._ssam2 import find_local_maxima, kde_2d
 
-
-def _draw_outline(artist, lw=2, color="black"):
-    "Draws outlines around the (text) artists for better legibility."
-    _ = artist.set_path_effects(
-        [PathEffects.withStroke(linewidth=lw, foreground=color), PathEffects.Normal()]
-    )
-
-
 SCALEBAR_PARAMS: dict[str, Any] = {"dx": 1, "units": "um"}
 """Default scalebar parameters"""
 
 
 def _plot_scalebar(ax: Axes, dx: float = 1, units="um", **kwargs):
     ax.add_artist(ScaleBar(dx, units=units, **kwargs))
-
-
-def _get_kl_divergence(p, q):
-    # mask = (p!=0) * (q!=0)
-    output = np.zeros(p.shape)
-    # output[mask] = p[mask]*np.log(p[mask]/q[mask])
-    output[:] = p[:] * np.log(p[:] / q[:])
-    return output
 
 
 def _determine_localmax_and_sample(distribution, min_distance=3, min_expression=5):
@@ -313,131 +296,6 @@ def _create_histogram(
     hist[hist < min_expression] = 0
 
     return hist
-
-
-def _compute_divergence_embedded(
-    df,
-    genes,
-    visualizer,
-    KDE_bandwidth,
-    min_expression,
-    metric="cosine_similarity",
-    pca_divergence=0.8,
-):
-    """This is a legacy function, replaced by _compute_divergence_patched. It contains other similarity measures than cosine similarity.
-    To be integrated into the patch-based divergence computation later.
-    """
-    signal = _create_histogram(
-        df,
-        genes,
-        x_max=df.x_pixel.max(),
-        y_max=df.y_pixel.max(),
-        KDE_bandwidth=KDE_bandwidth,
-    )
-
-    genes = visualizer.genes
-
-    pca = PCA(pca_divergence).fit(visualizer.localmax_celltyping_samples.T)
-
-    mask = signal > min_expression
-
-    df_top = df[df.z_delim < df.z]
-    df_bot = df[df.z_delim > df.z]
-
-    hists_top = np.zeros((mask.sum(), pca.components_.shape[0]))
-    hists_bot = np.zeros((mask.sum(), pca.components_.shape[0]))
-
-    for i, g in tqdm.tqdm(enumerate(visualizer.genes)):
-        if np.abs(pca.components_.std(0)[i]) < 0.001:
-            continue
-
-        hist_top = np.dot(
-            _create_histogram(
-                df_top,
-                genes=[g],
-                x_max=df.x_pixel.max(),
-                y_max=df.y_pixel.max(),
-                KDE_bandwidth=1.0,
-            )[mask][:, None],
-            pca.components_[None, :, i],
-        )
-        hist_bot = np.dot(
-            _create_histogram(
-                df_bot,
-                genes=[g],
-                x_max=df.x_pixel.max(),
-                y_max=df.y_pixel.max(),
-                KDE_bandwidth=1.0,
-            )[mask][:, None],
-            pca.components_[None, :, i],
-        )
-
-        hists_top += hist_top
-        hists_bot += hist_bot
-
-    if metric == "cosine_similarity":
-        # Cosine similarity:
-        hists_top_norm = hists_top / np.linalg.norm(hists_top, axis=1)[:, None]
-        hists_bot_norm = hists_bot / np.linalg.norm(hists_bot, axis=1)[:, None]
-
-        cos_sim = (hists_top_norm * hists_bot_norm).sum(axis=1)
-
-        distance_ = np.zeros_like(signal)
-        distance_[mask] = cos_sim
-
-        return distance_, signal
-
-    elif metric == "kl_divergence":
-        # KL divergence
-        # D_KL(P||Q) = sum_i P(i) log(P(i)/Q(i))
-
-        hists_top_p = hists_top[:]  # / np.linalg.norm(hists_top, axis=1)[:, None]
-        hists_bot_p = hists_bot[:]  # / np.linalg.norm(hists_bot, axis=1)[:, None]
-
-        hists_top_p[hists_top_p > 0] = 0
-        hists_bot_p[hists_bot_p > 0] = 0
-
-        hists_top_p = np.nan_to_num(hists_top_p / hists_top_p.sum(1)[:, None])
-        hists_bot_p = np.nan_to_num(hists_bot_p / hists_bot_p.sum(1)[:, None])
-
-        kl_divergence = np.zeros((hists_top_p.shape[0],))
-        for i in range(hists_top_p.shape[0]):
-            kl_divergence[i] = (
-                hists_top_p[i] * np.nan_to_num(np.log(hists_top_p[i] / hists_bot_p[i]))
-            ).sum() + (
-                hists_bot_p[i] * np.nan_to_num(np.log(hists_bot_p[i] / hists_top_p[i]))
-            ).sum()
-
-        distance_ = np.zeros_like(signal)
-        distance_[mask] = kl_divergence
-
-        return distance_, signal
-
-    elif metric == "euclidean_distance":
-        distance_ = np.zeros_like(signal)
-        distance_[mask] = np.linalg.norm(hists_top - hists_bot, axis=1)
-
-        return distance_, signal
-
-    elif metric == "correlation":
-
-        def pearson_cross_correlation(a, b):
-            out = np.zeros((a.shape[0]))
-
-            a = a - a.mean(axis=1)[:, None]
-            b = b - b.mean(axis=1)[:, None]
-
-            for i in range(a.shape[0]):
-                out[i] = np.dot(a[i], b[i]) / (
-                    np.linalg.norm(a[i]) * np.linalg.norm(b[i])
-                )
-
-            return out
-
-        distance_ = np.zeros_like(signal)
-        distance_[mask] = pearson_cross_correlation(hists_top, hists_bot)
-
-        return distance_, signal
 
 
 def _compute_embedding_vectors(subset_df, signal_mask, factor):
