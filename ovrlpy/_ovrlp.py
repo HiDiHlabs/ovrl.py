@@ -1547,6 +1547,7 @@ def run(
     cell_diameter=10,
     min_expression: float = 1.0,
     signature_matrix=None,
+    patch_size: int = 1000,
     n_workers: int = len(os.sched_getaffinity(0)),
     umap_kwargs={
         "n_components": 2,
@@ -1587,6 +1588,9 @@ def run(
         radius of 'KDE_bandwidth' for a region to be considered containing a cell.
     signature_matrix : pandas.DataFrame, optional
         A celltypes x gene table of expression signatures to use to annotate the UMAP.
+    patch_size : int
+        Size of the length in each dimension when calculating signal integrity in patches.
+        Smaller values will use less memory, but may take longer to compute.
     n_workers : int
         The number of workers to use for processsing.
     umap_kwargs : dict, optional
@@ -1634,6 +1638,7 @@ def run(
         vis.pca_2d.components_,
         KDE_bandwidth=KDE_bandwidth,
         min_expression=1,
+        patch_length=patch_size,
         n_workers=n_workers,
     )
 
