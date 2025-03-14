@@ -329,7 +329,7 @@ def _compute_divergence_patched(
     KDE_bandwidth=1,
     patch_length=1000,
     patch_padding=10,
-    n_workers=5,
+    n_workers: int = 8,
 ):
     n_components = pca_component_matrix.shape[0]
 

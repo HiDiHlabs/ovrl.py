@@ -1,5 +1,6 @@
 """This is a package to detect overlapping cells in a 2D spatial transcriptomics sample."""
 
+import os
 import warnings
 from functools import reduce
 from operator import add
@@ -616,7 +617,7 @@ class Visualizer:
         gene_key: str = "gene",
         coordinates_key: str = "spatial",
         signature_matrix=None,
-        n_workers: int = 32,
+        n_workers: int = 8,
     ):
         """
         Fits the visualizer to a spatial transcripts dataset using the SSAM algorithm.
@@ -1546,6 +1547,7 @@ def run(
     cell_diameter=10,
     min_expression: float = 1.0,
     signature_matrix=None,
+    n_workers: int = len(os.sched_getaffinity(0)),
     umap_kwargs={
         "n_components": 2,
         "min_dist": 0.0,
@@ -1585,6 +1587,8 @@ def run(
         radius of 'KDE_bandwidth' for a region to be considered containing a cell.
     signature_matrix : pandas.DataFrame, optional
         A celltypes x gene table of expression signatures to use to annotate the UMAP.
+    n_workers : int
+        The number of workers to use for processsing.
     umap_kwargs : dict, optional
         Additional keyword arguments for the 2D UMAP embedding.
     cumap_kwargs : dict, optional
@@ -1621,7 +1625,7 @@ def run(
     )
 
     print("Creating gene expression embeddings for visualization:")
-    vis.fit_transcripts(df, signature_matrix=signature_matrix)
+    vis.fit_transcripts(df, signature_matrix=signature_matrix, n_workers=n_workers)
 
     print("Creating signal integrity map:")
     integrity_, signal_ = _compute_divergence_patched(
@@ -1630,6 +1634,7 @@ def run(
         vis.pca_2d.components_,
         KDE_bandwidth=KDE_bandwidth,
         min_expression=1,
+        n_workers=n_workers,
     )
 
     vis.integrity_map = integrity_.T
