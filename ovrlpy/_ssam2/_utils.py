@@ -7,23 +7,33 @@ from scipy.ndimage import gaussian_filter
 from skimage.feature import peak_local_max
 
 
-def kde_2d(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
+def kde_2d(
+    coordinates: np.ndarray, size=None, bandwidth: float = 1.5, truncate: float = 4
+):
     """
     Create a histogram of the data.
     """
 
-    return _kde_nd(coordinates[:, :2], size=size, bandwidth=bandwidth)
+    return _kde_nd(
+        coordinates[:, :2], size=size, bandwidth=bandwidth, truncate=truncate
+    )
 
 
-def kde_3d(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
+def kde_3d(
+    coordinates: np.ndarray, size=None, bandwidth: float = 1.5, truncate: float = 4
+):
     """
     Create a histogram of the data.
     """
 
-    return _kde_nd(coordinates[:, :3], size=size, bandwidth=bandwidth)
+    return _kde_nd(
+        coordinates[:, :3], size=size, bandwidth=bandwidth, truncate=truncate
+    )
 
 
-def _kde_nd(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
+def _kde_nd(
+    coordinates: np.ndarray, size=None, bandwidth: float = 1.5, truncate: float = 4
+):
     """
     Create a histogram of the data.
     """
@@ -49,7 +59,9 @@ def _kde_nd(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
         [coordinates[:, i] for i in range(coordinates.shape[1])], bins=dim_bins
     )
 
-    kde = gaussian_filter(histogram, sigma=bandwidth)
+    kde = gaussian_filter(
+        histogram, sigma=bandwidth, truncate=truncate, mode="constant"
+    )
 
     output[
         tuple(slice(int(bins[i].min()), int(bins[i].max())) for i in range(len(bins)))

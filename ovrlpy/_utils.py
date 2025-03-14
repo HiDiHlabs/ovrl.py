@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from math import ceil
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -322,15 +323,17 @@ def _compute_embedding_vectors(subset_df, signal_mask, factor):
 
 
 def _compute_divergence_patched(
-    df,
+    df: pd.DataFrame,
     gene_list,
-    pca_component_matrix,
-    min_expression=2,
-    KDE_bandwidth=1,
-    patch_length=1000,
-    patch_padding=10,
+    pca_component_matrix: np.ndarray,
+    min_expression: float = 2,
+    KDE_bandwidth: float = 1,
+    patch_length: int = 1000,
     n_workers: int = 8,
 ):
+    # the 4 comes from the default truncate in scipy.ndimage.gaussian_filter
+    patch_padding = int(ceil(4 * KDE_bandwidth))
+
     n_components = pca_component_matrix.shape[0]
 
     signal = kde_2d(df[["x", "y"]].values)
