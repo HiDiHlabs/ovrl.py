@@ -35,7 +35,7 @@ the repository and then install with ``pip`` as follows
    pip install .
 
 
-
+.. _install-tutorial:
 Interactive tutorials
 ---------------------
 
