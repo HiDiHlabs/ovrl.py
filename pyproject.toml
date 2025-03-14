@@ -37,7 +37,7 @@ classifiers = [
 [project.optional-dependencies]
 tutorial = ["pandas[parquet]"]
 docs = [
-    "sphinx",
+    "sphinx~=8.0",
     "sphinx-autoapi~=3.1",
     "sphinx-copybutton",
     "sphinx-rtd-theme",

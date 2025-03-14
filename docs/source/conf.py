@@ -3,7 +3,7 @@ import os
 import sys
 from datetime import datetime
 
-sys.path.insert(0, os.path.abspath("../../src"))
+sys.path.insert(0, os.path.abspath("../.."))
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -66,6 +66,7 @@ intersphinx_mapping = dict(
     python=("https://docs.python.org/3", None),
     scanpy=("https://scanpy.readthedocs.io/en/stable/", None),
     scipy=("https://docs.scipy.org/doc/scipy/", None),
+    umap=("https://umap-learn.readthedocs.io/page/", None),
 )
 
 # -- Options for HTML output -------------------------------------------------
@@ -77,13 +78,3 @@ html_theme_options = {
     "logo_only": True,
     # 'display_version': False,
 }
-
-
-# def skip_submodules(app, what, name, obj, skip, options):
-#     if what == "module":
-#         skip = True
-#     return skip
-
-
-# def setup(sphinx):
-#     sphinx.connect("autoapi-skip-member", skip_submodules)

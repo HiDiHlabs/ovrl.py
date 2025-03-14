@@ -50,7 +50,7 @@ def _assign_xy(
     df: pd.DataFrame, xy_columns: Sequence[str] = ["x", "y"], grid_size: int = 1
 ):
     """
-    Assigns an x,y coordinate to a pd.DataFrame of coordinates.
+    Assigns an x,y coordinate to a DataFrame of coordinates.
 
     Parameters
     ----------
@@ -78,7 +78,7 @@ def _assign_xy(
 
 def _assign_z_median(df: pd.DataFrame, z_column: str = "z"):
     """
-    Assigns a z-coordinate to a pd.DataFrame of coordinates.
+    Assigns a z-coordinate to a DataFrame of coordinates.
 
     Parameters
     ----------
@@ -110,7 +110,7 @@ def _assign_z_mean_message_passing(
     rounds: int = 3,
 ):
     """
-    Assigns a z-coordinate to a pd.DataFrame of coordinates.
+    Assigns a z-coordinate to a DataFrame of coordinates.
 
     Parameters
     ----------
@@ -166,7 +166,7 @@ def _assign_z_mean_message_passing(
 
 def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
     """
-    Assigns a z-coordinate to a pd.DataFrame of coordinates.
+    Assigns a z-coordinate to a DataFrame of coordinates.
 
     Parameters
     ----------
@@ -199,24 +199,26 @@ def pre_process_coordinates(
     inplace: bool = True,
 ) -> pd.DataFrame:
     """Runs the pre-processing routine of the coordinate dataframe.
+
     It assigns x,y coordinate pixels to all molecules in the data frame and determines a z-coordinate-center for each pixel.
 
-    Parameters:
-    -----------
-    coordinate_df (pandas.DataFrame):
+    Parameters
+    ----------
+    coordinate_df : pandas.DataFrame
         A dataframe of coordinates.
-    grid_size (int, optional):
+    grid_size : int, optional
         The size of the pixel grid. Defaults to 1.
-    use_message_passing (bool, optional):
+    use_message_passing : bool, optional
         Whether to use message passing to determine the z-dimension delimiter. Defaults to True.
-    measure (str, optional):
+    measure : str, optional
         The measure to use to determine the z-dimension delimiter. Defaults to 'mean'. Other option is 'median'.
-    inplace (bool, optional):
+    inplace : bool, optional
         Whether to modify the input dataframe or return a copy. Defaults to True.
 
-    Returns:
-    --------
-    pandas.DataFrame: A dataframe with added x_pixel, y_pixel and z_delim columns.
+    Returns
+    -------
+    pandas.DataFrame:
+        A dataframe with added x_pixel, y_pixel and z_delim columns.
     """
 
     if not inplace:
@@ -348,21 +350,21 @@ def plot_signal_integrity(
 
     Parameters
     ----------
-        integrity : np.ndarray
-            Integrity map obtained from ovrlpy analysis
-        signal : np.ndarray
-            Signal map from ovrlpy analysis
-        signal_threshold : float, optional
-            Threshold below which the signal is faded out in the plot,
-            to avoid displaying noisy areas with low predictive confidence.
-        cmap : str, matplotlib.colors.cmap, optional
-            Colormap for display.
-        plot_hist : bool, optional
-            Whether to plot a histogram of integrity values alongside the map.
-        scalebar : dict[str, typing.Any] | None
-            If `None` no scalebar will be plotted. Otherwise a dictionary with
-            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
-            By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
+    integrity : numpy.ndarray
+        Integrity map obtained from ovrlpy analysis
+    signal : numpy.ndarray
+        Signal map from ovrlpy analysis
+    signal_threshold : float, optional
+        Threshold below which the signal is faded out in the plot,
+        to avoid displaying noisy areas with low predictive confidence.
+    cmap : str | matplotlib.colors.Colormap, optional
+        Colormap for display.
+    plot_hist : bool, optional
+        Whether to plot a histogram of integrity values alongside the map.
+    scalebar : dict[str, typing.Any] | None
+        If `None` no scalebar will be plotted. Otherwise a dictionary with
+        additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
+        By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
     """
 
     figure_aspect_ratio = integrity.shape[0] / integrity.shape[1]
@@ -436,19 +438,19 @@ def detect_doublets(
 
     Parameters
     ----------
-        integrity_map : np.ndarray
-            Pixel map of signal integrity obtained from ovrlpy analysis
-        signal_map : np.ndarray
-            Signal strength map from ovrlpy analysis
-        min_distance : int, optional
-            Minimum distance between reported peaks
-        integrity_threshold : float, optional
-            Threhold of signal integrity value. A peak with an signal integrity > integrity_threshold is not considered.
-        minimum_signal_strength : float, optional
-            Minimum signal value for a peak to be considered
-        integrity_sigma : float, optional
-            Optional sigma value for gaussian filtering of the integrity map,
-            which leads to the detection of overlap regions with larger spatial extent.
+    integrity_map : numpy.ndarray
+        Pixel map of signal integrity obtained from ovrlpy analysis
+    signal_map : numpy.ndarray
+        Signal strength map from ovrlpy analysis
+    min_distance : int, optional
+        Minimum distance between reported peaks
+    integrity_threshold : float, optional
+        Threhold of signal integrity value. A peak with an signal integrity > integrity_threshold is not considered.
+    minimum_signal_strength : float, optional
+        Minimum signal value for a peak to be considered
+    integrity_sigma : float, optional
+        Optional sigma value for gaussian filtering of the integrity map,
+        which leads to the detection of overlap regions with larger spatial extent.
     """
 
     if integrity_sigma is not None:
@@ -494,19 +496,19 @@ class Visualizer:
         Contains a latent gene expression UMAP and RGB embedding.
 
     Parameters
-        ----------
-        KDE_bandwidth : float, optional
-            The bandwidth of the KDE.
-        celltyping_min_expression : int, optional
-            Minimum expression level for cell typing.
-        celltyping_min_distance : int, optional
-            Minimum distance for cell typing.
-        n_components_pca : float, optional
-            Number of components for PCA.
-        umap_kwargs : dict, optional
-            Keyword arguments for 2D UMAP embedding.
-        cumap_kwargs : dict, optional
-            Keyword arguments for 3D UMAP embedding.
+    ----------
+    KDE_bandwidth : float, optional
+        The bandwidth of the KDE.
+    celltyping_min_expression : int, optional
+        Minimum expression level for cell typing.
+    celltyping_min_distance : int, optional
+        Minimum distance for cell typing.
+    n_components_pca : float, optional
+        Number of components for PCA.
+    umap_kwargs : dict, optional
+        Keyword arguments for 2D UMAP embedding.
+    cumap_kwargs : dict, optional
+        Keyword arguments for 3D UMAP embedding.
 
     Attributes
     ----------
@@ -516,23 +518,23 @@ class Visualizer:
         Minimum expression level for cell typing.
     celltyping_min_distance : int
         Minimum distance for cell typing.
-    pseudocell_locations_x : np.ndarray
+    pseudocell_locations_x : numpy.ndarray
         x-coordinates of cell typing regions of interest obtained through gene expression localmax sampling.
-    pseudocell_locations_y : np.ndarray
+    pseudocell_locations_y : numpy.ndarray
         y-coordinates of cell typing regions of interest obtained through gene expression localmax sampling.
-    pseudocell_expression_samples : pd.DataFrame
+    pseudocell_expression_samples : pandas.DataFrame
         Gene expression matrix of the cell typing regions of interest.
-    signatures : pd.DataFrame
+    signatures : pandas.DataFrame
         A matrix of celltypes x gene signatures to use to annotate the UMAP.
-    celltype_centers : np.ndarray
+    celltype_centers : numpy.ndarray
         The center of gravity of each celltype in the 2d embedding, used for UMAP annotation.
-    celltype_class_assignments : np.ndarray
+    celltype_class_assignments : numpy.ndarray
         The class assignments of the cell types.
-    pca_2d : PCA
+    pca_2d : sklearn.decomposition.PCA
         The PCA object used for the 2d embedding.
     embedder_2d : umap.UMAP
         The UMAP object used for the 2d embedding.
-    pca_3d : PCA
+    pca_3d : sklearn.decomposition.PCA
         The PCA object used for the 3d RGB embedding.
     embedder_3d : umap.UMAP
         The UMAP object used for the 3d RGB embedding.
@@ -544,15 +546,15 @@ class Visualizer:
         Keyword arguments for 3D UMAP RGB embedding object.
     genes : list
         A list of genes to utilize in the model.
-    embedding : np.ndarray
+    embedding : numpy.ndarray
         The 2d embedding of pseudocell gene expression .
-    colors : np.ndarray
+    colors : numpy.ndarray
         The RGB embedding.
     colors_min_max : list
         The minimum and maximum values of the RGB embedding, necessary for normalization of the transform method.
-    integrity_map : np.ndarray
+    integrity_map : numpy.ndarray
         The integrity map of the tissue.
-    signal_map : np.ndarray
+    signal_map : numpy.ndarray
         A pixel map of overall signal strength in the tissue, used to mask out low-signal regions that are difficult to interpret.
     """
 
@@ -717,11 +719,14 @@ class Visualizer:
     def fit_pseudocells(
         self, pseudocell_expression_samples: pd.DataFrame, genes: list = None
     ):
-        """fits the visualizer to a given pseudocell expression sample.
+        """Fits the visualizer to a given pseudocell expression sample.
 
-        Args:
-            pseudocell_expression_samples (pandas.DataFrame): A gene x cell matrix of gene expression
-            genes (list, optional): A list of genes to utilize in the model. Defaults to None.
+        Parameters
+        ----------
+        pseudocell_expression_samples : pandas.DataFrame
+            A gene x cell matrix of gene expression
+        genes : list, optional
+            A list of genes to utilize in the model.
         """
 
         self.pseudocell_expression_samples = pseudocell_expression_samples
@@ -858,8 +863,10 @@ class Visualizer:
     def transform_pseudocells(self, pseudocell_expression_samples: pd.DataFrame):
         """Transforms a matrix of gene expression to the visualizer's 2d and 3d embedding space.
 
-        Args:
-            pseudocell_expression_samples (pd.DataFrame): A gene x cell matrix of gene expression
+        Parameters
+        ----------
+        pseudocell_expression_samples : pandas.DataFrame
+            A gene x cell matrix of gene expression
         """
 
         print(pseudocell_expression_samples)
@@ -886,7 +893,7 @@ class Visualizer:
         tissue's determined pseudo-cells.
 
         Returns
-        ----------
+        -------
         pandas.DataFrame
         """
         pseudocell_df = pd.DataFrame(
@@ -1082,12 +1089,12 @@ class Visualizer:
 
         Parameters
         ----------
-        ax : Optional[matplotlib.axes.Axes]
-            axis object to plot on.
+        ax : typing.Optional[matplotlib.axes.Axes]
+            Axis object to plot on.
         rasterized : bool, optional
             If True the plot will be rasterized.
         kwargs
-            Keyword arguments for the matplotlib's scatter plot function.
+            Keyword arguments for :py:func:``matplotlib.pyplot.scatter``.
         """
         _plot_embeddings(
             self.embedding,
@@ -1358,28 +1365,28 @@ def plot_region_of_interest(
 
     Parameters
     ----------
-    x (float):
+    x : float
         x coordinate of the region of interest
-    y (float):
+    y : float
         y coordinate of the region of interest
-    coordinate_df (pd.DataFrame):
+    coordinate_df : pandas.DataFrame
         DataFrame of gene-annotated molecule coordinates
-    visualizer (Visualizer):
+    visualizer : Visualizer
         Visualizer object containing the fitted model
-    integrity_map (np.ndarray):
+    integrity_map : numpy.ndarray
         integrity map of the tissue
-    signal_map (np.ndarray):
+    signal_map : numpy.ndarray
         Signal map of the tissue
-    window_size (int, optional):
+    window_size : int, optional
         Size of the window to display. Defaults to 30.
-    signal_plot_threshold (float, optional):
+    signal_plot_threshold : float, optional
         Threshold for the signal plot. Defaults to 5.
-    rasterized (bool, optional):
+    rasterized : bool, optional
         If True all plots will be rasterized. Defaults to True.
     scalebar : dict[str, typing.Any] | None
         If `None` no scalebar will be plotted. Otherwise a dictionary with
         additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
-            By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
+        By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
     """
 
     # first, create and color-embed the subsample of the region of interest:
@@ -1585,9 +1592,9 @@ def run(
 
     Returns
     -------
-    integrity_map : np.ndarray
+    integrity_map : numpy.ndarray
         A integrity pixel map of the spatial transcriptomics dataset.
-    signal_map : np.ndarray
+    signal_map : numpy.ndarray
         A pixel map of the spatial transcriptomics dataset containing the detected signal.
     vis : Visualizer
         A visualizer object that can be used to plot the
