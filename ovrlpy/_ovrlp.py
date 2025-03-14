@@ -1094,7 +1094,7 @@ class Visualizer:
         rasterized : bool, optional
             If True the plot will be rasterized.
         kwargs
-            Keyword arguments for :py:func:``matplotlib.pyplot.scatter``.
+            Keyword arguments for :py:func:`matplotlib.pyplot.scatter`.
         """
         _plot_embeddings(
             self.embedding,
