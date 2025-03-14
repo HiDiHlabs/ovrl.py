@@ -23,9 +23,10 @@ Steps for Installation
 2. **Install the Package**
 
    To install the ovrlpy package, execute the following command:
+
    .. note::
 
-   Ensure that Python (>= 3.6 and < 3.13) and pip are installed on your machine before proceeding.
+      Ensure that Python (>= 3.6 and < 3.13) and pip are installed on your machine before proceeding.
 
    .. code-block:: bash
 
