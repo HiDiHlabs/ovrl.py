@@ -17,16 +17,20 @@ Users can also use the built-in 3D visualisation tool to explore regions of sign
 
 ## installation
 
-The tool can be installed using the requirements.txt file in the root directory of the repository.
+`ovrlpy` can be installed from [PyPI](https://pypi.org)
 
 ```bash
-pip install -e .
+pip install ovrlpy
 ```
 
-In order to use the ipython notebooks and perform interactive analysis, you will need to install the jupyter package also. For the tutorials, pyarrow and fastparquet are also required.
+In order to use the ipython notebooks and perform interactive analysis, you will need to install the `jupyter` package or have an
+JupyterLab / JupyterHub instance available.
+
+### tutorials
+Additional dependencies necessary for following the tutorials can be installed as follows
 
 ```bash
-pip install jupyter pyarrow fastparquet
+pip install ovrlpy[tutorial]
 ```
 
 ## quickstart
@@ -106,4 +110,3 @@ ovrlpy.plot_region_of_interest(
 ```
 
 ![plot_region_of_interest output](docs/resources/plot_roi.png)
-

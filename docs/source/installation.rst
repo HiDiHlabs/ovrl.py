@@ -1,61 +1,59 @@
 Installation
 ============
 
-
-To install the necessary tools and dependencies for this project, follow the steps outlined below. These instructions will guide you through setting up the environment for both standard use and interactive analysis with Jupyter notebooks.
+To install the necessary tools and dependencies for this project, follow the steps outlined below.
+These instructions will guide you through setting up the environment for both standard
+use and interactive analysis with Jupyter notebooks.
 
 .. note::
-   Make sure you have Python and pip installed on your machine before proceeding.
+   Make sure you have Python (>= 3.11 and <3.14) and pip installed on your machine
+   before proceeding.
 
-Steps for Installation
------------------------
+PyPI
+-----
 
-1. **Clone the Repository**
-
-   First, ensure that you have cloned the repository to your local machine. If you haven't already done so, use the following commands:
-
-   .. code-block:: bash
-
-      git clone https://github.com/HiDiHlabs/ovrl.py.git
-      cd ovrl.py
-
-
-2. **Install the Package**
-
-   To install the ovrlpy package, execute the following command:
-
-   .. note::
-
-      Ensure that Python (>= 3.6 and < 3.13) and pip are installed on your machine before proceeding.
-
-   .. code-block:: bash
-
-      pip install .
-
-   This installs the package based on the current state of the source files.
-
-3. **Set Up for Interactive Analysis (Optional)**
-
-   If you plan to use Jupyter notebooks for interactive analysis or the project's tutorials, you'll need to install some additional packages: **Jupyter**. Install them using:
-
-   .. code-block:: bash
-
-      pip install jupyter
-
-
-Summary of Commands
--------------------
-
-Here's a summary of the commands to run for installation:
+ovrlpy can be installed from `PyPI <https://pypi.org/project/ovrlpy>`_ via
 
 .. code-block:: bash
 
-   # Step 1: Clone the repository
+   pip install ovrlpy
+
+
+From GitHub
+-----------
+
+To install ovrlpy from `GitHub <https://github.com/HiDiHlabs/ovrl.py>`_ you can clone
+the repository and then install with ``pip`` as follows
+
+.. code-block:: bash
+
+   # clone the repository
    git clone https://github.com/HiDiHlabs/ovrl.py.git
    cd ovrl.py
 
-   # Step 2: Install package from source
+   # install the package
    pip install .
 
-   # Step 3: Install Jupyter and other packages for interactive analysis
-   pip install jupyter pyarrow fastparquet
+
+
+Interactive tutorials
+---------------------
+
+If you want to follow the interactive tutorials you need to install further dependencies
+
+.. code-block:: bash
+
+   pip install ovrlpy[tutorial]
+
+
+Furthermore, you will need ``jupyter`` to run the interactive tutorial notebooks.
+
+.. code-block:: bash
+
+   pip install jupyter
+
+
+.. note::
+
+   Instead of installing ``jupyter`` you can also use existing JupyterLab or JupyterHub
+   instances.
