@@ -43,10 +43,9 @@ import pandas as pd
 import ovrlpy
 
 # define ovrlpy analysis parameters:
-n_expected_celltypes=20
+n_expected_celltypes = 20
 
 # load the data
-
 coordinate_df = pd.read_csv('path/to/coordinate_file.csv')
 coordinate_df.head()
 ```
@@ -54,13 +53,10 @@ coordinate_df.head()
 you can then fit an ovrlpy model to the data and create a signal integrity map:
 
 ```python
-
 # fit the ovrlpy model to the data
-
-from ovrlpy import ovrlp
-
-signal_integrity, signal_strength, visualizer = ovrlpy.run(coordinate_df, n_expected_celltypes=n_expected_celltypes)
-
+signal_integrity, signal_strength, visualizer = ovrlpy.run(
+    coordinate_df, n_expected_celltypes=n_expected_celltypes
+)
 ```
 
 returns a signal integrity map, a signal map and a visualizer object that can be used to visualize the data:
@@ -74,7 +70,7 @@ visualizer.plot_fit()
 and visualize the signal integrity map:
 
 ```python
-fig, ax = ovrlp.plot_signal_integrity(signal_integrity,signal_strength,signal_threshold=4.0)
+fig, ax = ovrlpy.plot_signal_integrity(signal_integrity, signal_strength, signal_threshold=4)
 ```
 
 ![plot_signal_integrity output](docs/resources/xenium_integrity_with_highlights.svg)
@@ -82,7 +78,6 @@ fig, ax = ovrlp.plot_signal_integrity(signal_integrity,signal_strength,signal_th
 Ovrlpy can also identify individual overlap events in the data:
 
 ```python
-import matplotlib.pyplot as plt
 doublet_df = ovrlpy.detect_doublets(
     signal_integrity, signal_strength, minimum_signal_strength=3, integrity_sigma=2
 )
@@ -105,7 +100,6 @@ ovrlpy.plot_region_of_interest(
     visualizer,
     signal_integrity,
     signal_strength,
-    window_size=window_size,
 )
 ```
 

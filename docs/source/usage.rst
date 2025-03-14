@@ -1,8 +1,5 @@
-Usage
-=====
-
 Quickstart
-----------
+==========
 
 This quickstart guide will walk you through the basic steps of using **ovrlpy** to create a signal integrity map from a imaging-based spatial transcriptomics dataset. Follow the steps below to get started.
 
@@ -35,8 +32,6 @@ Fit the **ovrlpy** model to generate the signal integrity map.
 
 .. code-block:: python
 
-   from ovrlpy import ovrlp
-
    # Fit the ovrlpy model to the spatial data
    integrity, signal, visualizer = ovrlp.compute_coherence_map(
        df=coordinate_df,
@@ -45,6 +40,7 @@ Fit the **ovrlpy** model to generate the signal integrity map.
    )
 
 This function generates:
+
 - **integrity**: The signal integrity map.
 - **signal**: The signal map representing the strength of spatial signals.
 - **visualizer**: A visualizer object that helps to plot and explore the results.
@@ -79,8 +75,6 @@ Identify overlapping signals (doublets) in the tissue and visualize them.
 
 .. code-block:: python
 
-   import matplotlib.pyplot as plt
-
    # Detect doublet events (overlapping signals) in the dataset
    doublet_df = ovrlp.detect_doublets(
        integrity,
@@ -113,12 +107,11 @@ Visualize a specific overlap event (doublet) in 3D to see how it looks in the ti
    subsample_embedding, subsample_embedding_color = visualizer.transform(subsample)
 
    # Plot the doublet event with 3D visualization
-   visualizer.plot_instance(
+   visualizer.plot_region_of_interest(
        subsample,
-       subsample[['x', 'y']].values,
        subsample_embedding_color,
        x, y,
-       window_size=window_size
+       window_size=window_size,
    )
 
 This visualization shows a 3D representation of the spatial overlap event, giving more insight into the structure and coherence of the signals.
