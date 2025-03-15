@@ -20,6 +20,8 @@ from sklearn.decomposition import PCA
 from ._ssam2 import _sample_expression
 from ._utils import (
     SCALEBAR_PARAMS,
+    UMAP_2D_PARAMS,
+    UMAP_RGB_PARAMS,
     _compute_divergence_patched,
     _create_histogram,
     _create_knn_graph,
@@ -565,21 +567,8 @@ class Visualizer:
         celltyping_min_expression=10,
         celltyping_min_distance=5,
         n_components_pca=0.7,
-        umap_kwargs={
-            "n_components": 2,
-            "min_dist": 0.0,
-            "n_neighbors": 20,
-            "random_state": 42,
-            "n_jobs": 1,
-        },
-        cumap_kwargs={
-            "n_components": 3,
-            "min_dist": 0.0,
-            "metric": "euclidean",
-            "n_neighbors": 20,
-            "random_state": 42,
-            "n_jobs": 1,
-        },
+        umap_kwargs=UMAP_2D_PARAMS,
+        cumap_kwargs=UMAP_RGB_PARAMS,
     ) -> None:
         self.KDE_bandwidth = KDE_bandwidth
 
@@ -1549,20 +1538,8 @@ def run(
     signature_matrix=None,
     patch_size: int = 1000,
     n_workers: int = len(os.sched_getaffinity(0)),
-    umap_kwargs={
-        "n_components": 2,
-        "min_dist": 0.0,
-        "n_neighbors": 20,
-        "random_state": 42,
-        "n_jobs": 1,
-    },
-    cumap_kwargs={
-        "n_neighbors": 10,
-        "min_dist": 0,
-        "metric": "euclidean",
-        "random_state": 42,
-        "n_jobs": 1,
-    },
+    umap_kwargs=UMAP_2D_PARAMS,
+    cumap_kwargs=UMAP_RGB_PARAMS,
 ):
     """
     This is a wrapper function that computes the integrity map for a given spatial
@@ -1624,8 +1601,8 @@ def run(
         celltyping_min_expression=min_expression,
         celltyping_min_distance=min_distance,
         n_components_pca=n_expected_celltypes,
-        umap_kwargs=umap_kwargs,
-        cumap_kwargs=cumap_kwargs,
+        umap_kwargs=umap_kwargs | {"n_jobs": n_workers},
+        cumap_kwargs=cumap_kwargs | {"n_jobs": n_workers},
     )
 
     print("Creating gene expression embeddings for visualization:")

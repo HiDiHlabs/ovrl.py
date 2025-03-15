@@ -11,7 +11,7 @@ from ._ovrlp import (
     run,
     sample_expression_at_xy,
 )
-from ._utils import SCALEBAR_PARAMS
+from ._utils import SCALEBAR_PARAMS, UMAP_2D_PARAMS, UMAP_RGB_PARAMS
 
 try:
     __version__ = version("ovrlpy")
@@ -32,4 +32,6 @@ __all__ = [
     "Visualizer",
     "run",
     "SCALEBAR_PARAMS",
+    "UMAP_2D_PARAMS",
+    "UMAP_RGB_PARAMS",
 ]

@@ -18,6 +18,22 @@ from ._ssam2 import find_local_maxima, kde_2d
 SCALEBAR_PARAMS: dict[str, Any] = {"dx": 1, "units": "um"}
 """Default scalebar parameters"""
 
+UMAP_2D_PARAMS: dict[str, Any] = {
+    "n_components": 2,
+    "n_neighbors": 20,
+    "min_dist": 0,
+    "random_state": 42,
+}
+"""Default 2D-UMAP parameters"""
+
+UMAP_RGB_PARAMS: dict[str, Any] = {
+    "n_components": 3,
+    "n_neighbors": 10,
+    "min_dist": 0,
+    "random_state": 42,
+}
+"""Default RGB-UMAP parameters"""
+
 
 def _plot_scalebar(ax: Axes, dx: float = 1, units="um", **kwargs):
     ax.add_artist(ScaleBar(dx, units=units, **kwargs))
