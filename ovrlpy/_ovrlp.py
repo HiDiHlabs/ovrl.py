@@ -481,7 +481,7 @@ def detect_doublets(
 
 
 def _determine_celltype_class_assignments(expression_samples, signature_matrix):
-    expression_samples_ = expression_samples.copy().loc[signature_matrix.index]
+    expression_samples_ = expression_samples.loc[signature_matrix.index].copy()
     correlations = np.array(
         [
             np.corrcoef(expression_samples_.iloc[:, i], signature_matrix.values.T)[
