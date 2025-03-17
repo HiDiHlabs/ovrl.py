@@ -138,8 +138,8 @@ def _plot_embeddings(
 
     ax.axis("off")
 
-    alpha = 0.1 if "alpha" not in scatter_kwargs else scatter_kwargs.pop("alpha")
-    marker = "." if "marker" not in scatter_kwargs else scatter_kwargs.pop("marker")
+    alpha = scatter_kwargs.pop("alpha", 0.1)
+    marker = scatter_kwargs.pop("marker", ".")
 
     ax.scatter(
         embedding[:, 0],
