@@ -175,7 +175,11 @@ def _sample_expression_nd(
         with ThreadPoolExecutor(max_workers=n_workers) as executor:
             fs = {
                 executor.submit(
-                    _utils.kde_and_sample, coords, local_maximum_coordinates, size=size
+                    _utils.kde_and_sample,
+                    coords,
+                    local_maximum_coordinates,
+                    size=size,
+                    bandwidth=1,
                 ): gene
                 for gene, coords in gene_coord_dict.items()
             }
