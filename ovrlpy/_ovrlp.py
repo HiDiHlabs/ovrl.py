@@ -197,9 +197,11 @@ def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
 def pre_process_coordinates(
     coordinate_df: pd.DataFrame,
     grid_size: int = 1,
+    coordinates: tuple[str, str, str] = ("x", "y", "z"),
     use_message_passing: bool = True,
     measure: str = "mean",
     inplace: bool = True,
+    **kwargs,
 ) -> pd.DataFrame:
     """Runs the pre-processing routine of the coordinate dataframe.
 
@@ -211,6 +213,8 @@ def pre_process_coordinates(
         A dataframe of coordinates.
     grid_size : int, optional
         The size of the pixel grid. Defaults to 1.
+    coordinates : tuple[str, str, str], optional
+        Name of the coordinate columns.
     use_message_passing : bool, optional
         Whether to use message passing to determine the z-dimension delimiter. Defaults to True.
     measure : str, optional
@@ -223,20 +227,21 @@ def pre_process_coordinates(
     pandas.DataFrame:
         A dataframe with added x_pixel, y_pixel and z_delim columns.
     """
+    *xy, z = coordinates
 
     if not inplace:
         coordinate_df = coordinate_df.copy()
 
-    _assign_xy(coordinate_df, grid_size=grid_size)
+    _assign_xy(coordinate_df, xy_columns=xy, grid_size=grid_size)
 
     if use_message_passing:
-        _assign_z_mean_message_passing(coordinate_df)
+        _assign_z_mean_message_passing(coordinate_df, z_column=z, **kwargs)
 
     else:
         if measure == "mean":
-            _assign_z_mean(coordinate_df)
+            _assign_z_mean(coordinate_df, z_column=z)
         elif measure == "median":
-            _assign_z_median(coordinate_df)
+            _assign_z_median(coordinate_df, z_column=z)
         else:
             raise ValueError("measure must be either 'mean' or 'median'")
 
@@ -1590,8 +1595,7 @@ def run(
         n_expected_celltypes = 0.8
 
     print("Running vertical adjustment")
-    _assign_xy(df)
-    _assign_z_mean_message_passing(df, rounds=20)
+    pre_process_coordinates(df, grid_size=1, rounds=20)
 
     vis = Visualizer(
         KDE_bandwidth=KDE_bandwidth,
