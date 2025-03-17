@@ -859,7 +859,6 @@ class Visualizer:
             A gene x cell matrix of gene expression
         """
 
-        print(pseudocell_expression_samples)
         subsample_embedding, subsample_embedding_color = _transform_embeddings(
             pseudocell_expression_samples.T.values,
             self.pca_2d,
