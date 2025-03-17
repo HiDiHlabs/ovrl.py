@@ -1380,9 +1380,7 @@ def plot_region_of_interest(
 
     # first, create and color-embed the subsample of the region of interest:
     subsample = visualizer.subsample_df(x, y, coordinate_df, window_size=window_size)
-    subsample_embedding, subsample_embedding_color = visualizer.transform_transcripts(
-        subsample
-    )
+    _, subsample_embedding_color = visualizer.transform_transcripts(subsample)
 
     vertical_indices = subsample.z.argsort()
     subsample = subsample.sort_values("z")
