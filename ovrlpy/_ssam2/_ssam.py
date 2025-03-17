@@ -20,6 +20,7 @@ def _sample_expression(
     gene_column: str = "gene",
     n_workers: int = 8,
     mode: Optional[str] = None,
+    dtype=np.float32,
 ) -> anndata.AnnData:
     """
     Sample expression from a coordinate dataframe.
@@ -46,6 +47,8 @@ def _sample_expression(
             Number of parallel workers for sampling.
         mode : str, optional
             Sampling mode, either '2d' or '3d'.
+        dtype
+            Datatype for the KDE.
 
     Returns
     -------
@@ -86,6 +89,7 @@ def _sample_expression(
         coord_columns=coord_columns,
         gene_column=gene_column,
         n_workers=n_workers,
+        dtype=dtype,
     )
 
 
@@ -99,6 +103,7 @@ def _sample_expression_nd(
     coord_columns: Iterable[str] = ["x", "y", "z"],
     gene_column: str = "gene",
     n_workers: int = 8,
+    dtype=np.float32,
 ) -> anndata.AnnData:
     coord_columns = list(coord_columns)
 
@@ -130,7 +135,7 @@ def _sample_expression_nd(
 
     # perform a global KDE to determine local maxima:
     vector_field_norm = _utils._kde_nd(
-        coordinate_dataframe_[coord_columns].values, bandwidth=1
+        coordinate_dataframe_[coord_columns].values, bandwidth=1, dtype=dtype
     )
     local_maximum_coordinates = _utils.find_local_maxima(
         vector_field_norm,
@@ -180,6 +185,7 @@ def _sample_expression_nd(
                     local_maximum_coordinates,
                     size=size,
                     bandwidth=1,
+                    dtype=dtype,
                 ): gene
                 for gene, coords in gene_coord_dict.items()
             }

@@ -352,13 +352,14 @@ def _compute_divergence_patched(
     KDE_bandwidth: float = 1,
     patch_length: int = 1000,
     n_workers: int = 8,
+    dtype=np.float32,
 ):
     # the 4 comes from the default truncate in scipy.ndimage.gaussian_filter
     patch_padding = int(ceil(4 * KDE_bandwidth))
 
     n_components = pca_component_matrix.shape[0]
 
-    signal = kde_2d(df[["x", "y"]].values, bandwidth=KDE_bandwidth)
+    signal = kde_2d(df[["x", "y"]].values, bandwidth=KDE_bandwidth, dtype=dtype)
 
     cosine_similarity = np.zeros_like(signal)
 
@@ -392,7 +393,7 @@ def _compute_divergence_patched(
                     continue
 
                 patch_signal = kde_2d(
-                    patch_df[["x", "y"]].values, bandwidth=KDE_bandwidth
+                    patch_df[["x", "y"]].values, bandwidth=KDE_bandwidth, dtype=dtype
                 )
 
                 patch_signal_mask = patch_signal > min_expression
@@ -404,9 +405,11 @@ def _compute_divergence_patched(
                 # plt.figure()
                 # plt.imshow(patch_signal)
 
-                patch_embedding_top = np.zeros((patch_signal_mask.sum(), n_components))
+                patch_embedding_top = np.zeros(
+                    (patch_signal_mask.sum(), n_components), dtype=dtype
+                )
                 patch_embedding_bottom = np.zeros(
-                    (patch_signal_mask.sum(), n_components)
+                    (patch_signal_mask.sum(), n_components), dtype=dtype
                 )
 
                 df_gene_grouped = patch_df.groupby("gene", observed=False).apply(
@@ -424,6 +427,7 @@ def _compute_divergence_patched(
                             patch_signal_mask,
                             pca_component_matrix[:, i],
                             bandwidth=KDE_bandwidth,
+                            dtype=dtype,
                         ): gene
                         for i, gene in enumerate(gene_list)
                     }
@@ -439,14 +443,10 @@ def _compute_divergence_patched(
                 patch_norm_top = np.linalg.norm(patch_embedding_top, axis=1)
                 patch_norm_bottom = np.linalg.norm(patch_embedding_bottom, axis=1)
 
-                patch_cosine_similarity = np.sum(
+                spatial_patch_cosine_similarity = np.zeros_like(patch_signal)
+                spatial_patch_cosine_similarity[patch_signal_mask] = np.sum(
                     patch_embedding_top * patch_embedding_bottom, axis=1
                 ) / (patch_norm_top * patch_norm_bottom)
-                spatial_patch_cosine_similarity = np.zeros_like(patch_signal)
-
-                spatial_patch_cosine_similarity[patch_signal_mask] = (
-                    patch_cosine_similarity
-                )
                 spatial_patch_cosine_similarity = spatial_patch_cosine_similarity[
                     patch_padding : patch_padding + patch_size_x,
                     patch_padding : patch_padding + patch_size_y,

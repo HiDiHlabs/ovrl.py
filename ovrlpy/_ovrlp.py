@@ -513,6 +513,8 @@ class Visualizer:
         Minimum distance for cell typing.
     n_components_pca : float, optional
         Number of components for PCA.
+    dtype
+        Datatype for the KDE.
     umap_kwargs : dict, optional
         Keyword arguments for 2D UMAP embedding.
     cumap_kwargs : dict, optional
@@ -572,10 +574,12 @@ class Visualizer:
         celltyping_min_expression=10,
         celltyping_min_distance=5,
         n_components_pca=0.7,
+        dtype=np.float32,
         umap_kwargs=UMAP_2D_PARAMS,
         cumap_kwargs=UMAP_RGB_PARAMS,
     ) -> None:
         self.KDE_bandwidth = KDE_bandwidth
+        self.dtype = dtype
 
         self.celltyping_min_expression = celltyping_min_expression
         self.celltyping_min_distance = celltyping_min_distance
@@ -652,6 +656,7 @@ class Visualizer:
             kde_bandwidth=self.KDE_bandwidth,
             n_workers=n_workers,
             min_pixel_distance=self.celltyping_min_distance,
+            dtype=self.dtype,
         )
 
         self.pseudocell_locations_x, self.pseudocell_locations_y, _ = adata_ssam.obsm[
@@ -737,7 +742,9 @@ class Visualizer:
 
         if signature_matrix is None:
             signature_matrix = pd.DataFrame(
-                np.eye(len(self.genes)), index=self.genes, columns=self.genes
+                np.eye(len(self.genes), dtype=self.dtype),
+                index=self.genes,
+                columns=self.genes,
             )
 
         self.signatures = signature_matrix
