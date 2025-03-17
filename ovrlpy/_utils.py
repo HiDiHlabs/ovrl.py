@@ -315,7 +315,7 @@ def _create_histogram(
     return hist
 
 
-def _compute_embedding_vectors(subset_df, signal_mask, factor):
+def _compute_embedding_vectors(subset_df, signal_mask, factor, **kwargs):
     if len(subset_df) < 2:
         return None, None
 
@@ -325,12 +325,14 @@ def _compute_embedding_vectors(subset_df, signal_mask, factor):
     if len(subset_top) == 0:
         signal_top = 0
     else:
-        signal_top = kde_2d(subset_top[:, :2], size=signal_mask.shape)[signal_mask]
+        signal_top = kde_2d(subset_top[:, :2], size=signal_mask.shape, **kwargs)[
+            signal_mask
+        ]
         signal_top = signal_top[:, None] * factor[None]
     if len(subset_bottom) == 0:
         signal_bottom = 0
     else:
-        signal_bottom = kde_2d(subset_bottom[:, :2], size=signal_mask.shape)[
+        signal_bottom = kde_2d(subset_bottom[:, :2], size=signal_mask.shape, **kwargs)[
             signal_mask
         ]
         signal_bottom = signal_bottom[:, None] * factor[None]
@@ -356,7 +358,7 @@ def _compute_divergence_patched(
 
     n_components = pca_component_matrix.shape[0]
 
-    signal = kde_2d(df[["x", "y"]].values)
+    signal = kde_2d(df[["x", "y"]].values, bandwidth=KDE_bandwidth)
 
     cosine_similarity = np.zeros_like(signal)
 
@@ -421,6 +423,7 @@ def _compute_divergence_patched(
                             df_gene_grouped.loc[gene],
                             patch_signal_mask,
                             pca_component_matrix[:, i],
+                            bandwidth=KDE_bandwidth,
                         ): gene
                         for i, gene in enumerate(gene_list)
                     }
