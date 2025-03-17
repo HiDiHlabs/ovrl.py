@@ -338,6 +338,10 @@ def _compute_embedding_vectors(subset_df, signal_mask, factor):
     return signal_top, signal_bottom
 
 
+def ceildiv(a, b):
+    return -(a // -b)
+
+
 def _compute_divergence_patched(
     df: pd.DataFrame,
     gene_list,
@@ -356,11 +360,12 @@ def _compute_divergence_patched(
 
     cosine_similarity = np.zeros_like(signal)
 
-    patch_count_x = signal.shape[0] // patch_length
-    patch_count_y = signal.shape[1] // patch_length
+    # ensure that patch_length is an upper-bound for the actual size
+    patch_count_x = ceildiv(signal.shape[0], patch_length) + 1
+    patch_count_y = ceildiv(signal.shape[1], patch_length) + 1
 
-    x_patches = np.linspace(0, signal.shape[0], patch_count_x + 1).astype(int)
-    y_patches = np.linspace(0, signal.shape[1], patch_count_y + 1).astype(int)
+    x_patches = np.linspace(0, signal.shape[0], patch_count_x, dtype=int)
+    y_patches = np.linspace(0, signal.shape[1], patch_count_y, dtype=int)
 
     with tqdm.tqdm(total=(len(x_patches) - 1) * (len(y_patches) - 1)) as pbar:
         for i in range(len(x_patches) - 1):
