@@ -643,16 +643,7 @@ class Visualizer:
 
         if genes is None:
             genes = sorted(coordinate_df[gene_key].unique())
-
         self.genes = genes
-
-        if signature_matrix is None:
-            signature_matrix = pd.DataFrame(
-                np.eye(len(genes)), index=genes, columns=genes
-            ).astype(float)
-            signature_matrix[:] = np.eye(len(genes))
-
-        self.signatures = signature_matrix
 
         adata_ssam = _sample_expression(
             coordinate_df,
@@ -667,37 +658,14 @@ class Visualizer:
             "spatial"
         ].T
 
-        self.pseudocell_expression_samples = pd.DataFrame(
-            adata_ssam.X.T, columns=adata_ssam.obs_names, index=adata_ssam.var_names
-        )
-        self.pca_2d = PCA(
-            n_components=min(
-                self.n_components_pca, self.pseudocell_expression_samples.shape[0] // 2
+        self.fit_pseudocells(
+            pd.DataFrame(
+                adata_ssam.X.T, columns=adata_ssam.obs_names, index=adata_ssam.var_names
             )
         )
-        factors = self.pca_2d.fit_transform(self.pseudocell_expression_samples.T)
-
-        print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
-
-        self.embedder_2d = umap.UMAP(**self.umap_kwargs)
-        self.embedding = self.embedder_2d.fit_transform(factors)
-
-        self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-        embedding_color = self.embedder_3d.fit_transform(
-            factors / norm(factors, axis=1)[..., None]
-        )
-
-        embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
-
-        self.colors = _min_to_max(embedding_color.copy())
-        self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
-
-        self.fit_signatures(signature_matrix)
-
-        gene_assignments = _determine_celltype_class_assignments(
-            self.pseudocell_expression_samples,
-            pd.DataFrame(np.eye(len(genes)), index=genes, columns=genes).astype(float),
-        )
+        # fit_pseudocells calls fit_signature on the identity matrix so we can reuse
+        # the assignments as gene assignments
+        gene_assignments = self.celltype_class_assignments
 
         # determine the center of gravity of each celltype in the embedding:
         self.gene_centers = np.array(
@@ -710,6 +678,8 @@ class Visualizer:
                 for i in range(len(self.genes))
             ]
         )
+        if signature_matrix is not None:
+            self.fit_signatures(signature_matrix)
 
     def fit_pseudocells(
         self, pseudocell_expression_samples: pd.DataFrame, genes: list = None
@@ -768,8 +738,7 @@ class Visualizer:
         if signature_matrix is None:
             signature_matrix = pd.DataFrame(
                 np.eye(len(self.genes)), index=self.genes, columns=self.genes
-            ).astype(float)
-            signature_matrix[:] = np.eye(len(self.genes))
+            )
 
         self.signatures = signature_matrix
         celltypes = sorted(signature_matrix.columns)
@@ -823,37 +792,18 @@ class Visualizer:
             Data frame of gene-annotated molecule coordinates to transform.
         """
 
-        genes = self.genes
-
-        subsample = coordinate_df
-
         distances, neighbor_indices = _create_knn_graph(
-            subsample[["x", "y", "z"]].values, k=90
+            coordinate_df[["x", "y", "z"]].values, k=90
         )
         local_expression = _get_knn_expression(
             distances,
             neighbor_indices,
-            genes,
-            subsample.gene.cat.codes.values,
+            self.genes,
+            coordinate_df["gene"].cat.codes.values,
             bandwidth=self.KDE_bandwidth,
         )
         local_expression /= (local_expression**2).sum(0) ** 0.5
-        subsample_embedding, subsample_embedding_color = _transform_embeddings(
-            local_expression.T.values,
-            self.pca_2d,
-            embedder_2d=self.embedder_2d,
-            embedder_3d=self.embedder_3d,
-        )
-        subsample_embedding_color, _ = _fill_color_axes(
-            subsample_embedding_color, self.pca_3d
-        )
-        color_min, color_max = self.colors_min_max
-        subsample_embedding_color = (subsample_embedding_color - color_min) / (
-            color_max - color_min
-        )
-        subsample_embedding_color = np.clip(subsample_embedding_color, 0, 1)
-
-        return subsample_embedding, subsample_embedding_color
+        return self.transform_pseudocells(local_expression)
 
     def transform_pseudocells(self, pseudocell_expression_samples: pd.DataFrame):
         """Transforms a matrix of gene expression to the visualizer's 2d and 3d embedding space.
