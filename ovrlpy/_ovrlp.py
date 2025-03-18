@@ -500,8 +500,8 @@ def _determine_celltype_class_assignments(expression_samples, signature_matrix):
 
 class Visualizer:
     """
-        A class to visualize spatial transcriptomics data.
-        Contains a latent gene expression UMAP and RGB embedding.
+    A class to visualize spatial transcriptomics data.
+    Contains a latent gene expression UMAP and RGB embedding.
 
     Parameters
     ----------

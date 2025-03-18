@@ -44,9 +44,6 @@ autoapi_options = [
     "imported-members",
 ]
 autoapi_own_page_level = "function"
-# autoapi_python_class_content = "both"
-# autoapi_template_dir = "_templates"
-# autoapi_member_order = "groupwise"
 
 python_use_unqualified_type_names = True  # still experimental
 
@@ -76,5 +73,15 @@ html_theme = "sphinx_rtd_theme"
 html_logo = "../resources/ovrlpy-logo.png"
 html_theme_options = {
     "logo_only": True,
-    # 'display_version': False,
+    "display_version": False,
 }
+
+
+def skip_attributes(app, what, name, obj, skip, options):
+    if what == "attribute":
+        skip = True
+    return skip
+
+
+def setup(sphinx):
+    sphinx.connect("autoapi-skip-member", skip_attributes)
