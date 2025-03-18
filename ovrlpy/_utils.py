@@ -73,6 +73,15 @@ def _determine_localmax_and_sample(distribution, min_distance=3, min_expression=
 
 ## These functions are going to be seperated into a package of their own at some point:
 
+# define a 45-degree 3D rotation matrix
+_ROTATION_MATRIX = np.array(
+    [
+        [0.500, 0.500, -0.707],
+        [-0.146, 0.854, 0.500],
+        [0.854, -0.146, 0.500],
+    ]
+)
+
 
 def _fill_color_axes(rgb, dimred=None):
     if dimred is None:
@@ -80,19 +89,8 @@ def _fill_color_axes(rgb, dimred=None):
 
     facs = dimred.transform(rgb)
 
-    # rotate the ica_facs 45 in all the dimensions:
-    # define a 45-degree 3d rotation matrix
-
-    rotation_matrix = np.array(
-        [
-            [0.500, 0.500, -0.707],
-            [-0.146, 0.854, 0.500],
-            [0.854, -0.146, 0.500],
-        ]
-    )
-
-    # rotate the facs:
-    facs = np.dot(facs, rotation_matrix)
+    # rotate the facs 45 in all the dimensions
+    facs = np.dot(facs, _ROTATION_MATRIX)
 
     return facs, dimred
 
@@ -109,12 +107,7 @@ def _min_to_max(arr, arr_min=None, arr_max=None):
 
 
 # define a function that fits expression data to into the umap embeddings:
-def _transform_embeddings(
-    expression,
-    pca,
-    embedder_2d,
-    embedder_3d,
-):
+def _transform_embeddings(expression, pca, embedder_2d, embedder_3d):
     factors = pca.transform(expression)
 
     embedding = embedder_2d.transform(factors)
@@ -317,26 +310,23 @@ def _create_histogram(
     return hist
 
 
-def _compute_embedding_vectors(subset_df, signal_mask, factor, **kwargs):
-    if len(subset_df) < 2:
+def _compute_embedding_vectors(df: pd.DataFrame, mask: np.ndarray, factor, **kwargs):
+    if len(df) < 2:
         return None, None
 
-    subset_top = subset_df[subset_df[:, 2] > subset_df[:, 3]]
-    subset_bottom = subset_df[subset_df[:, 2] < subset_df[:, 3]]
+    # TODO: what happens if equal?
+    top = df[df[:, 2] > df[:, 3]]
+    bottom = df[df[:, 2] < df[:, 3]]
 
-    if len(subset_top) == 0:
+    if len(top) == 0:
         signal_top = 0
     else:
-        signal_top = kde_2d(subset_top[:, :2], size=signal_mask.shape, **kwargs)[
-            signal_mask
-        ]
+        signal_top = kde_2d(top[:, :2], size=mask.shape, **kwargs)[mask]
         signal_top = signal_top[:, None] * factor[None]
-    if len(subset_bottom) == 0:
+    if len(bottom) == 0:
         signal_bottom = 0
     else:
-        signal_bottom = kde_2d(subset_bottom[:, :2], size=signal_mask.shape, **kwargs)[
-            signal_mask
-        ]
+        signal_bottom = kde_2d(bottom[:, :2], size=mask.shape, **kwargs)[mask]
         signal_bottom = signal_bottom[:, None] * factor[None]
 
     return signal_top, signal_bottom
