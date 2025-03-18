@@ -615,6 +615,7 @@ class Visualizer:
         gene_key: str = "gene",
         coordinates_key: str = "spatial",
         signature_matrix=None,
+        patch_length: int = 500,
         n_workers: int = 8,
     ):
         """
@@ -635,6 +636,9 @@ class Visualizer:
         signature_matrix : pandas.DataFrame
             A matrix of celltypes x gene signatures to use to annotate the UMAP.
             None defaults to displaying individual genes.
+        patch_length : int
+            Size of the length in each dimension when calculating signal integrity in patches.
+            Smaller values will use less memory, but may take longer to compute.
         n_workers : int
             The number of workers to use in the SSAM algorithm
         """
@@ -656,6 +660,7 @@ class Visualizer:
             kde_bandwidth=self.KDE_bandwidth,
             n_workers=n_workers,
             min_pixel_distance=self.celltyping_min_distance,
+            patch_length=patch_length,
             dtype=self.dtype,
         )
 
@@ -1495,7 +1500,7 @@ def run(
     cell_diameter=10,
     min_expression: float = 1.0,
     signature_matrix=None,
-    patch_size: int = 1000,
+    patch_length: int = 500,
     n_workers: int = len(os.sched_getaffinity(0)),
     umap_kwargs=UMAP_2D_PARAMS,
     cumap_kwargs=UMAP_RGB_PARAMS,
@@ -1524,7 +1529,7 @@ def run(
         radius of 'KDE_bandwidth' for a region to be considered containing a cell.
     signature_matrix : pandas.DataFrame, optional
         A celltypes x gene table of expression signatures to use to annotate the UMAP.
-    patch_size : int
+    patch_length : int
         Size of the length in each dimension when calculating signal integrity in patches.
         Smaller values will use less memory, but may take longer to compute.
     n_workers : int
@@ -1564,7 +1569,12 @@ def run(
     )
 
     print("Creating gene expression embeddings for visualization:")
-    vis.fit_transcripts(df, signature_matrix=signature_matrix, n_workers=n_workers)
+    vis.fit_transcripts(
+        df,
+        signature_matrix=signature_matrix,
+        patch_length=patch_length,
+        n_workers=n_workers,
+    )
 
     print("Creating signal integrity map:")
     integrity_, signal_ = _compute_divergence_patched(
@@ -1573,7 +1583,7 @@ def run(
         vis.pca_2d.components_,
         KDE_bandwidth=KDE_bandwidth,
         min_expression=1,
-        patch_length=patch_size,
+        patch_length=patch_length,
         n_workers=n_workers,
     )
 

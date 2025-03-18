@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from math import ceil
 from typing import Any
@@ -13,6 +14,7 @@ from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
+from ._patching import _patches, n_patches
 from ._ssam2 import find_local_maxima, kde_2d
 
 SCALEBAR_PARAMS: dict[str, Any] = {"dx": 1, "units": "um"}
@@ -340,22 +342,18 @@ def _compute_embedding_vectors(subset_df, signal_mask, factor, **kwargs):
     return signal_top, signal_bottom
 
 
-def ceildiv(a, b):
-    return -(a // -b)
-
-
 def _compute_divergence_patched(
     df: pd.DataFrame,
-    gene_list,
+    gene_list: Iterable,
     pca_component_matrix: np.ndarray,
     min_expression: float = 2,
     KDE_bandwidth: float = 1,
-    patch_length: int = 1000,
+    patch_length: int = 500,
     n_workers: int = 8,
     dtype=np.float32,
 ):
     # the 4 comes from the default truncate in scipy.ndimage.gaussian_filter
-    patch_padding = int(ceil(4 * KDE_bandwidth))
+    padding = int(ceil(4 * KDE_bandwidth))
 
     n_components = pca_component_matrix.shape[0]
 
@@ -363,102 +361,69 @@ def _compute_divergence_patched(
 
     cosine_similarity = np.zeros_like(signal)
 
-    # ensure that patch_length is an upper-bound for the actual size
-    patch_count_x = ceildiv(signal.shape[0], patch_length) + 1
-    patch_count_y = ceildiv(signal.shape[1], patch_length) + 1
+    with ThreadPoolExecutor(max_workers=n_workers) as executor:
+        for patch_df, offset, size in tqdm.tqdm(
+            _patches(df, patch_length, padding, size=signal.shape),
+            total=n_patches(patch_length, signal.shape),
+        ):
+            if len(patch_df) == 0:
+                continue
 
-    x_patches = np.linspace(0, signal.shape[0], patch_count_x, dtype=int)
-    y_patches = np.linspace(0, signal.shape[1], patch_count_y, dtype=int)
+            patch_signal = kde_2d(
+                patch_df[["x", "y"]].values, bandwidth=KDE_bandwidth, dtype=dtype
+            )
 
-    with tqdm.tqdm(total=(len(x_patches) - 1) * (len(y_patches) - 1)) as pbar:
-        for i in range(len(x_patches) - 1):
-            for j in range(len(y_patches) - 1):
-                x_ = x_patches[i] - patch_padding
-                y_ = y_patches[j] - patch_padding
-                _x = x_patches[i + 1] + patch_padding
-                _y = y_patches[j + 1] + patch_padding
+            patch_signal_mask = patch_signal > min_expression
+            n_pixels = patch_signal_mask.sum()
 
-                patch_size_x = _x - x_ - patch_padding * 2
-                patch_size_y = _y - y_ - patch_padding * 2
+            if n_pixels == 0:
+                continue
 
-                patch_df = df[
-                    (df.x >= x_) & (df.x < _x) & (df.y >= y_) & (df.y < _y)
-                ].copy()
+            patch_embedding_top = np.zeros((n_pixels, n_components), dtype=dtype)
+            patch_embedding_bottom = np.zeros((n_pixels, n_components), dtype=dtype)
 
-                patch_df.x -= x_
-                patch_df.y -= y_
+            df_gene_grouped = patch_df.groupby("gene", observed=False).apply(
+                lambda x: x[["x", "y", "z", "z_delim"]].values
+            )
 
-                if len(patch_df) == 0:
-                    pbar.update(1)
-                    continue
+            # return cosine_similarity, signal
+            fs = {
+                executor.submit(
+                    _compute_embedding_vectors,
+                    df_gene_grouped.loc[gene],
+                    patch_signal_mask,
+                    pca_component_matrix[:, i],
+                    bandwidth=KDE_bandwidth,
+                    dtype=dtype,
+                ): gene
+                for i, gene in enumerate(gene_list)
+            }
 
-                patch_signal = kde_2d(
-                    patch_df[["x", "y"]].values, bandwidth=KDE_bandwidth, dtype=dtype
-                )
+            for f in as_completed(fs):
+                top_, bottom_ = f.result()
 
-                patch_signal_mask = patch_signal > min_expression
+                if top_ is not None:
+                    assert bottom_ is not None
+                    patch_embedding_top += top_
+                    patch_embedding_bottom += bottom_
 
-                if patch_signal_mask.sum() == 0:
-                    pbar.update(1)
-                    continue
+            patch_norm_top = np.linalg.norm(patch_embedding_top, axis=1)
+            patch_norm_bottom = np.linalg.norm(patch_embedding_bottom, axis=1)
 
-                # plt.figure()
-                # plt.imshow(patch_signal)
+            spatial_patch_cosine_similarity = np.zeros_like(patch_signal)
+            spatial_patch_cosine_similarity[patch_signal_mask] = np.sum(
+                patch_embedding_top * patch_embedding_bottom, axis=1
+            ) / (patch_norm_top * patch_norm_bottom)
+            # remove padding
+            spatial_patch_cosine_similarity = spatial_patch_cosine_similarity[
+                padding : padding + size[0], padding : padding + size[1]
+            ]
 
-                patch_embedding_top = np.zeros(
-                    (patch_signal_mask.sum(), n_components), dtype=dtype
-                )
-                patch_embedding_bottom = np.zeros(
-                    (patch_signal_mask.sum(), n_components), dtype=dtype
-                )
-
-                df_gene_grouped = patch_df.groupby("gene", observed=False).apply(
-                    lambda x: x[["x", "y", "z", "z_delim"]].values
-                )
-                # df_gene_grouped = df_gene_grouped[df_gene_grouped.apply(lambda x: x.shape[0]>0)]
-
-                with ThreadPoolExecutor(max_workers=n_workers) as executor:
-                    # _compute_embedding_vectors(df_gene_grouped.loc[gene_list[0]],patch_signal_mask,pca_component_matrix[:,0])
-                    # return cosine_similarity, signal
-                    fs = {
-                        executor.submit(
-                            _compute_embedding_vectors,
-                            df_gene_grouped.loc[gene],
-                            patch_signal_mask,
-                            pca_component_matrix[:, i],
-                            bandwidth=KDE_bandwidth,
-                            dtype=dtype,
-                        ): gene
-                        for i, gene in enumerate(gene_list)
-                    }
-
-                    for f in as_completed(fs):
-                        top_, bottom_ = f.result()
-
-                        if top_ is not None:
-                            assert bottom_ is not None
-                            patch_embedding_top += top_
-                            patch_embedding_bottom += bottom_
-
-                patch_norm_top = np.linalg.norm(patch_embedding_top, axis=1)
-                patch_norm_bottom = np.linalg.norm(patch_embedding_bottom, axis=1)
-
-                spatial_patch_cosine_similarity = np.zeros_like(patch_signal)
-                spatial_patch_cosine_similarity[patch_signal_mask] = np.sum(
-                    patch_embedding_top * patch_embedding_bottom, axis=1
-                ) / (patch_norm_top * patch_norm_bottom)
-                spatial_patch_cosine_similarity = spatial_patch_cosine_similarity[
-                    patch_padding : patch_padding + patch_size_x,
-                    patch_padding : patch_padding + patch_size_y,
-                ]  # remove patch edges
-
-                x_pad = x_ + patch_padding
-                y_pad = y_ + patch_padding
-                cosine_similarity[
-                    x_pad : x_pad + spatial_patch_cosine_similarity.shape[0],
-                    y_pad : y_pad + spatial_patch_cosine_similarity.shape[1],
-                ] = spatial_patch_cosine_similarity
-
-                pbar.update(1)
+            x_pad = offset[0] + padding
+            y_pad = offset[1] + padding
+            cosine_similarity[
+                x_pad : x_pad + spatial_patch_cosine_similarity.shape[0],
+                y_pad : y_pad + spatial_patch_cosine_similarity.shape[1],
+            ] = spatial_patch_cosine_similarity
 
     return cosine_similarity, signal
