@@ -1515,7 +1515,7 @@ def run(
     ----------
     df : pandas.DataFrame
         The spatial transcriptomics dataset.
-    n_expected_celltypes : int, optional.
+    n_expected_celltypes : int, optional
         A rough estimate of expected cell type clusters.
         A higher number will lead to a more disjoint UMAP embedding and a higher
         detection of overlap events.

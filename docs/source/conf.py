@@ -63,6 +63,7 @@ intersphinx_mapping = dict(
     python=("https://docs.python.org/3", None),
     scanpy=("https://scanpy.readthedocs.io/en/stable/", None),
     scipy=("https://docs.scipy.org/doc/scipy/", None),
+    sklearn=("https://scikit-learn.org/stable/", None),
     umap=("https://umap-learn.readthedocs.io/page/", None),
 )
 
@@ -71,10 +72,7 @@ intersphinx_mapping = dict(
 
 html_theme = "sphinx_rtd_theme"
 html_logo = "../resources/ovrlpy-logo.png"
-html_theme_options = {
-    "logo_only": True,
-    "display_version": False,
-}
+html_theme_options = {"logo_only": True}
 
 
 def skip_attributes(app, what, name, obj, skip, options):
