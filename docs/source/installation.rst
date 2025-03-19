@@ -6,6 +6,7 @@ These instructions will guide you through setting up the environment for both st
 use and interactive analysis with Jupyter notebooks.
 
 .. note::
+
    Make sure you have Python (>= 3.11 and <3.14) and pip installed on your machine
    before proceeding.
 
@@ -39,14 +40,8 @@ the repository and then install with ``pip`` as follows
 Interactive tutorials
 ---------------------
 
-If you want to follow the interactive tutorials you need to install further dependencies
-
-.. code-block:: bash
-
-   pip install ovrlpy[tutorial]
-
-
-Furthermore, you will need ``jupyter`` to run the interactive tutorial notebooks.
+If you want to follow the interactive tutorials you will need ``jupyter`` to run the
+tutorial notebooks.
 
 .. code-block:: bash
 

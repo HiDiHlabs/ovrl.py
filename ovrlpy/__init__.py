@@ -1,5 +1,6 @@
 from importlib.metadata import PackageNotFoundError, version
 
+from . import io
 from ._ovrlp import (
     Visualizer,
     detect_doublets,
@@ -22,6 +23,7 @@ del PackageNotFoundError, version
 
 
 __all__ = [
+    "io",
     "detect_doublets",
     "sample_expression_at_xy",
     "get_pseudocell_locations",

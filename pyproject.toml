@@ -19,7 +19,7 @@ dependencies = [
     "matplotlib~=3.8",
     "matplotlib-scalebar",
     "numpy~=1.25",
-    "pandas~=2.0",
+    "pandas[parquet]~=2.0",
     "scikit-image>=0.18",
     "scikit-learn~=1.1",
     "scipy~=1.11",
@@ -35,7 +35,6 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-tutorial = ["pandas[parquet]"]
 docs = [
     "sphinx~=8.0",
     "sphinx-autoapi~=3.1",

@@ -1,0 +1,115 @@
+import os
+from collections.abc import Collection
+from pathlib import Path
+
+import pandas as pd
+
+
+def _filter_genes(df: pd.DataFrame, remove_features: Collection[str]) -> pd.DataFrame:
+    if len(remove_features) > 0:
+        df = df.loc[~df["gene"].str.contains(f"{'|'.join(remove_features)}")]
+        df = df.assign(
+            gene=lambda df: df["gene"].astype("category").cat.remove_unused_categories()
+        )
+    return df
+
+
+# 10x Xenium
+_XENIUM_COLUMNS = {
+    "feature_name": "gene",
+    "x_location": "x",
+    "y_location": "y",
+    "z_location": "z",
+}
+
+XENIUM_CTRLS = [
+    "^BLANK",
+    "^DeprecatedCodeword",
+    "^Intergenic",
+    "^NegControl",
+    "^UnassignedCodeword",
+]
+"""Patterns for Xenium controls"""
+
+
+def read_Xenium(
+    filepath: str | os.PathLike, *, remove_features: Collection[str] = XENIUM_CTRLS
+) -> pd.DataFrame:
+    """
+    Read a Xenium transcripts file.
+
+    Parameters
+    ----------
+    filepath : os.PathLike or str
+        Path to the Xenium transcripts file. Both, .csv.gz and .parquet files, are supported.
+    remove_features : collections.abc.Collection[str], optional
+        List of regex patterns to filter the 'feature_name' column,
+        :py:attr:`ovrlpy.io.XENIUM_CTRLS` by default.
+
+    Returns
+    -------
+    pandas.DataFrame
+    """
+    filepath = Path(filepath)
+    columns = list(_XENIUM_COLUMNS.keys())
+
+    if filepath.suffix == ".parquet":
+        transcripts = pd.read_parquet(filepath, columns=columns)
+
+        # v2/v3 versions of the XOA files encode the feature_name column as string
+        # while in v1 it is only designated as binary so we need to cast
+        # that's why we check whether the data in the column is bytes (and not string)
+        if isinstance(transcripts["feature_name"].iat[0], bytes):
+            transcripts["feature_name"] = transcripts["feature_name"].str.decode(
+                "utf-8"
+            )
+
+        transcripts["feature_name"] = transcripts["feature_name"].astype("category")
+
+        # TODO: 'is_gene' column exists for Xenium v3 which only has .parquet
+        # can be used to filter
+
+    else:
+        transcripts = pd.read_csv(filepath, usecols=columns, dtype={"gene": "category"})
+
+    transcripts = transcripts.rename(columns=_XENIUM_COLUMNS)
+    transcripts = _filter_genes(transcripts, remove_features)
+
+    return transcripts
+
+
+# Vizgen MERFISH
+_MERFISH_COLUMNS = {"gene": "gene", "global_x": "x", "global_y": "y", "global_z": "z"}
+
+MERFISH_CTRLS = ["^Blank"]
+"""Patterns for Vizgen controls"""
+
+
+def read_MERFISH(
+    filepath: str | os.PathLike, *, remove_genes: Collection[str] = MERFISH_CTRLS
+) -> pd.DataFrame:
+    """
+    Read a Vizgen transcripts file.
+
+    Parameters
+    ----------
+    filepath : os.PathLike or str
+        Path to the Vizgen transcripts file.
+    remove_genes : collections.abc.Collection[str], optional
+        List of regex patterns to filter the 'gene' column,
+        :py:attr:`ovrlpy.io.MERFISH_CTRLS` by default.
+
+    Returns
+    -------
+    pandas.DataFrame
+    """
+
+    transcripts = pd.read_csv(
+        Path(filepath),
+        usecols=list(_MERFISH_COLUMNS.keys()),
+        dtype={"gene": "category"},
+    ).rename(columns=_MERFISH_COLUMNS)
+
+    transcripts = _filter_genes(transcripts, remove_genes)
+
+    return transcripts

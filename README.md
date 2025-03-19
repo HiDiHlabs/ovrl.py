@@ -23,16 +23,6 @@ Users can also use the built-in 3D visualisation tool to explore regions of sign
 pip install ovrlpy
 ```
 
-In order to use the ipython notebooks and perform interactive analysis, you will need to install the `jupyter` package or have an
-JupyterLab / JupyterHub instance available.
-
-### tutorials
-Additional dependencies necessary for following the tutorials can be installed as follows
-
-```bash
-pip install ovrlpy[tutorial]
-```
-
 ## quickstart
 
 The simplest use case of ovrlpy is the creation of a signal integrity map from a spatial transcriptomics dataset.
