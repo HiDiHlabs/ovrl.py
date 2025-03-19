@@ -40,6 +40,8 @@ coordinate_df = pd.read_csv('path/to/coordinate_file.csv')
 coordinate_df.head()
 ```
 
+the coordinate dataframe should contain a *gene*, *x*, *y*, and *z* column.
+
 you can then fit an ovrlpy model to the data and create a signal integrity map:
 
 ```python
