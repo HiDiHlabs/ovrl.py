@@ -55,16 +55,16 @@ def read_Xenium(
 
     if filepath.suffix == ".parquet":
         transcripts = pd.read_parquet(filepath, columns=columns)
+        transcripts["feature_name"] = transcripts["feature_name"].astype("category")
 
         # v2/v3 versions of the XOA files encode the feature_name column as string
         # while in v1 it is only designated as binary so we need to cast
         # that's why we check whether the data in the column is bytes (and not string)
-        if isinstance(transcripts["feature_name"].iat[0], bytes):
-            transcripts["feature_name"] = transcripts["feature_name"].str.decode(
-                "utf-8"
-            )
-
-        transcripts["feature_name"] = transcripts["feature_name"].astype("category")
+        if isinstance(transcripts["feature_name"].cat.categories[0], bytes):
+            decoded_cat = transcripts["feature_name"].cat.categories.str.decode("utf-8")
+            transcripts["feature_name"] = transcripts[
+                "feature_name"
+            ].cat.rename_categories(decoded_cat)
 
         # TODO: 'is_gene' column exists for Xenium v3 which only has .parquet
         # can be used to filter
