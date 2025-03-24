@@ -615,6 +615,7 @@ class Visualizer:
         gene_key: str = "gene",
         coordinates_key: str = "spatial",
         signature_matrix=None,
+        fit_umap: bool = True,
         patch_length: int = 500,
         n_workers: int = 8,
     ):
@@ -636,6 +637,9 @@ class Visualizer:
         signature_matrix : pandas.DataFrame
             A matrix of celltypes x gene signatures to use to annotate the UMAP.
             None defaults to displaying individual genes.
+        fit_umap : bool
+            Whether to fit the UMAP to the data or not. Requires a lot of memory for
+            large datasets.
         patch_length : int
             Size of the length in each dimension when calculating signal integrity in patches.
             Smaller values will use less memory, but may take longer to compute.
@@ -671,28 +675,39 @@ class Visualizer:
         self.fit_pseudocells(
             pd.DataFrame(
                 adata_ssam.X.T, columns=adata_ssam.obs_names, index=adata_ssam.var_names
-            )
+            ),
+            fit_umap=fit_umap,
         )
-        # fit_pseudocells calls fit_signature on the identity matrix so we can reuse
-        # the assignments as gene assignments
-        gene_assignments = self.celltype_class_assignments
+        if fit_umap:
+            # fit_pseudocells calls fit_signature on the gene x gene identity matrix
+            # so we can reuse the assignments as gene assignments
 
-        # determine the center of gravity of each celltype in the embedding:
-        self.gene_centers = np.array(
-            [
-                (
-                    np.median(self.embedding[gene_assignments == i, :], axis=0)
-                    if (gene_assignments == i).sum() > 0
-                    else (np.nan, np.nan)
-                )
-                for i in range(len(self.genes))
-            ]
-        )
+            self.gene_centers = self._coordinate_center(
+                self.celltype_class_assignments, len(self.genes)
+            )
         if signature_matrix is not None:
             self.fit_signatures(signature_matrix)
 
+    def _coordinate_center(self, assignments: np.ndarray, n: int):
+        # determine the center of gravity of each assignment (celltype or gene)
+        # in the embedding
+        return np.array(
+            [
+                (
+                    np.median(self.embedding[assignments == i, :], axis=0)
+                    if (assignments == i).sum() > 0
+                    else (np.nan, np.nan)
+                )
+                for i in range(n)
+            ]
+        )
+
     def fit_pseudocells(
-        self, pseudocell_expression_samples: pd.DataFrame, genes: list = None
+        self,
+        pseudocell_expression_samples: pd.DataFrame,
+        *,
+        genes: list = None,
+        fit_umap: bool = True,
     ):
         """Fits the visualizer to a given pseudocell expression sample.
 
@@ -702,6 +717,9 @@ class Visualizer:
             A gene x cell matrix of gene expression
         genes : list, optional
             A list of genes to utilize in the model.
+        fit_umap : bool
+            Whether to fit the UMAP to the data or not. Requires a lot of memory for
+            large datasets.
         """
 
         self.pseudocell_expression_samples = pseudocell_expression_samples
@@ -715,24 +733,27 @@ class Visualizer:
                 self.n_components_pca, pseudocell_expression_samples.shape[0] // 2
             )
         )
-        factors = self.pca_2d.fit_transform(pseudocell_expression_samples.T)
+        if fit_umap:
+            factors = self.pca_2d.fit_transform(pseudocell_expression_samples.T)
 
-        print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
+            print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
 
-        self.embedder_2d = umap.UMAP(**self.umap_kwargs)
-        self.embedding = self.embedder_2d.fit_transform(factors)
+            self.embedder_2d = umap.UMAP(**self.umap_kwargs)
+            self.embedding = self.embedder_2d.fit_transform(factors)
 
-        self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-        embedding_color = self.embedder_3d.fit_transform(
-            factors / norm(factors, axis=1)[..., None]
-        )
+            self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
+            embedding_color = self.embedder_3d.fit_transform(
+                factors / norm(factors, axis=1)[..., None]
+            )
 
-        embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
+            embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
-        self.colors = _min_to_max(embedding_color.copy())
-        self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
-
-        self.fit_signatures()
+            self.colors = _min_to_max(embedding_color.copy())
+            self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
+            print("Fitting gene centers")
+            self.fit_signatures()
+        else:
+            self.pca_2d.fit(pseudocell_expression_samples.T)
 
     def fit_signatures(self, signature_matrix=None):
         """
@@ -753,20 +774,14 @@ class Visualizer:
             )
 
         self.signatures = signature_matrix
-        celltypes = sorted(signature_matrix.columns)
 
         self.celltype_class_assignments = _determine_celltype_class_assignments(
             self.pseudocell_expression_samples, signature_matrix
         )
 
         # determine the center of gravity of each celltype in the embedding:
-        self.celltype_centers = np.array(
-            [
-                np.median(
-                    self.embedding[self.celltype_class_assignments == i, :], axis=0
-                )
-                for i in range(len(celltypes))
-            ]
+        self.celltype_centers = self._coordinate_center(
+            self.celltype_class_assignments, len(signature_matrix.columns)
         )
 
     def subsample_df(self, x, y, coordinate_df: pd.DataFrame, window_size: int = 30):
@@ -1500,6 +1515,7 @@ def run(
     cell_diameter=10,
     min_expression: float = 1.0,
     signature_matrix=None,
+    fit_umap: bool = True,
     patch_length: int = 500,
     n_workers: int = len(os.sched_getaffinity(0)),
     umap_kwargs=UMAP_2D_PARAMS,
@@ -1530,6 +1546,9 @@ def run(
         radius of 'KDE_bandwidth' for a region to be considered containing a cell.
     signature_matrix : pandas.DataFrame, optional
         A celltypes x gene table of expression signatures to use to annotate the UMAP.
+    fit_umap : bool
+        Whether to fit the UMAP to the data or not. Requires a lot of memory for
+        large datasets.
     patch_length : int
         Size of the length in each dimension when calculating signal integrity in patches.
         Smaller values will use less memory, but may take longer to compute.
@@ -1573,6 +1592,7 @@ def run(
     vis.fit_transcripts(
         df,
         signature_matrix=signature_matrix,
+        fit_umap=fit_umap,
         patch_length=patch_length,
         n_workers=n_workers,
     )
