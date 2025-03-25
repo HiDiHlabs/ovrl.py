@@ -203,6 +203,7 @@ def _sample_expression_nd(
             patches.append(
                 pd.DataFrame({futures[f]: f.result() for f in as_completed(futures)})
             )
+            del futures
 
     # store in anndata object:
     with warnings.catch_warnings(

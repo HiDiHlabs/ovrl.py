@@ -376,8 +376,7 @@ def _compute_divergence_patched(
                 lambda x: x[["x", "y", "z", "z_delim"]].values
             )
 
-            # return cosine_similarity, signal
-            fs = {
+            fs = set(
                 executor.submit(
                     _compute_embedding_vectors,
                     df_gene_grouped.loc[gene],
@@ -385,9 +384,9 @@ def _compute_divergence_patched(
                     pca_component_matrix[:, i],
                     bandwidth=KDE_bandwidth,
                     dtype=dtype,
-                ): gene
+                )
                 for i, gene in enumerate(gene_list)
-            }
+            )
 
             for f in as_completed(fs):
                 top_, bottom_ = f.result()
@@ -396,6 +395,8 @@ def _compute_divergence_patched(
                     assert bottom_ is not None
                     patch_embedding_top += top_
                     patch_embedding_bottom += bottom_
+
+                fs.remove(f)
 
             patch_norm_top = np.linalg.norm(patch_embedding_top, axis=1)
             patch_norm_bottom = np.linalg.norm(patch_embedding_bottom, axis=1)
