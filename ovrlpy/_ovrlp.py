@@ -287,11 +287,11 @@ def get_pseudocell_locations(
         df, genes=genes, min_expression=min_expression, KDE_bandwidth=KDE_bandwidth
     )
 
-    pseudocell_locations_x, pseudocells_y, _ = _determine_localmax_and_sample(
+    x, y, _ = _determine_localmax_and_sample(
         hist, min_distance=min_distance, min_expression=min_expression
     )
 
-    return pseudocell_locations_x, pseudocells_y
+    return x, y
 
 
 def sample_expression_at_xy(
