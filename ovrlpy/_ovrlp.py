@@ -485,14 +485,17 @@ def detect_doublets(
     return doublet_df
 
 
-def _determine_celltype_class_assignments(expression_samples, signature_matrix):
-    expression_samples_ = expression_samples.loc[signature_matrix.index].copy()
+def _determine_celltype_class_assignments(
+    samples: pd.DataFrame, signatures: pd.DataFrame
+):
+    samples = samples.loc[:, signatures.columns]
+    signature_mtx = signatures.to_numpy()
+    # TODO: this is quite inefficient?
+    # it calculates all pairwise correlation coefficients even if not needed.
     correlations = np.array(
         [
-            np.corrcoef(expression_samples_.iloc[:, i], signature_matrix.values.T)[
-                0, 1:
-            ]
-            for i in range(expression_samples.shape[1])
+            np.corrcoef(samples.iloc[i, :], signature_mtx)[0, 1:]
+            for i in range(samples.shape[0])
         ]
     )
     return np.argmax(correlations, -1)
@@ -672,12 +675,7 @@ class Visualizer:
             "spatial"
         ].T
 
-        self.fit_pseudocells(
-            pd.DataFrame(
-                adata_ssam.X.T, columns=adata_ssam.obs_names, index=adata_ssam.var_names
-            ),
-            fit_umap=fit_umap,
-        )
+        self.fit_pseudocells(adata_ssam.to_df(), fit_umap=fit_umap)
 
         if signature_matrix is not None:
             self.fit_signatures(signature_matrix)
@@ -708,7 +706,7 @@ class Visualizer:
         Parameters
         ----------
         pseudocell_expression_samples : pandas.DataFrame
-            A gene x cell matrix of gene expression
+            A cell x gene matrix of gene expression
         genes : list, optional
             A list of genes to utilize in the model.
         fit_umap : bool
@@ -719,16 +717,16 @@ class Visualizer:
         self.pseudocell_expression_samples = pseudocell_expression_samples
 
         if genes is None:
-            genes = pseudocell_expression_samples.index
+            genes = pseudocell_expression_samples.columns
         self.genes = genes
 
         self.pca_2d = PCA(
             n_components=min(
-                self.n_components_pca, pseudocell_expression_samples.shape[0] // 2
+                self.n_components_pca, pseudocell_expression_samples.shape[1] // 2
             )
         )
         if fit_umap:
-            factors = self.pca_2d.fit_transform(pseudocell_expression_samples.T)
+            factors = self.pca_2d.fit_transform(pseudocell_expression_samples)
 
             print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
 
@@ -746,7 +744,7 @@ class Visualizer:
             self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
 
         else:
-            self.pca_2d.fit(pseudocell_expression_samples.T)
+            self.pca_2d.fit(pseudocell_expression_samples)
 
     def fit_signatures(self, signature_matrix=None):
         """
@@ -823,7 +821,7 @@ class Visualizer:
             bandwidth=self.KDE_bandwidth,
         )
         local_expression /= (local_expression**2).sum(0) ** 0.5
-        return self.transform_pseudocells(local_expression)
+        return self.transform_pseudocells(local_expression.T)
 
     def transform_pseudocells(self, pseudocell_expression_samples: pd.DataFrame):
         """Transforms a matrix of gene expression to the visualizer's 2d and 3d embedding space.
@@ -831,11 +829,11 @@ class Visualizer:
         Parameters
         ----------
         pseudocell_expression_samples : pandas.DataFrame
-            A gene x cell matrix of gene expression
+            A cell x gene matrix of gene expression
         """
 
         subsample_embedding, subsample_embedding_color = _transform_embeddings(
-            pseudocell_expression_samples.T.values,
+            pseudocell_expression_samples.to_numpy(),
             self.pca_2d,
             embedder_2d=self.embedder_2d,
             embedder_3d=self.embedder_3d,
