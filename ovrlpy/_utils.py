@@ -146,19 +146,20 @@ def _plot_embeddings(
         **scatter_kwargs,
     )
 
-    text_artists = []
-    for i, celltype in enumerate(celltypes):
-        if not np.isnan(celltype_centers[i, 0]):
-            t = ax.text(
-                np.nan_to_num((celltype_centers[i, 0])),
-                np.nan_to_num(celltype_centers[i, 1]),
-                celltype,
-                color="k",
-                fontsize=12,
-            )
-            text_artists.append(t)
+    if celltypes is None and celltype_centers is None:
+        text_artists = []
+        for i, celltype in enumerate(celltypes):
+            if not np.isnan(celltype_centers[i, 0]):
+                t = ax.text(
+                    np.nan_to_num((celltype_centers[i, 0])),
+                    np.nan_to_num(celltype_centers[i, 1]),
+                    celltype,
+                    color="k",
+                    fontsize=12,
+                )
+                text_artists.append(t)
 
-    _untangle_text(text_artists, ax)
+        _untangle_text(text_artists, ax)
 
 
 def _untangle_text(text_artists, ax=None, max_iterations=10000):

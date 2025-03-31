@@ -1062,7 +1062,7 @@ class Visualizer:
             self.embedding,
             self.colors,
             self.celltype_centers,
-            self.signatures.columns,
+            None if self.signatures is None else self.signatures.columns,
             rasterized,
             ax,
             **kwargs,
