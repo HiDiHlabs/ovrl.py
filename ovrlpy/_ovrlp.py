@@ -1395,13 +1395,19 @@ def run(
     print("Running vertical adjustment")
     pre_process_coordinates(df, grid_size=1, rounds=20)
 
+    if "random_state" not in umap_kwargs:
+        umap_kwargs = {"n_jobs": n_workers} | umap_kwargs
+
+    if "random_state" not in cumap_kwargs:
+        cumap_kwargs = {"n_jobs": n_workers} | cumap_kwargs
+
     vis = Visualizer(
         KDE_bandwidth=KDE_bandwidth,
         celltyping_min_expression=min_expression,
         celltyping_min_distance=min_distance,
         n_components_pca=n_expected_celltypes,
-        umap_kwargs=umap_kwargs | {"n_jobs": n_workers},
-        cumap_kwargs=cumap_kwargs | {"n_jobs": n_workers},
+        umap_kwargs=umap_kwargs,
+        cumap_kwargs=cumap_kwargs,
     )
 
     print("Creating gene expression embeddings for visualization:")
