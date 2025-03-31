@@ -146,7 +146,7 @@ def _plot_embeddings(
         **scatter_kwargs,
     )
 
-    if celltypes is None and celltype_centers is None:
+    if celltypes is not None and celltype_centers is not None:
         text_artists = []
         for i, celltype in enumerate(celltypes):
             if not np.isnan(celltype_centers[i, 0]):
