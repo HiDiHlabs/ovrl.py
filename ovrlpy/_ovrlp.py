@@ -678,13 +678,7 @@ class Visualizer:
             ),
             fit_umap=fit_umap,
         )
-        if fit_umap:
-            # fit_pseudocells calls fit_signature on the gene x gene identity matrix
-            # so we can reuse the assignments as gene assignments
 
-            self.gene_centers = self._coordinate_center(
-                self.celltype_class_assignments, len(self.genes)
-            )
         if signature_matrix is not None:
             self.fit_signatures(signature_matrix)
 
@@ -750,8 +744,7 @@ class Visualizer:
 
             self.colors = _min_to_max(embedding_color.copy())
             self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
-            print("Fitting gene centers")
-            self.fit_signatures()
+
         else:
             self.pca_2d.fit(pseudocell_expression_samples.T)
 
