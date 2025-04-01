@@ -6,7 +6,6 @@ from functools import reduce
 from operator import add
 from typing import Optional, Sequence
 
-import anndata
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -612,11 +611,9 @@ class Visualizer:
 
     def fit_transcripts(
         self,
-        coordinate_df: Optional[pd.DataFrame] = None,
-        adata: Optional[anndata.AnnData] = None,
+        coordinate_df: pd.DataFrame,
         genes=None,
         gene_key: str = "gene",
-        coordinates_key: str = "spatial",
         signature_matrix=None,
         fit_umap: bool = True,
         patch_length: int = 500,
@@ -629,17 +626,12 @@ class Visualizer:
         ----------
         coordinate_df : pandas.DataFrame
             A dataframe of coordinates.
-        adata : anndata.AnnData
-            An AnnData object containing the coordinates.
         genes : list
             A list of genes to utilize in the model. None uses all genes.
         gene_key : str
             The key in the dataframe containing the gene names.
-        coordinates_key : str
-            The key in the dataframe containing the coordinates.
         signature_matrix : pandas.DataFrame
             A matrix of celltypes x gene signatures to use to annotate the UMAP.
-            None defaults to displaying individual genes.
         fit_umap : bool
             Whether to fit the UMAP to the data or not. Requires a lot of memory for
             large datasets.
@@ -650,17 +642,11 @@ class Visualizer:
             The number of workers to use in the SSAM algorithm
         """
 
-        if (coordinate_df is None) and (adata is None):
-            raise ValueError("Either adata or coordinate_df must be provided.")
-
-        if coordinate_df is None:
-            coordinate_df = adata.uns[coordinates_key]
-
         if genes is None:
             genes = sorted(coordinate_df[gene_key].unique())
         self.genes = genes
 
-        adata_ssam = _sample_expression(
+        local_maxima, coordinates = _sample_expression(
             coordinate_df,
             gene_column=gene_key,
             minimum_expression=self.celltyping_min_expression,
@@ -671,11 +657,9 @@ class Visualizer:
             dtype=self.dtype,
         )
 
-        self.pseudocell_locations_x, self.pseudocell_locations_y, _ = adata_ssam.obsm[
-            "spatial"
-        ].T
+        self.pseudocell_locations_x, self.pseudocell_locations_y, _ = coordinates.T
 
-        self.fit_pseudocells(adata_ssam.to_df(), fit_umap=fit_umap)
+        self.fit_pseudocells(local_maxima, fit_umap=fit_umap)
 
         if signature_matrix is not None:
             self.fit_signatures(signature_matrix)

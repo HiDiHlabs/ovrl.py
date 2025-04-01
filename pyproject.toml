@@ -15,7 +15,6 @@ authors = [
     { name = "Sebastian Tiesmeyer", email = "sebastian.tiesmeyer@bih-charite.de" },
 ]
 dependencies = [
-    "anndata>=0.10",
     "matplotlib~=3.8",
     "matplotlib-scalebar",
     "numpy~=1.25",
