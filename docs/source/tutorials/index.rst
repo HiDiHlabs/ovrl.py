@@ -1,11 +1,10 @@
 Tutorials
 =========
 
-We will demonstrate an example usage of ovrlpy on 3 different datasets:
+We will demonstrate an example usage of ovrlpy on 2 different datasets:
 
 - `Xenium Brain <https://www.10xgenomics.com/products/xenium-in-situ/mouse-brain-dataset-explorer>`_
 - `Vizgen liver <https://info.vizgen.com/mouse-liver-data>`_
-- `Vizgen receptor <https://info.vizgen.com/mouse-brain-map>`_
 
 You can find the tutorial notebooks
 `here <https://github.com/HiDiHlabs/ovrl.py/tree/main/docs/source/tutorials>`_.
@@ -22,4 +21,3 @@ You can find the tutorial notebooks
 
    xenium_brain
    vizgen_liver
-   vizgen_receptor
