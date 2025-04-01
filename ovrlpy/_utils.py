@@ -16,6 +16,7 @@ from sklearn.neighbors import NearestNeighbors
 
 from ._patching import _patches, n_patches
 from ._ssam2 import find_local_maxima, kde_2d
+from ._ssam2._utils import _TRUNCATE
 
 SCALEBAR_PARAMS: dict[str, Any] = {"dx": 1, "units": "um"}
 """Default scalebar parameters"""
@@ -333,8 +334,7 @@ def _compute_divergence_patched(
     n_workers: int = 8,
     dtype=np.float32,
 ):
-    # the 4 comes from the default truncate in scipy.ndimage.gaussian_filter
-    padding = int(ceil(4 * KDE_bandwidth))
+    padding = int(ceil(_TRUNCATE * KDE_bandwidth))
 
     n_components = pca_component_matrix.shape[0]
 

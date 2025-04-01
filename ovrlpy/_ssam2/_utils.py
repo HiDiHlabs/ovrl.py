@@ -5,6 +5,8 @@ import numpy as np
 from scipy.ndimage import gaussian_filter
 from skimage.feature import peak_local_max
 
+_TRUNCATE = 4
+
 
 def kde_2d(coordinates: np.ndarray, **kwargs):
     """
@@ -24,7 +26,7 @@ def _kde_nd(
     coordinates: np.ndarray,
     size=None,
     bandwidth: float = 1.5,
-    truncate: float = 4,
+    truncate: float = _TRUNCATE,
     dtype=np.float32,
 ):
     """

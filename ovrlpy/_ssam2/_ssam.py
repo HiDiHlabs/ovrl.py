@@ -7,6 +7,7 @@ import tqdm
 
 from .._patching import _patches, n_patches
 from . import _utils
+from ._utils import _TRUNCATE
 
 
 def _sample_expression(
@@ -91,8 +92,8 @@ def _sample_expression(
     size = vector_field_norm.shape
     del vector_field_norm
 
-    # truncate=4 and bandwidth=1 -> 4*1
-    padding = 4
+    # truncate * bandwidth=1 -> _TRUNCATE * 1
+    padding = _TRUNCATE
 
     print("sampling expression:")
     patches = []
