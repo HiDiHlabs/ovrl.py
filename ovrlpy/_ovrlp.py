@@ -69,8 +69,12 @@ def _assign_xy(
         A dataframe with an x,y coordinate assigned to each row.
 
     """
-    df["x_pixel"] = (df[xy_columns[0]] / grid_size).astype(int)
-    df["y_pixel"] = (df[xy_columns[1]] / grid_size).astype(int)
+    x, y = xy_columns
+    df[x] -= df[x].min()
+    df[y] -= df[y].min()
+
+    df["x_pixel"] = (df[x] / grid_size).astype(int)
+    df["y_pixel"] = (df[y] / grid_size).astype(int)
 
     # assign each pixel a unique id
     df["n_pixel"] = df["x_pixel"] + df["y_pixel"] * df["x_pixel"].max()
