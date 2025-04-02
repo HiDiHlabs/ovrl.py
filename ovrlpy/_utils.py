@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from math import ceil
 from typing import Any
 
@@ -302,24 +302,26 @@ def _create_histogram(
     return hist
 
 
-def _compute_embedding_vectors(df: pd.DataFrame, mask: np.ndarray, factor, **kwargs):
+def _compute_embedding_vectors(
+    df: np.ndarray, mask: np.ndarray, factor: np.ndarray, **kwargs
+):
     if len(df) < 2:
         return None, None
 
     # TODO: what happens if equal?
-    top = df[df[:, 2] > df[:, 3]]
-    bottom = df[df[:, 2] < df[:, 3]]
+    top = df[df[:, 2] > df[:, 3], :2]
+    bottom = df[df[:, 2] < df[:, 3], :2]
 
     if len(top) == 0:
-        signal_top = 0
+        signal_top = None
     else:
-        signal_top = kde_2d(top[:, :2], size=mask.shape, **kwargs)[mask]
-        signal_top = signal_top[:, None] * factor[None]
+        signal_top = kde_2d(top, size=mask.shape, **kwargs)[mask]
+        signal_top = signal_top[:, None] @ factor[None, :]
     if len(bottom) == 0:
-        signal_bottom = 0
+        signal_bottom = None
     else:
-        signal_bottom = kde_2d(bottom[:, :2], size=mask.shape, **kwargs)[mask]
-        signal_bottom = signal_bottom[:, None] * factor[None]
+        signal_bottom = kde_2d(bottom, size=mask.shape, **kwargs)[mask]
+        signal_bottom = signal_bottom[:, None] @ factor[None, :]
 
     return signal_top, signal_bottom
 
@@ -327,7 +329,7 @@ def _compute_embedding_vectors(df: pd.DataFrame, mask: np.ndarray, factor, **kwa
 def _compute_divergence_patched(
     df: pd.DataFrame,
     gene_list: Iterable,
-    pca_component_matrix: np.ndarray,
+    pca_components: np.ndarray,
     min_expression: float = 2,
     KDE_bandwidth: float = 1,
     patch_length: int = 500,
@@ -336,7 +338,8 @@ def _compute_divergence_patched(
 ):
     padding = int(ceil(_TRUNCATE * KDE_bandwidth))
 
-    n_components = pca_component_matrix.shape[0]
+    n_components = pca_components.shape[0]
+    pca_components = pca_components.astype(dtype, copy=False)
 
     signal = kde_2d(df[["x", "y"]].values, bandwidth=KDE_bandwidth, dtype=dtype)
 
@@ -363,31 +366,47 @@ def _compute_divergence_patched(
             patch_embedding_top = np.zeros((n_pixels, n_components), dtype=dtype)
             patch_embedding_bottom = np.zeros((n_pixels, n_components), dtype=dtype)
 
-            df_gene_grouped = patch_df.groupby("gene", observed=False).apply(
-                lambda x: x[["x", "y", "z", "z_delim"]].values
-            )
+            gene_coords = {
+                gene: df.to_numpy()
+                for gene, df in patch_df.groupby("gene", observed=True)[
+                    ["x", "y", "z", "z_delim"]
+                ]
+            }
 
-            fs = set(
-                executor.submit(
-                    _compute_embedding_vectors,
-                    df_gene_grouped.loc[gene],
-                    patch_signal_mask,
-                    pca_component_matrix[:, i],
-                    bandwidth=KDE_bandwidth,
-                    dtype=dtype,
-                )
-                for i, gene in enumerate(gene_list)
-            )
+            # ensure that there are not too many results stored but also hopefully not too many workers idling
+            n_tasks = 2 * n_workers
+            futures = set()
+            genes = list(enumerate(gene_list))
+            while True:
+                futures = wait(futures, return_when=FIRST_COMPLETED)
+                done = futures.done
+                futures = futures.not_done
+                # submit a new batch of tasks
+                while len(futures) < n_tasks and len(genes) > 0:
+                    i, gene = genes.pop()
+                    if gene not in gene_coords:
+                        continue
+                    futures.add(
+                        executor.submit(
+                            _compute_embedding_vectors,
+                            gene_coords.pop(gene),
+                            patch_signal_mask,
+                            pca_components[:, i],
+                            bandwidth=KDE_bandwidth,
+                            dtype=dtype,
+                        )
+                    )
+                # process finished tasks
+                for future in done:
+                    top_, bottom_ = future.result()
+                    if top_ is not None:
+                        patch_embedding_top += top_
+                    if bottom_ is not None:
+                        patch_embedding_bottom += bottom_
+                del done
 
-            for f in as_completed(fs):
-                top_, bottom_ = f.result()
-
-                if top_ is not None:
-                    assert bottom_ is not None
-                    patch_embedding_top += top_
-                    patch_embedding_bottom += bottom_
-
-                fs.remove(f)
+                if len(futures) == 0:
+                    break
 
             patch_norm_top = np.linalg.norm(patch_embedding_top, axis=1)
             patch_norm_bottom = np.linalg.norm(patch_embedding_bottom, axis=1)
