@@ -1,5 +1,5 @@
 import os
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from pathlib import Path
 
 import pandas as pd
@@ -117,5 +117,49 @@ def read_MERFISH(
 
     # convert plane to um
     transcripts["z"] *= z_scale
+
+    return transcripts
+
+
+# Nanostring CosMx
+_COSMX_COLUMNS = {"target": "gene", "x_global_px": "x", "y_global_px": "y", "z": "z"}
+
+COSMX_CTRLS = ["^NegPrb"]
+"""Patterns for CosMx controls"""
+
+
+def read_CosMx(
+    filepath: str | os.PathLike,
+    scale: Mapping[str, float] = {"xy": 0.12028, "z": 0.8},
+    *,
+    remove_targets: Collection[str] = COSMX_CTRLS,
+) -> pd.DataFrame:
+    """
+    Read a Nanostring CosMx transcripts file.
+
+    Parameters
+    ----------
+    filepath : os.PathLike or str
+        Path to the CosMx transcripts file.
+    scale : collections.abc.Mapping[str, float]
+        The factors for scaling the coordinates from pixel space to um.
+    remove_targets : collections.abc.Collection[str], optional
+        List of regex patterns to filter the 'target' column,
+        :py:attr:`ovrlpy.io.COSMX_CTRLS` by default.
+
+    Returns
+    -------
+    pandas.DataFrame
+    """
+
+    transcripts = pd.read_csv(
+        Path(filepath), usecols=_COSMX_COLUMNS.keys(), dtype={"target": "category"}
+    ).rename(columns=_COSMX_COLUMNS)
+
+    transcripts = _filter_genes(transcripts, remove_targets)
+
+    # convert pixel to um
+    transcripts[["x", "y"]] *= scale["xy"]
+    transcripts["z"] *= scale["z"]
 
     return transcripts
