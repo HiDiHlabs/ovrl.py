@@ -637,8 +637,7 @@ class Visualizer:
         signature_matrix : pandas.DataFrame
             A matrix of celltypes x gene signatures to use to annotate the UMAP.
         fit_umap : bool
-            Whether to fit the UMAP to the data or not. Requires a lot of memory for
-            large datasets.
+            Whether to fit the UMAP to the data.
         patch_length : int
             Size of the length in each dimension when calculating signal integrity in patches.
             Smaller values will use less memory, but may take longer to compute.
@@ -698,8 +697,7 @@ class Visualizer:
         genes : list, optional
             A list of genes to utilize in the model.
         fit_umap : bool
-            Whether to fit the UMAP to the data or not. Requires a lot of memory for
-            large datasets.
+            Whether to fit the UMAP to the data.
         """
 
         self.pseudocell_expression_samples = pseudocell_expression_samples
@@ -1351,8 +1349,7 @@ def run(
     signature_matrix : pandas.DataFrame, optional
         A celltypes x gene table of expression signatures to use to annotate the UMAP.
     fit_umap : bool
-        Whether to fit the UMAP to the data or not. Requires a lot of memory for
-        large datasets.
+        Whether to fit the UMAP to the data.
     patch_length : int
         Size of the length in each dimension when calculating signal integrity in patches.
         Smaller values will use less memory, but may take longer to compute.
