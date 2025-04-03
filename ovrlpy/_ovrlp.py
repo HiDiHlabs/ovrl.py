@@ -1321,7 +1321,7 @@ def run(
     signature_matrix=None,
     fit_umap: bool = True,
     patch_length: int = 500,
-    n_workers: int = len(os.sched_getaffinity(0)),
+    n_workers: int = min(8, len(os.sched_getaffinity(0))),
     umap_kwargs=UMAP_2D_PARAMS,
     cumap_kwargs=UMAP_RGB_PARAMS,
 ):
