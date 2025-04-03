@@ -86,7 +86,10 @@ MERFISH_CTRLS = ["^Blank"]
 
 
 def read_MERFISH(
-    filepath: str | os.PathLike, *, remove_genes: Collection[str] = MERFISH_CTRLS
+    filepath: str | os.PathLike,
+    z_scale: float = 1.5,
+    *,
+    remove_genes: Collection[str] = MERFISH_CTRLS,
 ) -> pd.DataFrame:
     """
     Read a Vizgen transcripts file.
@@ -95,6 +98,8 @@ def read_MERFISH(
     ----------
     filepath : os.PathLike or str
         Path to the Vizgen transcripts file.
+    z_scale : float
+        Factor to scale z-plane index to um, i.e. distance between z-planes.
     remove_genes : collections.abc.Collection[str], optional
         List of regex patterns to filter the 'gene' column,
         :py:attr:`ovrlpy.io.MERFISH_CTRLS` by default.
@@ -105,11 +110,12 @@ def read_MERFISH(
     """
 
     transcripts = pd.read_csv(
-        Path(filepath),
-        usecols=list(_MERFISH_COLUMNS.keys()),
-        dtype={"gene": "category"},
+        Path(filepath), usecols=_MERFISH_COLUMNS.keys(), dtype={"gene": "category"}
     ).rename(columns=_MERFISH_COLUMNS)
 
     transcripts = _filter_genes(transcripts, remove_genes)
+
+    # convert plane to um
+    transcripts["z"] *= z_scale
 
     return transcripts
