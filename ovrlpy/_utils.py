@@ -316,12 +316,12 @@ def _compute_embedding_vectors(
         signal_top = None
     else:
         signal_top = kde_2d(top, size=mask.shape, **kwargs)[mask]
-        signal_top = signal_top[:, None] @ factor[None, :]
+        signal_top = signal_top[:, None] * factor[None, :]
     if len(bottom) == 0:
         signal_bottom = None
     else:
         signal_bottom = kde_2d(bottom, size=mask.shape, **kwargs)[mask]
-        signal_bottom = signal_bottom[:, None] @ factor[None, :]
+        signal_bottom = signal_bottom[:, None] * factor[None, :]
 
     return signal_top, signal_bottom
 
