@@ -1,29 +1,34 @@
 ### utils file with basic functions needed for the SSAM algorithm.
 
-from typing import Optional
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
 from skimage.feature import peak_local_max
 
+_TRUNCATE = 4
 
-def kde_2d(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
+
+def kde_2d(coordinates: np.ndarray, **kwargs):
     """
     Create a histogram of the data.
     """
+    return _kde_nd(coordinates[:, :2], **kwargs)
 
-    return _kde_nd(coordinates[:, :2], size=size, bandwidth=bandwidth)
 
-
-def kde_3d(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
+def kde_3d(coordinates: np.ndarray, **kwargs):
     """
     Create a histogram of the data.
     """
+    return _kde_nd(coordinates[:, :3], **kwargs)
 
-    return _kde_nd(coordinates[:, :3], size=size, bandwidth=bandwidth)
 
-
-def _kde_nd(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
+def _kde_nd(
+    coordinates: np.ndarray,
+    size=None,
+    bandwidth: float = 1.5,
+    truncate: float = _TRUNCATE,
+    dtype=np.float32,
+):
     """
     Create a histogram of the data.
     """
@@ -32,12 +37,12 @@ def _kde_nd(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
         if size is None:
             raise ValueError("If no coordinates are provided, size must be provided.")
         else:
-            return np.zeros(size)
+            return np.zeros(size, dtype=dtype)
 
     if size is None:
-        size = np.ceil(np.max(coordinates, axis=0)).astype(int)
+        size = np.floor(np.max(coordinates, axis=0) + 1).astype(int)
 
-    output = np.zeros(size)
+    output = np.zeros(size, dtype=dtype)
 
     dim_bins = list()
     for i in range(coordinates.shape[1]):
@@ -49,7 +54,9 @@ def _kde_nd(coordinates: np.ndarray, size=None, bandwidth: float = 1.5):
         [coordinates[:, i] for i in range(coordinates.shape[1])], bins=dim_bins
     )
 
-    kde = gaussian_filter(histogram, sigma=bandwidth)
+    kde = gaussian_filter(
+        histogram, sigma=bandwidth, truncate=truncate, mode="constant", output=dtype
+    )
 
     output[
         tuple(slice(int(bins[i].min()), int(bins[i].max())) for i in range(len(bins)))
@@ -74,20 +81,14 @@ def find_local_maxima(
     return local_maxima
 
 
-def kde_and_sample(
-    coordinates: np.ndarray,
-    sampling_coordinates: np.ndarray,
-    size: Optional[tuple[int, ...]] = None,
-    bandwidth: float = 1.5,
-):
+def kde_and_sample(coordinates: np.ndarray, sampling_coordinates: np.ndarray, **kwargs):
     """
     Create a kde of the data and sample at 'sampling_coordinates'.
     """
 
     sampling_coordinates = np.round(sampling_coordinates).astype(int)
-
-    kde = _kde_nd(coordinates, size=size, bandwidth=bandwidth)
     n_dims = sampling_coordinates.shape[1]
-    output = kde[tuple(sampling_coordinates[:, i] for i in range(n_dims))]
 
-    return output
+    kde = _kde_nd(coordinates, **kwargs)
+
+    return kde[tuple(sampling_coordinates[:, i] for i in range(n_dims))]

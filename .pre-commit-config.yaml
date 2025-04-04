@@ -19,6 +19,5 @@ repos:
     hooks:
       # Linter
       - id: ruff
-        args: [--fix, --extend-select=I]
       # Formatter
       - id: ruff-format

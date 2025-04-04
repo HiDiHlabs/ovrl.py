@@ -1,11 +1,11 @@
 """This is a package to detect overlapping cells in a 2D spatial transcriptomics sample."""
 
+import os
 import warnings
 from functools import reduce
 from operator import add
 from typing import Optional, Sequence
 
-import anndata
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -19,7 +19,8 @@ from sklearn.decomposition import PCA
 from ._ssam2 import _sample_expression
 from ._utils import (
     SCALEBAR_PARAMS,
-    _compute_divergence_patched,
+    UMAP_2D_PARAMS,
+    UMAP_RGB_PARAMS,
     _create_histogram,
     _create_knn_graph,
     _determine_localmax_and_sample,
@@ -30,6 +31,7 @@ from ._utils import (
     _plot_embeddings,
     _plot_scalebar,
     _transform_embeddings,
+    compute_VSI,
 )
 
 _BIH_CMAP = LinearSegmentedColormap.from_list(
@@ -50,7 +52,7 @@ def _assign_xy(
     df: pd.DataFrame, xy_columns: Sequence[str] = ["x", "y"], grid_size: int = 1
 ):
     """
-    Assigns an x,y coordinate to a pd.DataFrame of coordinates.
+    Assigns an x,y coordinate to a DataFrame of coordinates.
 
     Parameters
     ----------
@@ -67,8 +69,12 @@ def _assign_xy(
         A dataframe with an x,y coordinate assigned to each row.
 
     """
-    df["x_pixel"] = (df[xy_columns[0]] / grid_size).astype(int)
-    df["y_pixel"] = (df[xy_columns[1]] / grid_size).astype(int)
+    x, y = xy_columns
+    df[x] -= df[x].min()
+    df[y] -= df[y].min()
+
+    df["x_pixel"] = (df[x] / grid_size).astype(int)
+    df["y_pixel"] = (df[y] / grid_size).astype(int)
 
     # assign each pixel a unique id
     df["n_pixel"] = df["x_pixel"] + df["y_pixel"] * df["x_pixel"].max()
@@ -78,7 +84,7 @@ def _assign_xy(
 
 def _assign_z_median(df: pd.DataFrame, z_column: str = "z"):
     """
-    Assigns a z-coordinate to a pd.DataFrame of coordinates.
+    Assigns a z-coordinate to a DataFrame of coordinates.
 
     Parameters
     ----------
@@ -110,7 +116,7 @@ def _assign_z_mean_message_passing(
     rounds: int = 3,
 ):
     """
-    Assigns a z-coordinate to a pd.DataFrame of coordinates.
+    Assigns a z-coordinate to a DataFrame of coordinates.
 
     Parameters
     ----------
@@ -166,7 +172,7 @@ def _assign_z_mean_message_passing(
 
 def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
     """
-    Assigns a z-coordinate to a pd.DataFrame of coordinates.
+    Assigns a z-coordinate to a DataFrame of coordinates.
 
     Parameters
     ----------
@@ -194,44 +200,51 @@ def _assign_z_mean(df: pd.DataFrame, z_column: str = "z"):
 def pre_process_coordinates(
     coordinate_df: pd.DataFrame,
     grid_size: int = 1,
+    coordinates: tuple[str, str, str] = ("x", "y", "z"),
     use_message_passing: bool = True,
     measure: str = "mean",
     inplace: bool = True,
+    **kwargs,
 ) -> pd.DataFrame:
     """Runs the pre-processing routine of the coordinate dataframe.
+
     It assigns x,y coordinate pixels to all molecules in the data frame and determines a z-coordinate-center for each pixel.
 
-    Parameters:
-    -----------
-    coordinate_df (pandas.DataFrame):
+    Parameters
+    ----------
+    coordinate_df : pandas.DataFrame
         A dataframe of coordinates.
-    grid_size (int, optional):
+    grid_size : int, optional
         The size of the pixel grid. Defaults to 1.
-    use_message_passing (bool, optional):
+    coordinates : tuple[str, str, str], optional
+        Name of the coordinate columns.
+    use_message_passing : bool, optional
         Whether to use message passing to determine the z-dimension delimiter. Defaults to True.
-    measure (str, optional):
+    measure : str, optional
         The measure to use to determine the z-dimension delimiter. Defaults to 'mean'. Other option is 'median'.
-    inplace (bool, optional):
+    inplace : bool, optional
         Whether to modify the input dataframe or return a copy. Defaults to True.
 
-    Returns:
-    --------
-    pandas.DataFrame: A dataframe with added x_pixel, y_pixel and z_delim columns.
+    Returns
+    -------
+    pandas.DataFrame:
+        A dataframe with added x_pixel, y_pixel and z_delim columns.
     """
+    *xy, z = coordinates
 
     if not inplace:
         coordinate_df = coordinate_df.copy()
 
-    _assign_xy(coordinate_df, grid_size=grid_size)
+    _assign_xy(coordinate_df, xy_columns=xy, grid_size=grid_size)
 
     if use_message_passing:
-        _assign_z_mean_message_passing(coordinate_df)
+        _assign_z_mean_message_passing(coordinate_df, z_column=z, **kwargs)
 
     else:
         if measure == "mean":
-            _assign_z_mean(coordinate_df)
+            _assign_z_mean(coordinate_df, z_column=z)
         elif measure == "median":
-            _assign_z_median(coordinate_df)
+            _assign_z_median(coordinate_df, z_column=z)
         else:
             raise ValueError("measure must be either 'mean' or 'median'")
 
@@ -277,11 +290,11 @@ def get_pseudocell_locations(
         df, genes=genes, min_expression=min_expression, KDE_bandwidth=KDE_bandwidth
     )
 
-    pseudocell_locations_x, pseudocells_y, _ = _determine_localmax_and_sample(
+    x, y, _ = _determine_localmax_and_sample(
         hist, min_distance=min_distance, min_expression=min_expression
     )
 
-    return pseudocell_locations_x, pseudocells_y
+    return x, y
 
 
 def sample_expression_at_xy(
@@ -348,21 +361,21 @@ def plot_signal_integrity(
 
     Parameters
     ----------
-        integrity : np.ndarray
-            Integrity map obtained from ovrlpy analysis
-        signal : np.ndarray
-            Signal map from ovrlpy analysis
-        signal_threshold : float, optional
-            Threshold below which the signal is faded out in the plot,
-            to avoid displaying noisy areas with low predictive confidence.
-        cmap : str, matplotlib.colors.cmap, optional
-            Colormap for display.
-        plot_hist : bool, optional
-            Whether to plot a histogram of integrity values alongside the map.
-        scalebar : dict[str, typing.Any] | None
-            If `None` no scalebar will be plotted. Otherwise a dictionary with
-            additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
-            By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
+    integrity : numpy.ndarray
+        Integrity map obtained from ovrlpy analysis
+    signal : numpy.ndarray
+        Signal map from ovrlpy analysis
+    signal_threshold : float, optional
+        Threshold below which the signal is faded out in the plot,
+        to avoid displaying noisy areas with low predictive confidence.
+    cmap : str | matplotlib.colors.Colormap, optional
+        Colormap for display.
+    plot_hist : bool, optional
+        Whether to plot a histogram of integrity values alongside the map.
+    scalebar : dict[str, typing.Any] | None
+        If `None` no scalebar will be plotted. Otherwise a dictionary with
+        additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
+        By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
     """
 
     figure_aspect_ratio = integrity.shape[0] / integrity.shape[1]
@@ -436,19 +449,19 @@ def detect_doublets(
 
     Parameters
     ----------
-        integrity_map : np.ndarray
-            Pixel map of signal integrity obtained from ovrlpy analysis
-        signal_map : np.ndarray
-            Signal strength map from ovrlpy analysis
-        min_distance : int, optional
-            Minimum distance between reported peaks
-        integrity_threshold : float, optional
-            Threhold of signal integrity value. A peak with an signal integrity > integrity_threshold is not considered.
-        minimum_signal_strength : float, optional
-            Minimum signal value for a peak to be considered
-        integrity_sigma : float, optional
-            Optional sigma value for gaussian filtering of the integrity map,
-            which leads to the detection of overlap regions with larger spatial extent.
+    integrity_map : numpy.ndarray
+        Pixel map of signal integrity obtained from ovrlpy analysis
+    signal_map : numpy.ndarray
+        Signal strength map from ovrlpy analysis
+    min_distance : int, optional
+        Minimum distance between reported peaks
+    integrity_threshold : float, optional
+        Threhold of signal integrity value. A peak with an signal integrity > integrity_threshold is not considered.
+    minimum_signal_strength : float, optional
+        Minimum signal value for a peak to be considered
+    integrity_sigma : float, optional
+        Optional sigma value for gaussian filtering of the integrity map,
+        which leads to the detection of overlap regions with larger spatial extent.
     """
 
     if integrity_sigma is not None:
@@ -475,14 +488,17 @@ def detect_doublets(
     return doublet_df
 
 
-def _determine_celltype_class_assignments(expression_samples, signature_matrix):
-    expression_samples_ = expression_samples.copy().loc[signature_matrix.index]
+def _determine_celltype_class_assignments(
+    samples: pd.DataFrame, signatures: pd.DataFrame
+):
+    samples = samples.loc[:, signatures.columns]
+    signature_mtx = signatures.to_numpy()
+    # TODO: this is quite inefficient?
+    # it calculates all pairwise correlation coefficients even if not needed.
     correlations = np.array(
         [
-            np.corrcoef(expression_samples_.iloc[:, i], signature_matrix.values.T)[
-                0, 1:
-            ]
-            for i in range(expression_samples.shape[1])
+            np.corrcoef(samples.iloc[i, :], signature_mtx)[0, 1:]
+            for i in range(samples.shape[0])
         ]
     )
     return np.argmax(correlations, -1)
@@ -490,23 +506,25 @@ def _determine_celltype_class_assignments(expression_samples, signature_matrix):
 
 class Visualizer:
     """
-        A class to visualize spatial transcriptomics data.
-        Contains a latent gene expression UMAP and RGB embedding.
+    A class to visualize spatial transcriptomics data.
+    Contains a latent gene expression UMAP and RGB embedding.
 
     Parameters
-        ----------
-        KDE_bandwidth : float, optional
-            The bandwidth of the KDE.
-        celltyping_min_expression : int, optional
-            Minimum expression level for cell typing.
-        celltyping_min_distance : int, optional
-            Minimum distance for cell typing.
-        n_components_pca : float, optional
-            Number of components for PCA.
-        umap_kwargs : dict, optional
-            Keyword arguments for 2D UMAP embedding.
-        cumap_kwargs : dict, optional
-            Keyword arguments for 3D UMAP embedding.
+    ----------
+    KDE_bandwidth : float, optional
+        The bandwidth of the KDE.
+    celltyping_min_expression : int, optional
+        Minimum expression level for cell typing.
+    celltyping_min_distance : int, optional
+        Minimum distance for cell typing.
+    n_components_pca : float, optional
+        Number of components for PCA.
+    dtype
+        Datatype for the KDE.
+    umap_kwargs : dict, optional
+        Keyword arguments for 2D UMAP embedding.
+    cumap_kwargs : dict, optional
+        Keyword arguments for 3D UMAP embedding.
 
     Attributes
     ----------
@@ -516,23 +534,23 @@ class Visualizer:
         Minimum expression level for cell typing.
     celltyping_min_distance : int
         Minimum distance for cell typing.
-    pseudocell_locations_x : np.ndarray
+    pseudocell_locations_x : numpy.ndarray
         x-coordinates of cell typing regions of interest obtained through gene expression localmax sampling.
-    pseudocell_locations_y : np.ndarray
+    pseudocell_locations_y : numpy.ndarray
         y-coordinates of cell typing regions of interest obtained through gene expression localmax sampling.
-    pseudocell_expression_samples : pd.DataFrame
+    pseudocell_expression_samples : pandas.DataFrame
         Gene expression matrix of the cell typing regions of interest.
-    signatures : pd.DataFrame
+    signatures : pandas.DataFrame
         A matrix of celltypes x gene signatures to use to annotate the UMAP.
-    celltype_centers : np.ndarray
+    celltype_centers : numpy.ndarray
         The center of gravity of each celltype in the 2d embedding, used for UMAP annotation.
-    celltype_class_assignments : np.ndarray
+    celltype_class_assignments : numpy.ndarray
         The class assignments of the cell types.
-    pca_2d : PCA
+    pca_2d : sklearn.decomposition.PCA
         The PCA object used for the 2d embedding.
     embedder_2d : umap.UMAP
         The UMAP object used for the 2d embedding.
-    pca_3d : PCA
+    pca_3d : sklearn.decomposition.PCA
         The PCA object used for the 3d RGB embedding.
     embedder_3d : umap.UMAP
         The UMAP object used for the 3d RGB embedding.
@@ -544,15 +562,15 @@ class Visualizer:
         Keyword arguments for 3D UMAP RGB embedding object.
     genes : list
         A list of genes to utilize in the model.
-    embedding : np.ndarray
+    embedding : numpy.ndarray
         The 2d embedding of pseudocell gene expression .
-    colors : np.ndarray
+    colors : numpy.ndarray
         The RGB embedding.
     colors_min_max : list
         The minimum and maximum values of the RGB embedding, necessary for normalization of the transform method.
-    integrity_map : np.ndarray
+    integrity_map : numpy.ndarray
         The integrity map of the tissue.
-    signal_map : np.ndarray
+    signal_map : numpy.ndarray
         A pixel map of overall signal strength in the tissue, used to mask out low-signal regions that are difficult to interpret.
     """
 
@@ -562,23 +580,12 @@ class Visualizer:
         celltyping_min_expression=10,
         celltyping_min_distance=5,
         n_components_pca=0.7,
-        umap_kwargs={
-            "n_components": 2,
-            "min_dist": 0.0,
-            "n_neighbors": 20,
-            "random_state": 42,
-            "n_jobs": 1,
-        },
-        cumap_kwargs={
-            "n_components": 3,
-            "min_dist": 0.0,
-            "metric": "euclidean",
-            "n_neighbors": 20,
-            "random_state": 42,
-            "n_jobs": 1,
-        },
+        dtype=np.float32,
+        umap_kwargs=UMAP_2D_PARAMS,
+        cumap_kwargs=UMAP_RGB_PARAMS,
     ) -> None:
         self.KDE_bandwidth = KDE_bandwidth
+        self.dtype = dtype
 
         self.celltyping_min_expression = celltyping_min_expression
         self.celltyping_min_distance = celltyping_min_distance
@@ -608,13 +615,13 @@ class Visualizer:
 
     def fit_transcripts(
         self,
-        coordinate_df: Optional[pd.DataFrame] = None,
-        adata: Optional[anndata.AnnData] = None,
+        coordinate_df: pd.DataFrame,
         genes=None,
         gene_key: str = "gene",
-        coordinates_key: str = "spatial",
         signature_matrix=None,
-        n_workers: int = 32,
+        fit_umap: bool = True,
+        patch_length: int = 500,
+        n_workers: int = 8,
     ):
         """
         Fits the visualizer to a spatial transcripts dataset using the SSAM algorithm.
@@ -623,136 +630,107 @@ class Visualizer:
         ----------
         coordinate_df : pandas.DataFrame
             A dataframe of coordinates.
-        adata : anndata.AnnData
-            An AnnData object containing the coordinates.
         genes : list
             A list of genes to utilize in the model. None uses all genes.
         gene_key : str
             The key in the dataframe containing the gene names.
-        coordinates_key : str
-            The key in the dataframe containing the coordinates.
         signature_matrix : pandas.DataFrame
             A matrix of celltypes x gene signatures to use to annotate the UMAP.
-            None defaults to displaying individual genes.
+        fit_umap : bool
+            Whether to fit the UMAP to the data.
+        patch_length : int
+            Size of the length in each dimension when calculating signal integrity in patches.
+            Smaller values will use less memory, but may take longer to compute.
         n_workers : int
             The number of workers to use in the SSAM algorithm
         """
 
-        if (coordinate_df is None) and (adata is None):
-            raise ValueError("Either adata or coordinate_df must be provided.")
-
-        if coordinate_df is None:
-            coordinate_df = adata.uns[coordinates_key]
-
         if genes is None:
             genes = sorted(coordinate_df[gene_key].unique())
-
         self.genes = genes
 
-        if signature_matrix is None:
-            signature_matrix = pd.DataFrame(
-                np.eye(len(genes)), index=genes, columns=genes
-            ).astype(float)
-            signature_matrix[:] = np.eye(len(genes))
-
-        self.signatures = signature_matrix
-
-        adata_ssam = _sample_expression(
+        local_maxima, coordinates = _sample_expression(
             coordinate_df,
             gene_column=gene_key,
             minimum_expression=self.celltyping_min_expression,
             kde_bandwidth=self.KDE_bandwidth,
             n_workers=n_workers,
             min_pixel_distance=self.celltyping_min_distance,
+            patch_length=patch_length,
+            dtype=self.dtype,
         )
 
-        self.pseudocell_locations_x, self.pseudocell_locations_y, _ = adata_ssam.obsm[
-            "spatial"
-        ].T
+        self.pseudocell_locations_x, self.pseudocell_locations_y, _ = coordinates.T
 
-        self.pseudocell_expression_samples = pd.DataFrame(
-            adata_ssam.X.T, columns=adata_ssam.obs_names, index=adata_ssam.var_names
-        )
-        self.pca_2d = PCA(
-            n_components=min(
-                self.n_components_pca, self.pseudocell_expression_samples.shape[0] // 2
-            )
-        )
-        factors = self.pca_2d.fit_transform(self.pseudocell_expression_samples.T)
+        self.fit_pseudocells(local_maxima, fit_umap=fit_umap)
 
-        print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
+        if signature_matrix is not None:
+            self.fit_signatures(signature_matrix)
 
-        self.embedder_2d = umap.UMAP(**self.umap_kwargs)
-        self.embedding = self.embedder_2d.fit_transform(factors)
-
-        self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-        embedding_color = self.embedder_3d.fit_transform(
-            factors / norm(factors, axis=1)[..., None]
-        )
-
-        embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
-
-        self.colors = _min_to_max(embedding_color.copy())
-        self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
-
-        self.fit_signatures(signature_matrix)
-
-        gene_assignments = _determine_celltype_class_assignments(
-            self.pseudocell_expression_samples,
-            pd.DataFrame(np.eye(len(genes)), index=genes, columns=genes).astype(float),
-        )
-
-        # determine the center of gravity of each celltype in the embedding:
-        self.gene_centers = np.array(
+    def _coordinate_center(self, assignments: np.ndarray, n: int):
+        # determine the center of gravity of each assignment (celltype or gene)
+        # in the embedding
+        return np.array(
             [
                 (
-                    np.median(self.embedding[gene_assignments == i, :], axis=0)
-                    if (gene_assignments == i).sum() > 0
+                    np.median(self.embedding[assignments == i, :], axis=0)
+                    if (assignments == i).sum() > 0
                     else (np.nan, np.nan)
                 )
-                for i in range(len(self.genes))
+                for i in range(n)
             ]
         )
 
     def fit_pseudocells(
-        self, pseudocell_expression_samples: pd.DataFrame, genes: list = None
+        self,
+        pseudocell_expression_samples: pd.DataFrame,
+        *,
+        genes: list = None,
+        fit_umap: bool = True,
     ):
-        """fits the visualizer to a given pseudocell expression sample.
+        """Fits the visualizer to a given pseudocell expression sample.
 
-        Args:
-            pseudocell_expression_samples (pandas.DataFrame): A gene x cell matrix of gene expression
-            genes (list, optional): A list of genes to utilize in the model. Defaults to None.
+        Parameters
+        ----------
+        pseudocell_expression_samples : pandas.DataFrame
+            A cell x gene matrix of gene expression
+        genes : list, optional
+            A list of genes to utilize in the model.
+        fit_umap : bool
+            Whether to fit the UMAP to the data.
         """
 
         self.pseudocell_expression_samples = pseudocell_expression_samples
 
         if genes is None:
-            genes = pseudocell_expression_samples.index
+            genes = pseudocell_expression_samples.columns
         self.genes = genes
 
         self.pca_2d = PCA(
             n_components=min(
-                self.n_components_pca, pseudocell_expression_samples.shape[0] // 2
+                self.n_components_pca, pseudocell_expression_samples.shape[1] // 2
             )
         )
-        factors = self.pca_2d.fit_transform(pseudocell_expression_samples.T)
+        if fit_umap:
+            factors = self.pca_2d.fit_transform(pseudocell_expression_samples)
 
-        print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
+            print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
 
-        self.embedder_2d = umap.UMAP(**self.umap_kwargs)
-        self.embedding = self.embedder_2d.fit_transform(factors)
+            self.embedder_2d = umap.UMAP(**self.umap_kwargs)
+            self.embedding = self.embedder_2d.fit_transform(factors)
 
-        self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
-        embedding_color = self.embedder_3d.fit_transform(
-            factors / norm(factors, axis=1)[..., None]
-        )
+            self.embedder_3d = umap.UMAP(**self.cumap_kwargs)
+            embedding_color = self.embedder_3d.fit_transform(
+                factors / norm(factors, axis=1)[..., None]
+            )
 
-        embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
+            embedding_color, self.pca_3d = _fill_color_axes(embedding_color)
 
-        self.colors = _min_to_max(embedding_color.copy())
-        self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
+            self.colors = _min_to_max(embedding_color.copy())
+            self.colors_min_max = [embedding_color.min(0), embedding_color.max(0)]
 
-        self.fit_signatures()
+        else:
+            self.pca_2d.fit(pseudocell_expression_samples)
 
     def fit_signatures(self, signature_matrix=None):
         """
@@ -767,25 +745,20 @@ class Visualizer:
 
         if signature_matrix is None:
             signature_matrix = pd.DataFrame(
-                np.eye(len(self.genes)), index=self.genes, columns=self.genes
-            ).astype(float)
-            signature_matrix[:] = np.eye(len(self.genes))
+                np.eye(len(self.genes), dtype=self.dtype),
+                index=self.genes,
+                columns=self.genes,
+            )
 
         self.signatures = signature_matrix
-        celltypes = sorted(signature_matrix.columns)
 
         self.celltype_class_assignments = _determine_celltype_class_assignments(
             self.pseudocell_expression_samples, signature_matrix
         )
 
         # determine the center of gravity of each celltype in the embedding:
-        self.celltype_centers = np.array(
-            [
-                np.median(
-                    self.embedding[self.celltype_class_assignments == i, :], axis=0
-                )
-                for i in range(len(celltypes))
-            ]
+        self.celltype_centers = self._coordinate_center(
+            self.celltype_class_assignments, len(signature_matrix.columns)
         )
 
     def subsample_df(self, x, y, coordinate_df: pd.DataFrame, window_size: int = 30):
@@ -823,48 +796,30 @@ class Visualizer:
             Data frame of gene-annotated molecule coordinates to transform.
         """
 
-        genes = self.genes
-
-        subsample = coordinate_df
-
         distances, neighbor_indices = _create_knn_graph(
-            subsample[["x", "y", "z"]].values, k=90
+            coordinate_df[["x", "y", "z"]].values, k=90
         )
         local_expression = _get_knn_expression(
             distances,
             neighbor_indices,
-            genes,
-            subsample.gene.cat.codes.values,
+            self.genes,
+            coordinate_df["gene"].cat.codes.values,
             bandwidth=self.KDE_bandwidth,
         )
         local_expression /= (local_expression**2).sum(0) ** 0.5
-        subsample_embedding, subsample_embedding_color = _transform_embeddings(
-            local_expression.T.values,
-            self.pca_2d,
-            embedder_2d=self.embedder_2d,
-            embedder_3d=self.embedder_3d,
-        )
-        subsample_embedding_color, _ = _fill_color_axes(
-            subsample_embedding_color, self.pca_3d
-        )
-        color_min, color_max = self.colors_min_max
-        subsample_embedding_color = (subsample_embedding_color - color_min) / (
-            color_max - color_min
-        )
-        subsample_embedding_color = np.clip(subsample_embedding_color, 0, 1)
-
-        return subsample_embedding, subsample_embedding_color
+        return self.transform_pseudocells(local_expression.T)
 
     def transform_pseudocells(self, pseudocell_expression_samples: pd.DataFrame):
         """Transforms a matrix of gene expression to the visualizer's 2d and 3d embedding space.
 
-        Args:
-            pseudocell_expression_samples (pd.DataFrame): A gene x cell matrix of gene expression
+        Parameters
+        ----------
+        pseudocell_expression_samples : pandas.DataFrame
+            A cell x gene matrix of gene expression
         """
 
-        print(pseudocell_expression_samples)
         subsample_embedding, subsample_embedding_color = _transform_embeddings(
-            pseudocell_expression_samples.T.values,
+            pseudocell_expression_samples.to_numpy(),
             self.pca_2d,
             embedder_2d=self.embedder_2d,
             embedder_3d=self.embedder_3d,
@@ -886,7 +841,7 @@ class Visualizer:
         tissue's determined pseudo-cells.
 
         Returns
-        ----------
+        -------
         pandas.DataFrame
         """
         pseudocell_df = pd.DataFrame(
@@ -1082,18 +1037,18 @@ class Visualizer:
 
         Parameters
         ----------
-        ax : Optional[matplotlib.axes.Axes]
-            axis object to plot on.
+        ax : typing.Optional[matplotlib.axes.Axes]
+            Axis object to plot on.
         rasterized : bool, optional
             If True the plot will be rasterized.
         kwargs
-            Keyword arguments for the matplotlib's scatter plot function.
+            Keyword arguments for :py:func:`matplotlib.pyplot.scatter`.
         """
         _plot_embeddings(
             self.embedding,
             self.colors,
             self.celltype_centers,
-            self.signatures.columns,
+            None if self.signatures is None else self.signatures.index,
             rasterized,
             ax,
             **kwargs,
@@ -1166,181 +1121,6 @@ class Visualizer:
         plt.subplot(122)
         self.plot_tissue(rasterized=rasterized, **tissue_kwargs)
 
-    def save(self, path: str):
-        """
-        Stores the visualizer and its attributes in an h5ad file.
-
-        Parameters
-        ----------
-        path : str
-            The path to the file.
-        """
-
-        import base64
-        import pickle
-
-        adata = anndata.AnnData(
-            X=self.pseudocell_expression_samples.T.values,
-            obs=pd.DataFrame(index=range(self.pseudocell_expression_samples.shape[1])),
-            var=pd.DataFrame(index=self.pseudocell_expression_samples.index),
-        )
-        adata.obs["pseudocell_id"] = self.pseudocell_expression_samples.columns
-
-        adata.uns["celltype_centers"] = self.celltype_centers
-        adata.uns["args"] = {
-            "KDE_bandwidth": self.KDE_bandwidth,
-            "celltyping_min_expression": self.celltyping_min_expression,
-            "celltyping_min_distance": self.celltyping_min_distance,
-        }
-
-        adata.obsm["celltype_class_assignments"] = self.celltype_class_assignments
-
-        adata.uns["signatures"] = self.signatures
-        adata.uns["pca_2d"] = {
-            "components_": self.pca_2d.components_,
-            "mean_": self.pca_2d.mean_,
-            "explained_variance_": self.pca_2d.explained_variance_,
-        }
-
-        knn_search_index_2d_pickled = base64.b64encode(
-            pickle.dumps(self.embedder_2d._knn_search_index)
-        ).decode("ascii")
-        knn_search_index_3d_pickled = base64.b64encode(
-            pickle.dumps(self.embedder_3d._knn_search_index)
-        ).decode("ascii")
-
-        adata.uns["embedder_2d"] = {
-            "kwargs": self.umap_kwargs,
-            "_raw_data": self.embedder_2d._raw_data,
-            "_small_data": self.embedder_2d._small_data,
-            "_input_hash": self.embedder_2d._input_hash,
-            # '_knn_search_index':self.embedder_2d._knn_search_index,
-            "_knn_search_index": knn_search_index_2d_pickled,
-            "_disconnection_distance": self.embedder_2d._disconnection_distance,
-            "_n_neighbors": self.embedder_2d._n_neighbors,
-            "embedding_": self.embedder_2d.embedding_,
-            "_a": self.embedder_2d._a,
-            "_b": self.embedder_2d._b,
-            "_initial_alpha": self.embedder_2d._initial_alpha,
-        }
-        adata.uns["pca_3d"] = {
-            "components_": self.pca_3d.components_,
-            "mean_": self.pca_3d.mean_,
-            "explained_variance_": self.pca_3d.explained_variance_,
-        }
-
-        adata.uns["embedder_3d"] = {
-            "kwargs": self.cumap_kwargs,
-            "_raw_data": self.embedder_3d._raw_data,
-            "_small_data": self.embedder_3d._small_data,
-            "_input_hash": self.embedder_3d._input_hash,
-            "_knn_search_index": knn_search_index_3d_pickled,  # self.embedder_3d._knn_search_index,
-            "_disconnection_distance": self.embedder_3d._disconnection_distance,
-            "_n_neighbors": self.embedder_3d._n_neighbors,
-            "embedding_": self.embedder_3d.embedding_,
-            "_a": self.embedder_3d._a,
-            "_b": self.embedder_3d._b,
-            "_initial_alpha": self.embedder_3d._initial_alpha,
-        }
-
-        adata.uns["colors_min_max"] = self.colors_min_max
-        adata.uns["colors"] = self.colors
-        adata.uns["embedding"] = self.embedding
-        adata.uns["integrity_map"] = self.integrity_map
-        adata.uns["signal_map"] = self.signal_map
-        adata.uns["pseudocell_locations_x"] = self.pseudocell_locations_x
-        adata.uns["pseudocell_locations_y"] = self.pseudocell_locations_y
-
-        adata.write_h5ad(path)
-
-
-def load_visualizer(path: str) -> Visualizer:
-    """
-    Loads a visualizer from an h5ad file.
-
-    Parameters
-    ----------
-    path : str
-        The path to the file.
-
-    Returns
-    -------
-    Visualizer
-    """
-
-    import base64
-    import pickle
-
-    adata = anndata.read_h5ad(path)
-
-    vis = Visualizer(**adata.uns["args"])
-
-    vis.pseudocell_expression_samples = pd.DataFrame(
-        adata.X.T, columns=adata.obs["pseudocell_id"], index=adata.var.index
-    )
-    vis.celltype_centers = adata.uns["celltype_centers"]
-    vis.celltype_class_assignments = adata.obsm["celltype_class_assignments"]
-    vis.signatures = adata.uns["signatures"]
-    vis.genes = vis.signatures.index
-
-    vis.pca_2d = PCA(n_components=adata.uns["pca_2d"]["components_"].shape[0])
-    vis.pca_2d.components_ = adata.uns["pca_2d"]["components_"]
-    vis.pca_2d.mean_ = adata.uns["pca_2d"]["mean_"]
-    vis.pca_2d.explained_variance_ = adata.uns["pca_2d"]["explained_variance_"]
-
-    vis.embedder_2d = umap.UMAP(**adata.uns["embedder_2d"]["kwargs"])
-    vis.embedder_2d._raw_data = adata.uns["embedder_2d"]["_raw_data"]
-    vis.embedder_2d._small_data = adata.uns["embedder_2d"]["_small_data"]
-    vis.embedder_2d._input_hash = adata.uns["embedder_2d"]["_input_hash"]
-    vis.embedder_2d._knn_search_index = pickle.loads(
-        base64.b64decode(adata.uns["embedder_2d"]["_knn_search_index"])
-    )
-    vis.embedder_2d._disconnection_distance = adata.uns["embedder_2d"][
-        "_disconnection_distance"
-    ]
-    vis.embedder_2d._n_neighbors = adata.uns["embedder_2d"]["_n_neighbors"]
-    vis.embedder_2d.embedding_ = adata.uns["embedder_2d"]["embedding_"]
-    vis.embedder_2d._a = adata.uns["embedder_2d"]["_a"]
-    vis.embedder_2d._b = adata.uns["embedder_2d"]["_b"]
-    vis.embedder_2d._initial_alpha = adata.uns["embedder_2d"]["_initial_alpha"]
-
-    vis.pca_3d = PCA(n_components=adata.uns["pca_3d"]["components_"].shape[0])
-    vis.pca_3d.components_ = adata.uns["pca_3d"]["components_"]
-    vis.pca_3d.mean_ = adata.uns["pca_3d"]["mean_"]
-    vis.pca_3d.explained_variance_ = adata.uns["pca_3d"]["explained_variance_"]
-
-    vis.embedder_3d = umap.UMAP(**adata.uns["embedder_3d"]["kwargs"])
-    vis.embedder_3d._raw_data = adata.uns["embedder_3d"]["_raw_data"]
-    vis.embedder_3d._small_data = adata.uns["embedder_3d"]["_small_data"]
-    vis.embedder_3d._input_hash = adata.uns["embedder_3d"]["_input_hash"]
-    vis.embedder_3d._knn_search_index = pickle.loads(
-        base64.b64decode(adata.uns["embedder_3d"]["_knn_search_index"])
-    )
-    vis.embedder_3d._disconnection_distance = adata.uns["embedder_3d"][
-        "_disconnection_distance"
-    ]
-    vis.embedder_3d._n_neighbors = adata.uns["embedder_3d"]["_n_neighbors"]
-    vis.embedder_3d.embedding_ = adata.uns["embedder_3d"]["embedding_"]
-    vis.embedder_3d._a = adata.uns["embedder_3d"]["_a"]
-    vis.embedder_3d._b = adata.uns["embedder_3d"]["_b"]
-    vis.embedder_3d._initial_alpha = adata.uns["embedder_3d"]["_initial_alpha"]
-
-    vis.colors_min_max = adata.uns["colors_min_max"]
-    vis.colors = adata.uns["colors"]
-    vis.embedding = adata.uns["embedding"]
-    if "integrity_map" in adata.uns.keys():
-        vis.integrity_map = adata.uns["integrity_map"]
-    else:
-        vis.integrity_map = None
-    if "signal_map" in adata.uns.keys():
-        vis.signal_map = adata.uns["signal_map"]
-    else:
-        vis.signal_map = None
-    vis.pseudocell_locations_x = adata.uns["pseudocell_locations_x"]
-    vis.pseudocell_locations_y = adata.uns["pseudocell_locations_y"]
-
-    return vis
-
 
 def plot_region_of_interest(
     x: float,
@@ -1358,35 +1138,33 @@ def plot_region_of_interest(
 
     Parameters
     ----------
-    x (float):
+    x : float
         x coordinate of the region of interest
-    y (float):
+    y : float
         y coordinate of the region of interest
-    coordinate_df (pd.DataFrame):
+    coordinate_df : pandas.DataFrame
         DataFrame of gene-annotated molecule coordinates
-    visualizer (Visualizer):
+    visualizer : Visualizer
         Visualizer object containing the fitted model
-    integrity_map (np.ndarray):
+    integrity_map : numpy.ndarray
         integrity map of the tissue
-    signal_map (np.ndarray):
+    signal_map : numpy.ndarray
         Signal map of the tissue
-    window_size (int, optional):
+    window_size : int, optional
         Size of the window to display. Defaults to 30.
-    signal_plot_threshold (float, optional):
+    signal_plot_threshold : float, optional
         Threshold for the signal plot. Defaults to 5.
-    rasterized (bool, optional):
+    rasterized : bool, optional
         If True all plots will be rasterized. Defaults to True.
     scalebar : dict[str, typing.Any] | None
         If `None` no scalebar will be plotted. Otherwise a dictionary with
         additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
-            By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
+        By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
     """
 
     # first, create and color-embed the subsample of the region of interest:
     subsample = visualizer.subsample_df(x, y, coordinate_df, window_size=window_size)
-    subsample_embedding, subsample_embedding_color = visualizer.transform_transcripts(
-        subsample
-    )
+    _, subsample_embedding_color = visualizer.transform_transcripts(subsample)
 
     vertical_indices = subsample.z.argsort()
     subsample = subsample.sort_values("z")
@@ -1539,20 +1317,11 @@ def run(
     cell_diameter=10,
     min_expression: float = 1.0,
     signature_matrix=None,
-    umap_kwargs={
-        "n_components": 2,
-        "min_dist": 0.0,
-        "n_neighbors": 20,
-        "random_state": 42,
-        "n_jobs": 1,
-    },
-    cumap_kwargs={
-        "n_neighbors": 10,
-        "min_dist": 0,
-        "metric": "euclidean",
-        "random_state": 42,
-        "n_jobs": 1,
-    },
+    fit_umap: bool = True,
+    patch_length: int = 500,
+    n_workers: int = min(8, len(os.sched_getaffinity(0))),
+    umap_kwargs=UMAP_2D_PARAMS,
+    cumap_kwargs=UMAP_RGB_PARAMS,
 ):
     """
     This is a wrapper function that computes the integrity map for a given spatial
@@ -1564,7 +1333,8 @@ def run(
     ----------
     df : pandas.DataFrame
         The spatial transcriptomics dataset.
-    n_expected_celltypes : int, optional.
+        This dataframe should contain a *gene*, *x*, *y*, and *z* column.
+    n_expected_celltypes : int, optional
         A rough estimate of expected cell type clusters.
         A higher number will lead to a more disjoint UMAP embedding and a higher
         detection of overlap events.
@@ -1578,6 +1348,13 @@ def run(
         radius of 'KDE_bandwidth' for a region to be considered containing a cell.
     signature_matrix : pandas.DataFrame, optional
         A celltypes x gene table of expression signatures to use to annotate the UMAP.
+    fit_umap : bool
+        Whether to fit the UMAP to the data.
+    patch_length : int
+        Size of the length in each dimension when calculating signal integrity in patches.
+        Smaller values will use less memory, but may take longer to compute.
+    n_workers : int
+        The number of workers to use for processsing.
     umap_kwargs : dict, optional
         Additional keyword arguments for the 2D UMAP embedding.
     cumap_kwargs : dict, optional
@@ -1585,24 +1362,29 @@ def run(
 
     Returns
     -------
-    integrity_map : np.ndarray
+    integrity_map : numpy.ndarray
         A integrity pixel map of the spatial transcriptomics dataset.
-    signal_map : np.ndarray
+    signal_map : numpy.ndarray
         A pixel map of the spatial transcriptomics dataset containing the detected signal.
     vis : Visualizer
         A visualizer object that can be used to plot the
         results of the integrity map
     """
 
-    KDE_bandwidth = cell_diameter / 5
+    KDE_bandwidth = cell_diameter / 4
     min_distance = cell_diameter * 0.9
 
     if n_expected_celltypes is None:
         n_expected_celltypes = 0.8
 
     print("Running vertical adjustment")
-    _assign_xy(df)
-    _assign_z_mean_message_passing(df, rounds=20)
+    pre_process_coordinates(df, grid_size=1, rounds=20)
+
+    if "random_state" not in umap_kwargs:
+        umap_kwargs = {"n_jobs": n_workers} | umap_kwargs
+
+    if "random_state" not in cumap_kwargs:
+        cumap_kwargs = {"n_jobs": n_workers} | cumap_kwargs
 
     vis = Visualizer(
         KDE_bandwidth=KDE_bandwidth,
@@ -1614,15 +1396,22 @@ def run(
     )
 
     print("Creating gene expression embeddings for visualization:")
-    vis.fit_transcripts(df, signature_matrix=signature_matrix)
+    vis.fit_transcripts(
+        df,
+        signature_matrix=signature_matrix,
+        fit_umap=fit_umap,
+        patch_length=patch_length,
+        n_workers=n_workers,
+    )
 
     print("Creating signal integrity map:")
-    integrity_, signal_ = _compute_divergence_patched(
+    integrity_, signal_ = compute_VSI(
         df,
-        vis.genes,
-        vis.pca_2d.components_,
+        pd.DataFrame(vis.pca_2d.components_, columns=vis.genes),
         KDE_bandwidth=KDE_bandwidth,
-        min_expression=1,
+        min_expression=None,
+        patch_length=patch_length,
+        n_workers=n_workers,
     )
 
     vis.integrity_map = integrity_.T

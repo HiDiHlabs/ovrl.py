@@ -8,23 +8,22 @@ name            = "ovrlpy"
 description     = "A python tool to investigate cell overlaps in imaging-based spatial transcriptomics data."
 readme          = { file = "README.md", content-type = "text/markdown" }
 license         = { file = "LICENSE" }
-requires-python = ">=3.6, <3.13"
+requires-python = ">=3.11, <3.14"
 dynamic         = ["version"]
 
 authors = [
     { name = "Sebastian Tiesmeyer", email = "sebastian.tiesmeyer@bih-charite.de" },
 ]
 dependencies = [
-    "anndata",
-    "matplotlib",
+    "matplotlib~=3.8",
     "matplotlib-scalebar",
-    "numpy",
-    "pandas",
-    "scikit-image >= 0.18",
-    "scikit-learn",
-    "scipy",
-    "tqdm",
-    "umap-learn",
+    "numpy~=1.25",
+    "pandas[parquet]~=2.0",
+    "scikit-image>=0.18",
+    "scikit-learn~=1.1",
+    "scipy~=1.11",
+    "tqdm~=4.65",
+    "umap-learn~=0.5",
 ]
 classifiers = [
     "Intended Audience :: Science/Research",
@@ -35,10 +34,9 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-tutorial = ["pandas[parquet]"]
 docs = [
-    "sphinx",
-    "sphinx-autoapi>=3.1",
+    "sphinx~=8.0",
+    "sphinx-autoapi~=3.1",
     "sphinx-copybutton",
     "sphinx-rtd-theme",
     "myst-nb",
@@ -55,3 +53,12 @@ Issues        = "https://github.com/HiDiHlabs/ovrl.py/issues"
 
 [tool.setuptools]
 packages = ["ovrlpy"]
+
+[tool.ruff]
+target-version = "py311"
+
+fix        = true
+show-fixes = true
+
+[tool.ruff.lint]
+extend-select = ["I"]

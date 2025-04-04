@@ -1,7 +1,7 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from math import ceil
 from typing import Any
 
-import matplotlib.patheffects as PathEffects
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -13,30 +13,22 @@ from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
+from ._patching import _patches, n_patches
 from ._ssam2 import find_local_maxima, kde_2d
-
-
-def _draw_outline(artist, lw=2, color="black"):
-    "Draws outlines around the (text) artists for better legibility."
-    _ = artist.set_path_effects(
-        [PathEffects.withStroke(linewidth=lw, foreground=color), PathEffects.Normal()]
-    )
-
+from ._ssam2._utils import _TRUNCATE
 
 SCALEBAR_PARAMS: dict[str, Any] = {"dx": 1, "units": "um"}
 """Default scalebar parameters"""
 
+UMAP_2D_PARAMS: dict[str, Any] = {"n_components": 2, "n_neighbors": 20, "min_dist": 0}
+"""Default 2D-UMAP parameters"""
+
+UMAP_RGB_PARAMS: dict[str, Any] = {"n_components": 3, "n_neighbors": 10, "min_dist": 0}
+"""Default RGB-UMAP parameters"""
+
 
 def _plot_scalebar(ax: Axes, dx: float = 1, units="um", **kwargs):
     ax.add_artist(ScaleBar(dx, units=units, **kwargs))
-
-
-def _get_kl_divergence(p, q):
-    # mask = (p!=0) * (q!=0)
-    output = np.zeros(p.shape)
-    # output[mask] = p[mask]*np.log(p[mask]/q[mask])
-    output[:] = p[:] * np.log(p[:] / q[:])
-    return output
 
 
 def _determine_localmax_and_sample(distribution, min_distance=3, min_expression=5):
@@ -71,6 +63,15 @@ def _determine_localmax_and_sample(distribution, min_distance=3, min_expression=
 
 ## These functions are going to be seperated into a package of their own at some point:
 
+# define a 45-degree 3D rotation matrix
+_ROTATION_MATRIX = np.array(
+    [
+        [0.500, 0.500, -0.707],
+        [-0.146, 0.854, 0.500],
+        [0.854, -0.146, 0.500],
+    ]
+)
+
 
 def _fill_color_axes(rgb, dimred=None):
     if dimred is None:
@@ -78,19 +79,8 @@ def _fill_color_axes(rgb, dimred=None):
 
     facs = dimred.transform(rgb)
 
-    # rotate the ica_facs 45 in all the dimensions:
-    # define a 45-degree 3d rotation matrix
-
-    rotation_matrix = np.array(
-        [
-            [0.500, 0.500, -0.707],
-            [-0.146, 0.854, 0.500],
-            [0.854, -0.146, 0.500],
-        ]
-    )
-
-    # rotate the facs:
-    facs = np.dot(facs, rotation_matrix)
+    # rotate the facs 45 in all the dimensions
+    facs = np.dot(facs, _ROTATION_MATRIX)
 
     return facs, dimred
 
@@ -107,12 +97,7 @@ def _min_to_max(arr, arr_min=None, arr_max=None):
 
 
 # define a function that fits expression data to into the umap embeddings:
-def _transform_embeddings(
-    expression,
-    pca,
-    embedder_2d,
-    embedder_3d,
-):
+def _transform_embeddings(expression, pca, embedder_2d, embedder_3d):
     factors = pca.transform(expression)
 
     embedding = embedder_2d.transform(factors)
@@ -138,8 +123,8 @@ def _plot_embeddings(
 
     ax.axis("off")
 
-    alpha = 0.1 if "alpha" not in scatter_kwargs else scatter_kwargs.pop("alpha")
-    marker = "." if "marker" not in scatter_kwargs else scatter_kwargs.pop("marker")
+    alpha = scatter_kwargs.pop("alpha", 0.1)
+    marker = scatter_kwargs.pop("marker", ".")
 
     ax.scatter(
         embedding[:, 0],
@@ -151,19 +136,20 @@ def _plot_embeddings(
         **scatter_kwargs,
     )
 
-    text_artists = []
-    for i, celltype in enumerate(celltypes):
-        if not np.isnan(celltype_centers[i, 0]):
-            t = ax.text(
-                np.nan_to_num((celltype_centers[i, 0])),
-                np.nan_to_num(celltype_centers[i, 1]),
-                celltype,
-                color="k",
-                fontsize=12,
-            )
-            text_artists.append(t)
+    if celltypes is not None and celltype_centers is not None:
+        text_artists = []
+        for i, celltype in enumerate(celltypes):
+            if not np.isnan(celltype_centers[i, 0]):
+                t = ax.text(
+                    np.nan_to_num((celltype_centers[i, 0])),
+                    np.nan_to_num(celltype_centers[i, 1]),
+                    celltype,
+                    color="k",
+                    fontsize=12,
+                )
+                text_artists.append(t)
 
-    _untangle_text(text_artists, ax)
+        _untangle_text(text_artists, ax)
 
 
 def _untangle_text(text_artists, ax=None, max_iterations=10000):
@@ -315,265 +301,165 @@ def _create_histogram(
     return hist
 
 
-def _compute_divergence_embedded(
-    df,
-    genes,
-    visualizer,
-    KDE_bandwidth,
-    min_expression,
-    metric="cosine_similarity",
-    pca_divergence=0.8,
+def _compute_embedding_vectors(
+    df: np.ndarray, mask: np.ndarray, factor: np.ndarray, **kwargs
 ):
-    """This is a legacy function, replaced by _compute_divergence_patched. It contains other similarity measures than cosine similarity.
-    To be integrated into the patch-based divergence computation later.
-    """
-    signal = _create_histogram(
-        df,
-        genes,
-        x_max=df.x_pixel.max(),
-        y_max=df.y_pixel.max(),
-        KDE_bandwidth=KDE_bandwidth,
-    )
-
-    genes = visualizer.genes
-
-    pca = PCA(pca_divergence).fit(visualizer.localmax_celltyping_samples.T)
-
-    mask = signal > min_expression
-
-    df_top = df[df.z_delim < df.z]
-    df_bot = df[df.z_delim > df.z]
-
-    hists_top = np.zeros((mask.sum(), pca.components_.shape[0]))
-    hists_bot = np.zeros((mask.sum(), pca.components_.shape[0]))
-
-    for i, g in tqdm.tqdm(enumerate(visualizer.genes)):
-        if np.abs(pca.components_.std(0)[i]) < 0.001:
-            continue
-
-        hist_top = np.dot(
-            _create_histogram(
-                df_top,
-                genes=[g],
-                x_max=df.x_pixel.max(),
-                y_max=df.y_pixel.max(),
-                KDE_bandwidth=1.0,
-            )[mask][:, None],
-            pca.components_[None, :, i],
-        )
-        hist_bot = np.dot(
-            _create_histogram(
-                df_bot,
-                genes=[g],
-                x_max=df.x_pixel.max(),
-                y_max=df.y_pixel.max(),
-                KDE_bandwidth=1.0,
-            )[mask][:, None],
-            pca.components_[None, :, i],
-        )
-
-        hists_top += hist_top
-        hists_bot += hist_bot
-
-    if metric == "cosine_similarity":
-        # Cosine similarity:
-        hists_top_norm = hists_top / np.linalg.norm(hists_top, axis=1)[:, None]
-        hists_bot_norm = hists_bot / np.linalg.norm(hists_bot, axis=1)[:, None]
-
-        cos_sim = (hists_top_norm * hists_bot_norm).sum(axis=1)
-
-        distance_ = np.zeros_like(signal)
-        distance_[mask] = cos_sim
-
-        return distance_, signal
-
-    elif metric == "kl_divergence":
-        # KL divergence
-        # D_KL(P||Q) = sum_i P(i) log(P(i)/Q(i))
-
-        hists_top_p = hists_top[:]  # / np.linalg.norm(hists_top, axis=1)[:, None]
-        hists_bot_p = hists_bot[:]  # / np.linalg.norm(hists_bot, axis=1)[:, None]
-
-        hists_top_p[hists_top_p > 0] = 0
-        hists_bot_p[hists_bot_p > 0] = 0
-
-        hists_top_p = np.nan_to_num(hists_top_p / hists_top_p.sum(1)[:, None])
-        hists_bot_p = np.nan_to_num(hists_bot_p / hists_bot_p.sum(1)[:, None])
-
-        kl_divergence = np.zeros((hists_top_p.shape[0],))
-        for i in range(hists_top_p.shape[0]):
-            kl_divergence[i] = (
-                hists_top_p[i] * np.nan_to_num(np.log(hists_top_p[i] / hists_bot_p[i]))
-            ).sum() + (
-                hists_bot_p[i] * np.nan_to_num(np.log(hists_bot_p[i] / hists_top_p[i]))
-            ).sum()
-
-        distance_ = np.zeros_like(signal)
-        distance_[mask] = kl_divergence
-
-        return distance_, signal
-
-    elif metric == "euclidean_distance":
-        distance_ = np.zeros_like(signal)
-        distance_[mask] = np.linalg.norm(hists_top - hists_bot, axis=1)
-
-        return distance_, signal
-
-    elif metric == "correlation":
-
-        def pearson_cross_correlation(a, b):
-            out = np.zeros((a.shape[0]))
-
-            a = a - a.mean(axis=1)[:, None]
-            b = b - b.mean(axis=1)[:, None]
-
-            for i in range(a.shape[0]):
-                out[i] = np.dot(a[i], b[i]) / (
-                    np.linalg.norm(a[i]) * np.linalg.norm(b[i])
-                )
-
-            return out
-
-        distance_ = np.zeros_like(signal)
-        distance_[mask] = pearson_cross_correlation(hists_top, hists_bot)
-
-        return distance_, signal
-
-
-def _compute_embedding_vectors(subset_df, signal_mask, factor):
-    if len(subset_df) < 2:
+    if len(df) < 2:
         return None, None
 
-    subset_top = subset_df[subset_df[:, 2] > subset_df[:, 3]]
-    subset_bottom = subset_df[subset_df[:, 2] < subset_df[:, 3]]
+    # TODO: what happens if equal?
+    top = df[df[:, 2] > df[:, 3], :2]
+    bottom = df[df[:, 2] < df[:, 3], :2]
 
-    if len(subset_top) == 0:
-        signal_top = 0
+    if len(top) == 0:
+        signal_top = None
     else:
-        signal_top = kde_2d(subset_top[:, :2], size=signal_mask.shape)[signal_mask]
-        signal_top = signal_top[:, None] * factor[None]
-    if len(subset_bottom) == 0:
-        signal_bottom = 0
+        signal_top = kde_2d(top, size=mask.shape, **kwargs)[mask]
+        signal_top = signal_top[:, None] * factor[None, :]
+    if len(bottom) == 0:
+        signal_bottom = None
     else:
-        signal_bottom = kde_2d(subset_bottom[:, :2], size=signal_mask.shape)[
-            signal_mask
-        ]
-        signal_bottom = signal_bottom[:, None] * factor[None]
+        signal_bottom = kde_2d(bottom, size=mask.shape, **kwargs)[mask]
+        signal_bottom = signal_bottom[:, None] * factor[None, :]
 
     return signal_top, signal_bottom
 
 
-def _compute_divergence_patched(
-    df,
-    gene_list,
-    pca_component_matrix,
-    min_expression=2,
-    KDE_bandwidth=1,
-    patch_length=1000,
-    patch_padding=10,
-    n_workers=5,
+def compute_VSI(
+    df: pd.DataFrame,
+    pca_components: pd.DataFrame,
+    min_expression: float = None,
+    KDE_bandwidth: float = 1,
+    patch_length: int = 500,
+    n_workers: int = 8,
+    dtype=np.float32,
 ):
-    n_components = pca_component_matrix.shape[0]
+    """
+    Calculate the vertical signal integrity (VSI).
 
-    signal = kde_2d(df[["x", "y"]].values)
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The spatial transcriptomics dataset.
+        This dataframe should contain a *gene*, *x*, *y*, and *z* column.
+        Needs to be prepared by calling pre_process_coordinates
+    pca_components : pandas.DataFrame
+        PCA components from fitted local maxima.
+    min_expression : float, optional
+        Minimal gene expression level to include in the VSI computation.
+        Defaults to the 110% of the maximum expression profile of two molecules in the KDE.
+    KDE_bandwidth : float, optional
+        Bandwidth for the kernel density estimation.
+    patch_length : int, optional
+        Data will be processed in patches. Upperbound for the length in x/y of a patch.
+    n_workers : int, optional
+        Number of threads to use for processing.
+    dtype
+        Datatype used for the calculations.
+
+    Returns
+    -------
+    VSI : numpy.ndarray
+        The vertical signal integrity score.
+    signal : numpy.ndarray
+        The total gene expression signal.
+    """
+    padding = int(ceil(_TRUNCATE * KDE_bandwidth))
+
+    n_components = pca_components.shape[0]
+    pca_components = pca_components.astype(dtype)
+
+    signal = kde_2d(df[["x", "y"]].values, bandwidth=KDE_bandwidth, dtype=dtype)
 
     cosine_similarity = np.zeros_like(signal)
 
-    patch_count_x = signal.shape[0] // patch_length
-    patch_count_y = signal.shape[1] // patch_length
+    if min_expression is None:
+        min_expression = 2.2 / (2 * np.pi * KDE_bandwidth**2)
 
-    x_patches = np.linspace(0, signal.shape[0], patch_count_x + 1).astype(int)
-    y_patches = np.linspace(0, signal.shape[1], patch_count_y + 1).astype(int)
+    with ThreadPoolExecutor(max_workers=n_workers) as executor:
+        for patch_df, offset, size in tqdm.tqdm(
+            _patches(df, patch_length, padding, size=signal.shape),
+            total=n_patches(patch_length, signal.shape),
+        ):
+            if len(patch_df) == 0:
+                continue
 
-    with tqdm.tqdm(total=(len(x_patches) - 1) * (len(y_patches) - 1)) as pbar:
-        for i in range(len(x_patches) - 1):
-            for j in range(len(y_patches) - 1):
-                x_ = x_patches[i] - patch_padding
-                y_ = y_patches[j] - patch_padding
-                _x = x_patches[i + 1] + patch_padding
-                _y = y_patches[j + 1] + patch_padding
+            patch_signal = kde_2d(
+                patch_df[["x", "y"]].values, bandwidth=KDE_bandwidth, dtype=dtype
+            )
 
-                patch_size_x = _x - x_ - patch_padding * 2
-                patch_size_y = _y - y_ - patch_padding * 2
+            patch_signal_mask = patch_signal > min_expression
+            n_pixels = patch_signal_mask.sum()
 
-                patch_df = df[
-                    (df.x >= x_) & (df.x < _x) & (df.y >= y_) & (df.y < _y)
-                ].copy()
+            if n_pixels == 0:
+                continue
 
-                patch_df.x -= x_
-                patch_df.y -= y_
+            patch_embedding_top = np.zeros((n_pixels, n_components), dtype=dtype)
+            patch_embedding_bottom = np.zeros((n_pixels, n_components), dtype=dtype)
 
-                if len(patch_df) == 0:
-                    pbar.update(1)
-                    continue
+            gene_coords = {
+                gene: df.to_numpy()
+                for gene, df in patch_df.groupby("gene", observed=True)[
+                    ["x", "y", "z", "z_delim"]
+                ]
+            }
 
-                patch_signal = kde_2d(
-                    patch_df[["x", "y"]].values, bandwidth=KDE_bandwidth
-                )
-
-                patch_signal_mask = patch_signal > min_expression
-
-                if patch_signal_mask.sum() == 0:
-                    pbar.update(1)
-                    continue
-
-                # plt.figure()
-                # plt.imshow(patch_signal)
-
-                patch_embedding_top = np.zeros((patch_signal_mask.sum(), n_components))
-                patch_embedding_bottom = np.zeros(
-                    (patch_signal_mask.sum(), n_components)
-                )
-
-                df_gene_grouped = patch_df.groupby("gene", observed=False).apply(
-                    lambda x: x[["x", "y", "z", "z_delim"]].values
-                )
-                # df_gene_grouped = df_gene_grouped[df_gene_grouped.apply(lambda x: x.shape[0]>0)]
-
-                with ThreadPoolExecutor(max_workers=n_workers) as executor:
-                    # _compute_embedding_vectors(df_gene_grouped.loc[gene_list[0]],patch_signal_mask,pca_component_matrix[:,0])
-                    # return cosine_similarity, signal
-                    fs = {
+            # ensure that there are not too many results stored but also hopefully not too many workers idling
+            n_tasks = 2 * n_workers
+            futures = set()
+            genes = list(pca_components.columns)
+            while True:
+                futures = wait(futures, return_when=FIRST_COMPLETED)
+                done = futures.done
+                futures = futures.not_done
+                # submit a new batch of tasks
+                while len(futures) < n_tasks and len(genes) > 0:
+                    gene = genes.pop()
+                    if gene not in gene_coords:
+                        continue
+                    futures.add(
                         executor.submit(
                             _compute_embedding_vectors,
-                            df_gene_grouped.loc[gene],
+                            gene_coords.pop(gene),
                             patch_signal_mask,
-                            pca_component_matrix[:, i],
-                        ): gene
-                        for i, gene in enumerate(gene_list)
-                    }
+                            pca_components[gene].to_numpy(copy=False),
+                            bandwidth=KDE_bandwidth,
+                            dtype=dtype,
+                        )
+                    )
+                # process finished tasks
+                for future in done:
+                    top_, bottom_ = future.result()
+                    if top_ is not None:
+                        patch_embedding_top += top_
+                    if bottom_ is not None:
+                        patch_embedding_bottom += bottom_
+                del done
 
-                    for f in as_completed(fs):
-                        top_, bottom_ = f.result()
+                if len(futures) == 0:
+                    break
 
-                        if top_ is not None:
-                            assert bottom_ is not None
-                            patch_embedding_top += top_
-                            patch_embedding_bottom += bottom_
+            patch_norm_top = np.linalg.norm(patch_embedding_top, axis=1)
+            patch_norm_bottom = np.linalg.norm(patch_embedding_bottom, axis=1)
+            patch_norm_product = patch_norm_top * patch_norm_bottom
+            patch_norm_product[patch_norm_product == 0] = 1  # avoid division by zero
 
-                patch_norm_top = np.linalg.norm(patch_embedding_top, axis=1)
-                patch_norm_bottom = np.linalg.norm(patch_embedding_bottom, axis=1)
+            spatial_patch_cosine_similarity = np.zeros_like(patch_signal)
 
-                patch_cosine_similarity = np.sum(
-                    patch_embedding_top * patch_embedding_bottom, axis=1
-                ) / (patch_norm_top * patch_norm_bottom)
-                spatial_patch_cosine_similarity = np.zeros_like(patch_signal)
+            spatial_patch_cosine_similarity[patch_signal_mask] = (
+                np.sum(patch_embedding_top * patch_embedding_bottom, axis=1)
+                / patch_norm_product
+            )
+            # remove padding
+            spatial_patch_cosine_similarity = spatial_patch_cosine_similarity[
+                padding : padding + size[0], padding : padding + size[1]
+            ]
 
-                spatial_patch_cosine_similarity[patch_signal_mask] = (
-                    patch_cosine_similarity
-                )
-                spatial_patch_cosine_similarity = spatial_patch_cosine_similarity[
-                    patch_padding : patch_padding + patch_size_x,
-                    patch_padding : patch_padding + patch_size_y,
-                ]  # remove patch edges
-
-                x_pad = x_ + patch_padding
-                y_pad = y_ + patch_padding
-                cosine_similarity[
-                    x_pad : x_pad + spatial_patch_cosine_similarity.shape[0],
-                    y_pad : y_pad + spatial_patch_cosine_similarity.shape[1],
-                ] = spatial_patch_cosine_similarity
-
-                pbar.update(1)
+            x_pad = offset[0] + padding
+            y_pad = offset[1] + padding
+            cosine_similarity[
+                x_pad : x_pad + spatial_patch_cosine_similarity.shape[0],
+                y_pad : y_pad + spatial_patch_cosine_similarity.shape[1],
+            ] = spatial_patch_cosine_similarity
 
     return cosine_similarity, signal
