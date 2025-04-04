@@ -363,9 +363,8 @@ def compute_VSI(
     """
     padding = int(ceil(_TRUNCATE * KDE_bandwidth))
 
-    genes = list(pca_components.columns)
     n_components = pca_components.shape[0]
-    pca_components = pca_components.to_numpy(dtype, copy=False)
+    pca_components = pca_components.astype(dtype)
 
     signal = kde_2d(df[["x", "y"]].values, bandwidth=KDE_bandwidth, dtype=dtype)
 
@@ -402,14 +401,14 @@ def compute_VSI(
             # ensure that there are not too many results stored but also hopefully not too many workers idling
             n_tasks = 2 * n_workers
             futures = set()
-            genes_w_index = list(enumerate(genes))
+            genes = list(pca_components.columns)
             while True:
                 futures = wait(futures, return_when=FIRST_COMPLETED)
                 done = futures.done
                 futures = futures.not_done
                 # submit a new batch of tasks
-                while len(futures) < n_tasks and len(genes_w_index) > 0:
-                    i, gene = genes_w_index.pop()
+                while len(futures) < n_tasks and len(genes) > 0:
+                    gene = genes.pop()
                     if gene not in gene_coords:
                         continue
                     futures.add(
@@ -417,7 +416,7 @@ def compute_VSI(
                             _compute_embedding_vectors,
                             gene_coords.pop(gene),
                             patch_signal_mask,
-                            pca_components[:, i],
+                            pca_components[gene].to_numpy(copy=False),
                             bandwidth=KDE_bandwidth,
                             dtype=dtype,
                         )

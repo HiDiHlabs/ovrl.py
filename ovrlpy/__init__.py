@@ -3,6 +3,7 @@ from importlib.metadata import PackageNotFoundError, version
 from . import io
 from ._ovrlp import (
     Visualizer,
+    compute_VSI,
     detect_doublets,
     get_pseudocell_locations,
     plot_region_of_interest,
@@ -23,6 +24,7 @@ del PackageNotFoundError, version
 
 __all__ = [
     "io",
+    "compute_VSI",
     "detect_doublets",
     "sample_expression_at_xy",
     "get_pseudocell_locations",
