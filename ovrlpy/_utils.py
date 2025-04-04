@@ -341,7 +341,7 @@ def compute_VSI(
     ----------
     df : pandas.DataFrame
         The spatial transcriptomics dataset.
-        This dataframe should contain a *gene*, *x*, *y*, and *z* column. 
+        This dataframe should contain a *gene*, *x*, *y*, and *z* column.
         Needs to be prepared by calling pre_process_coordinates
     pca_components : pandas.DataFrame
         PCA components from fitted local maxima.
@@ -372,9 +372,9 @@ def compute_VSI(
     signal = kde_2d(df[["x", "y"]].values, bandwidth=KDE_bandwidth, dtype=dtype)
 
     cosine_similarity = np.zeros_like(signal)
-    
+
     if min_expression is None:
-        min_expression = 2.2 / (2*np.pi*KDE_bandwidth**2)
+        min_expression = 2.2 / (2 * np.pi * KDE_bandwidth**2)
 
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
         for patch_df, offset, size in tqdm.tqdm(
@@ -441,14 +441,15 @@ def compute_VSI(
 
             patch_norm_top = np.linalg.norm(patch_embedding_top, axis=1)
             patch_norm_bottom = np.linalg.norm(patch_embedding_bottom, axis=1)
-            patch_norm_product = (patch_norm_top * patch_norm_bottom)
-            patch_norm_product[patch_norm_product == 0] = 1 # avoid division by zero
+            patch_norm_product = patch_norm_top * patch_norm_bottom
+            patch_norm_product[patch_norm_product == 0] = 1  # avoid division by zero
 
             spatial_patch_cosine_similarity = np.zeros_like(patch_signal)
-            
-            spatial_patch_cosine_similarity[patch_signal_mask] = np.sum(
-                patch_embedding_top * patch_embedding_bottom, axis=1
-            ) / patch_norm_product
+
+            spatial_patch_cosine_similarity[patch_signal_mask] = (
+                np.sum(patch_embedding_top * patch_embedding_bottom, axis=1)
+                / patch_norm_product
+            )
             # remove padding
             spatial_patch_cosine_similarity = spatial_patch_cosine_similarity[
                 padding : padding + size[0], padding : padding + size[1]
