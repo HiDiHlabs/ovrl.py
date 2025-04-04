@@ -1,4 +1,3 @@
-from collections.abc import Iterable
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from math import ceil
 from typing import Any
@@ -326,20 +325,47 @@ def _compute_embedding_vectors(
     return signal_top, signal_bottom
 
 
-def _compute_divergence_patched(
+def compute_VSI(
     df: pd.DataFrame,
-    gene_list: Iterable,
-    pca_components: np.ndarray,
+    pca_components: pd.DataFrame,
     min_expression: float = 2,
     KDE_bandwidth: float = 1,
     patch_length: int = 500,
     n_workers: int = 8,
     dtype=np.float32,
 ):
+    """
+    Calculate the vertical signal integrity (VSI).
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        TODO
+    pca_components : pandas.DataFrame
+        PCA components from fitted local maxima.
+    min_expression : float, optional
+        TODO
+    KDE_bandwidth : float, optional
+        Bandwidth for the kernel density estimation.
+    patch_length : int, optional
+        Data will be processed in patches. Upperbound for the length in x/y of a patch.
+    n_workers : int, optional
+        Number of threads to use for processing.
+    dtype
+        Datatype used for the calculations.
+
+    Returns
+    -------
+    VSI : numpy.ndarray
+        The vertical signal integrity score.
+    signal : numpy.ndarray
+        The total gene expression signal.
+    """
     padding = int(ceil(_TRUNCATE * KDE_bandwidth))
 
+    genes = list(pca_components.columns)
     n_components = pca_components.shape[0]
-    pca_components = pca_components.astype(dtype, copy=False)
+    pca_components = pca_components.to_numpy(dtype, copy=False)
 
     signal = kde_2d(df[["x", "y"]].values, bandwidth=KDE_bandwidth, dtype=dtype)
 
@@ -376,14 +402,14 @@ def _compute_divergence_patched(
             # ensure that there are not too many results stored but also hopefully not too many workers idling
             n_tasks = 2 * n_workers
             futures = set()
-            genes = list(enumerate(gene_list))
+            genes_w_index = list(enumerate(genes))
             while True:
                 futures = wait(futures, return_when=FIRST_COMPLETED)
                 done = futures.done
                 futures = futures.not_done
                 # submit a new batch of tasks
-                while len(futures) < n_tasks and len(genes) > 0:
-                    i, gene = genes.pop()
+                while len(futures) < n_tasks and len(genes_w_index) > 0:
+                    i, gene = genes_w_index.pop()
                     if gene not in gene_coords:
                         continue
                     futures.add(

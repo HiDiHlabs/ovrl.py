@@ -21,7 +21,6 @@ from ._utils import (
     SCALEBAR_PARAMS,
     UMAP_2D_PARAMS,
     UMAP_RGB_PARAMS,
-    _compute_divergence_patched,
     _create_histogram,
     _create_knn_graph,
     _determine_localmax_and_sample,
@@ -32,6 +31,7 @@ from ._utils import (
     _plot_embeddings,
     _plot_scalebar,
     _transform_embeddings,
+    compute_VSI,
 )
 
 _BIH_CMAP = LinearSegmentedColormap.from_list(
@@ -1405,10 +1405,9 @@ def run(
     )
 
     print("Creating signal integrity map:")
-    integrity_, signal_ = _compute_divergence_patched(
+    integrity_, signal_ = compute_VSI(
         df,
-        vis.genes,
-        vis.pca_2d.components_,
+        pd.DataFrame(vis.pca_2d.components_, columns=vis.genes),
         KDE_bandwidth=KDE_bandwidth,
         min_expression=1,
         patch_length=patch_length,
