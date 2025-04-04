@@ -1371,7 +1371,7 @@ def run(
         results of the integrity map
     """
 
-    KDE_bandwidth = cell_diameter / 5
+    KDE_bandwidth = cell_diameter / 4
     min_distance = cell_diameter * 0.9
 
     if n_expected_celltypes is None:
@@ -1409,7 +1409,7 @@ def run(
         df,
         pd.DataFrame(vis.pca_2d.components_, columns=vis.genes),
         KDE_bandwidth=KDE_bandwidth,
-        min_expression=1,
+        min_expression=None,
         patch_length=patch_length,
         n_workers=n_workers,
     )

@@ -40,7 +40,7 @@ def _kde_nd(
             return np.zeros(size, dtype=dtype)
 
     if size is None:
-        size = np.ceil(np.max(coordinates, axis=0)).astype(int)
+        size = np.floor(np.max(coordinates, axis=0) + 1).astype(int)
 
     output = np.zeros(size, dtype=dtype)
 
