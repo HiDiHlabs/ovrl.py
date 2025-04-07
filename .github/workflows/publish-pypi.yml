@@ -12,11 +12,12 @@ jobs:
       id-token: write # to authenticate as Trusted Publisher to pypi.org
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
           cache: "pip"
-          fetch-depth: 0
       - run: pip install build
       - run: python -m build
       - uses: pypa/gh-action-pypi-publish@release/v1
