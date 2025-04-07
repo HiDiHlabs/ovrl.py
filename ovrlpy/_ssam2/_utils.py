@@ -47,7 +47,7 @@ def _kde_nd(
     dim_bins = list()
     for i in range(coordinates.shape[1]):
         c_min = int(np.min(coordinates[:, i]))
-        c_max = int(np.floor(np.max(coordinates[:, i])+1))
+        c_max = int(np.floor(np.max(coordinates[:, i]) + 1))
         dim_bins.append(np.linspace(c_min, c_max, c_max - c_min + 1))
 
     histogram, bins = np.histogramdd(
