@@ -13,11 +13,12 @@ dynamic         = ["version"]
 
 authors = [
     { name = "Sebastian Tiesmeyer", email = "sebastian.tiesmeyer@bih-charite.de" },
+    { name = "Nikla Müller-Bötticher", email = "niklas.mueller-boetticher@bih-charite.de" },
 ]
 dependencies = [
     "matplotlib~=3.8",
     "matplotlib-scalebar",
-    "numpy~=1.25",
+    "numpy>=1.25,<3",
     "pandas[parquet]~=2.0",
     "scikit-image>=0.18",
     "scikit-learn~=1.1",
@@ -64,3 +65,10 @@ show-fixes = true
 
 [tool.ruff.lint]
 extend-select = ["I"]
+
+[tool.mypy]
+python_version         = "3.11"
+ignore_missing_imports = true
+warn_no_return         = false
+packages               = "ovrlpy"
+plugins                = "numpy.typing.mypy_plugin"

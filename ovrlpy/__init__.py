@@ -1,18 +1,16 @@
 from importlib.metadata import PackageNotFoundError, version
 
 from . import io
-from ._ovrlp import (
-    Visualizer,
-    compute_VSI,
-    detect_doublets,
-    get_pseudocell_locations,
+from ._ovrlp import Ovrlp
+from ._plotting import (
+    SCALEBAR_PARAMS,
+    plot_pseudocells,
     plot_region_of_interest,
     plot_signal_integrity,
-    pre_process_coordinates,
-    run,
-    sample_expression_at_xy,
+    plot_tissue,
+    plot_umap,
 )
-from ._utils import SCALEBAR_PARAMS, UMAP_2D_PARAMS, UMAP_RGB_PARAMS
+from ._utils import UMAP_2D_PARAMS, UMAP_RGB_PARAMS
 
 try:
     __version__ = version("ovrlpy")
@@ -24,15 +22,12 @@ del PackageNotFoundError, version
 
 __all__ = [
     "io",
-    "compute_VSI",
-    "detect_doublets",
-    "sample_expression_at_xy",
-    "get_pseudocell_locations",
+    "Ovrlp",
+    "plot_pseudocells",
     "plot_region_of_interest",
     "plot_signal_integrity",
-    "pre_process_coordinates",
-    "Visualizer",
-    "run",
+    "plot_tissue",
+    "plot_umap",
     "SCALEBAR_PARAMS",
     "UMAP_2D_PARAMS",
     "UMAP_RGB_PARAMS",

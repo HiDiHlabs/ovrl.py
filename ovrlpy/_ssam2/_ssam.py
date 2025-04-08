@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Iterable, Optional
+from typing import Iterable
 
 import numpy as np
 import pandas as pd
@@ -13,12 +13,11 @@ from ._utils import _TRUNCATE
 def _sample_expression(
     coordinates: pd.DataFrame,
     kde_bandwidth: float = 2.5,
-    minimum_expression: int = 2,
-    min_pixel_distance: int = 5,
+    min_expression: float = 2,
+    min_pixel_distance: float = 5,
     coord_columns: Iterable[str] = ["x", "y", "z"],
     gene_column: str = "gene",
     n_workers: int = 8,
-    mode: Optional[str] = None,
     patch_length: int = 500,
     dtype=np.float32,
 ) -> tuple[pd.DataFrame, np.ndarray]:
@@ -41,8 +40,6 @@ def _sample_expression(
             Name of the gene column in the coordinate dataframe.
         n_workers : int, optional
             Number of parallel workers for sampling.
-        mode : str, optional
-            Sampling mode, either '2d' or '3d'.
         patch_length : int
             Size of the length in each dimension when calculating signal integrity in patches.
             Smaller values will use less memory, but may take longer to compute.
@@ -56,20 +53,7 @@ def _sample_expression(
     """
 
     coord_columns = list(coord_columns)
-
-    if mode is None:
-        mode = f"{len(coord_columns)}d"
-
-    if mode == "2d":
-        print("Analyzing in 2d mode")
-        coord_columns = coord_columns[:2]
-    elif mode == "3d":
-        print("Analyzing in 3d mode")
-    else:
-        raise ValueError(
-            "Could not determine whether to use '2d' or '3d' analysis mode. Please specify mode='2d' or mode='3d'."
-        )
-
+    assert len(coord_columns) == 3 or len(coord_columns) == 2
     coordinates = coordinates[coord_columns + [gene_column]].copy()
 
     # lower resolution instead of increasing bandwidth!
@@ -78,21 +62,21 @@ def _sample_expression(
     print("determining pseudocells")
 
     # perform a global KDE to determine local maxima:
-    vector_field_norm = _utils._kde_nd(
-        coordinates[coord_columns].values, bandwidth=1, dtype=dtype
+    kde = _utils._kde_nd(
+        coordinates[coord_columns].to_numpy(), bandwidth=1, dtype=dtype
     )
+
+    min_dist = 1 + int(min_pixel_distance / kde_bandwidth)
     local_maximum_coordinates = _utils.find_local_maxima(
-        vector_field_norm,
-        min_pixel_distance=1 + int(min_pixel_distance / kde_bandwidth),
-        min_expression=minimum_expression,
+        kde, min_pixel_distance=min_dist, min_expression=min_expression
     )
 
     print("found", len(local_maximum_coordinates), "pseudocells")
 
-    size = vector_field_norm.shape
-    del vector_field_norm
+    size = kde.shape
+    del kde
 
-    # truncate * bandwidth=1 -> _TRUNCATE * 1
+    # truncate * bandwidth -> _TRUNCATE * 1
     padding = _TRUNCATE
 
     print("sampling expression:")
@@ -124,17 +108,18 @@ def _sample_expression(
                 patch_size[1] + 2 * padding,
                 *size[2:],
             )
-            futures = {}
-            for gene, df in patch_df.groupby(gene_column, observed=True):
-                future = executor.submit(
+
+            futures = {
+                executor.submit(
                     _utils.kde_and_sample,
                     df[coord_columns].to_numpy(),
                     maxima,
                     size=patch_size,
                     bandwidth=1,
                     dtype=dtype,
-                )
-                futures[future] = gene
+                ): gene
+                for gene, df in patch_df.groupby(gene_column, observed=True)
+            }
 
             patches.append(
                 pd.DataFrame({futures[f]: f.result() for f in as_completed(futures)})
@@ -142,7 +127,7 @@ def _sample_expression(
             del futures
 
     gene_list = sorted(coordinates[gene_column].unique())
-    coords = np.vstack(coords) * kde_bandwidth
+    locations = np.vstack(coords) * kde_bandwidth
     expression = pd.concat(patches).reset_index(drop=True)[gene_list].fillna(0)
 
-    return expression, coords
+    return expression, locations

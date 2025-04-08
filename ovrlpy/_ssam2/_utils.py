@@ -1,5 +1,4 @@
-### utils file with basic functions needed for the SSAM algorithm.
-
+from math import floor
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
@@ -47,7 +46,9 @@ def _kde_nd(
     dim_bins = list()
     for i in range(coordinates.shape[1]):
         c_min = int(np.min(coordinates[:, i]))
-        c_max = int(np.floor(np.max(coordinates[:, i]) + 1))
+        # the last interval of np.histogram is closed (while the rest is half-open)
+        # therefore we add an additional bin if the max is an int
+        c_max = int(floor(np.max(coordinates[:, i]) + 1))
         dim_bins.append(np.linspace(c_min, c_max, c_max - c_min + 1))
 
     histogram, bins = np.histogramdd(
@@ -66,13 +67,10 @@ def _kde_nd(
 
 
 def find_local_maxima(
-    vf: np.ndarray, min_pixel_distance: int = 5, min_expression: float = 2
+    x: np.ndarray, min_pixel_distance: int = 5, min_expression: float = 2
 ):
-    """
-    Find local maxima in a vector field.
-    """
     local_maxima = peak_local_max(
-        vf,
+        x,
         min_distance=min_pixel_distance,
         threshold_abs=min_expression,
         exclude_border=False,
