@@ -29,9 +29,6 @@ def _assign_xy(
     df["x_pixel"] = (df[x] / grid_size).astype(int)
     df["y_pixel"] = (df[y] / grid_size).astype(int)
 
-    # assign each pixel a unique id
-    df["pixel_id"] = df["x_pixel"] + df["y_pixel"] * df["x_pixel"].max()
-
 
 def _assign_z_mean_message_passing(
     df: pd.DataFrame, z_column: str = "z", rounds: int = 3
@@ -57,17 +54,12 @@ def _assign_z_mean_message_passing(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
 
-    means = df.groupby("pixel_id")[z_column].mean()
-    df["z_delim"] = means[df["pixel_id"]].to_numpy()
+    pixels = df.groupby(["x_pixel", "y_pixel"]).agg({z_column: "mean"}).reset_index()
 
-    pixel_coordinate_df = (
-        df[["pixel_id", "x_pixel", "y_pixel", "z_delim"]].groupby("pixel_id").max()
+    elevation_map = np.full(
+        (pixels["x_pixel"].max() + 1, pixels["y_pixel"].max() + 1), np.nan
     )
-
-    elevation_map = np.full((df["x_pixel"].max() + 1, df["y_pixel"].max() + 1), np.nan)
-    elevation_map[pixel_coordinate_df["x_pixel"], pixel_coordinate_df["y_pixel"]] = (
-        pixel_coordinate_df["z_delim"]
-    )
+    elevation_map[pixels["x_pixel"], pixels["y_pixel"]] = pixels[z_column]
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
@@ -106,8 +98,7 @@ def _assign_z_mean(df: pd.DataFrame, z_column: str = "z") -> np.ndarray:
         ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
-    means = df.groupby("pixel_id")[z_column].mean()
-    return means[df["pixel_id"]].to_numpy()
+    return df.groupby(["x_pixel", "y_pixel"])[z_column].transform("mean").to_numpy()
 
 
 def _assign_z_median(df: pd.DataFrame, z_column: str = "z") -> np.ndarray:
@@ -129,8 +120,7 @@ def _assign_z_median(df: pd.DataFrame, z_column: str = "z") -> np.ndarray:
         ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
-    medians = df.groupby("pixel_id")[z_column].median()
-    return medians[df["pixel_id"]].to_numpy()
+    return df.groupby(["x_pixel", "y_pixel"])[z_column].transform("median").to_numpy()
 
 
 def pre_process_coordinates(
@@ -184,4 +174,4 @@ def pre_process_coordinates(
                 "`method` must be one of 'mean', 'median', or 'message_passing'"
             )
     coordinates["z_delim"] = z_delim
-    return coordinates.drop(columns=["x_pixel", "y_pixel", "pixel_id"])
+    return coordinates.drop(columns=["x_pixel", "y_pixel"])
