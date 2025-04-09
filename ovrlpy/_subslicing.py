@@ -173,5 +173,6 @@ def pre_process_coordinates(
             raise ValueError(
                 "`method` must be one of 'mean', 'median', or 'message_passing'"
             )
+    coordinates.drop(columns=["x_pixel", "y_pixel"], inplace=True)
     coordinates["z_delim"] = z_delim
-    return coordinates.drop(columns=["x_pixel", "y_pixel"])
+    return coordinates
