@@ -1,6 +1,6 @@
 import os
 from collections.abc import Sequence
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from math import ceil
 from typing import Any
 
@@ -323,6 +323,7 @@ class Ovrlp:
         padding = int(ceil(_TRUNCATE * self.KDE_bandwidth))
 
         n_components = self.pca_2d.n_components_
+        n_tasks = 2 * self.n_workers
 
         signal = kde_2d(
             self.transcripts[["x", "y"]].to_numpy(),
@@ -368,22 +369,24 @@ class Ovrlp:
                     ]
                 }
 
-                futures = set(
-                    executor.submit(
-                        _compute_embedding_vectors,
-                        gene_coords.pop(gene),
-                        patch_signal_mask,
-                        self.pca_2d.components_[:, i],
-                        bandwidth=self.KDE_bandwidth,
-                        dtype=self.dtype,
-                    )
-                    for i, gene in enumerate(self.genes)
-                    if gene in gene_coords
-                )
-
-                while len(futures) > 0:
+                futures: set[Future] = set()
+                genes = list(enumerate(self.genes))
+                while len(futures) > 0 or len(genes) > 0:
                     finished, futures = wait(futures, return_when=FIRST_COMPLETED)
-
+                    # submit a new batch of tasks
+                    while len(futures) < n_tasks and len(genes) > 0:
+                        i, gene = genes.pop()
+                        if gene in gene_coords:
+                            futures.add(
+                                executor.submit(
+                                    _compute_embedding_vectors,
+                                    gene_coords.pop(gene),
+                                    patch_signal_mask,
+                                    self.pca_2d.components_[:, i],
+                                    bandwidth=self.KDE_bandwidth,
+                                    dtype=self.dtype,
+                                )
+                            )
                     # process finished tasks
                     for gene_embedding in finished:
                         top_, bottom_ = gene_embedding.result()
