@@ -129,7 +129,7 @@ def pre_process_coordinates(
     coordinate_keys: tuple[str, str, str] = ("x", "y", "z"),
     method: str = "message_passing",
     inplace: bool = True,
-    **kwargs,
+    rounds: int = 3,
 ) -> pd.DataFrame:
     """
     Runs the pre-processing routine of the coordinate dataframe.
@@ -146,14 +146,17 @@ def pre_process_coordinates(
     coordinate_keys : tuple[str, str, str], optional
         Name of the coordinate columns.
     method : bool, optional
-        The measure to use to determine the z-dimension delimiter.
+        The measure to use to determine the z-dimension threshold for subslicing.
+        One of, mean, median, and message_passing.
     inplace : bool, optional
         Whether to modify the input dataframe or return a copy.
+    rounds : int, optional
+        Only used if method is 'message_passing'. How many rounds of message passing to use.
 
     Returns
     -------
     pandas.DataFrame:
-        A dataframe with added x_pixel, y_pixel and z_delim columns.
+        A dataframe with added z_delim column.
     """
     *xy, z = coordinate_keys
 
@@ -164,7 +167,9 @@ def pre_process_coordinates(
 
     match method:
         case "message_passing":
-            z_delim = _assign_z_mean_message_passing(coordinates, z_column=z, **kwargs)
+            z_delim = _assign_z_mean_message_passing(
+                coordinates, z_column=z, rounds=rounds
+            )
         case "mean":
             z_delim = _assign_z_mean(coordinates, z_column=z)
         case "median":
