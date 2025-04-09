@@ -13,9 +13,8 @@ from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 from umap import UMAP
 
+from ._kde import _TRUNCATE, _sample_expression, kde_2d
 from ._patching import _patches, n_patches
-from ._ssam2 import _sample_expression, kde_2d
-from ._ssam2._utils import _TRUNCATE
 from ._subslicing import pre_process_coordinates
 from ._utils import (
     UMAP_2D_PARAMS,

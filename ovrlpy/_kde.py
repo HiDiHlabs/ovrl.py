@@ -1,13 +1,101 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from math import floor
 from typing import Iterable
 
 import numpy as np
 import pandas as pd
 import tqdm
+from scipy.ndimage import gaussian_filter
+from skimage.feature import peak_local_max
 
-from .._patching import _patches, n_patches
-from . import _utils
-from ._utils import _TRUNCATE
+from ._patching import _patches, n_patches
+
+_TRUNCATE = 4
+
+
+def kde_2d(coordinates: np.ndarray, **kwargs):
+    """
+    Create a histogram of the data.
+    """
+    return _kde_nd(coordinates[:, :2], **kwargs)
+
+
+def kde_3d(coordinates: np.ndarray, **kwargs):
+    """
+    Create a histogram of the data.
+    """
+    return _kde_nd(coordinates[:, :3], **kwargs)
+
+
+def _kde_nd(
+    coordinates: np.ndarray,
+    size=None,
+    bandwidth: float = 1.5,
+    truncate: float = _TRUNCATE,
+    dtype=np.float32,
+):
+    """
+    Create a histogram of the data.
+    """
+
+    if coordinates.shape[0] == 0:
+        if size is None:
+            raise ValueError("If no coordinates are provided, size must be provided.")
+        else:
+            return np.zeros(size, dtype=dtype)
+
+    if size is None:
+        size = np.floor(np.max(coordinates, axis=0) + 1).astype(int)
+
+    output = np.zeros(size, dtype=dtype)
+
+    dim_bins = list()
+    for i in range(coordinates.shape[1]):
+        c_min = int(np.min(coordinates[:, i]))
+        # the last interval of np.histogram is closed (while the rest is half-open)
+        # therefore we add an additional bin if the max is an int
+        c_max = int(floor(np.max(coordinates[:, i]) + 1))
+        dim_bins.append(np.linspace(c_min, c_max, c_max - c_min + 1))
+
+    histogram, bins = np.histogramdd(
+        [coordinates[:, i] for i in range(coordinates.shape[1])], bins=dim_bins
+    )
+
+    kde = gaussian_filter(
+        histogram, sigma=bandwidth, truncate=truncate, mode="constant", output=dtype
+    )
+
+    output[
+        tuple(slice(int(bins[i].min()), int(bins[i].max())) for i in range(len(bins)))
+    ] = kde
+
+    return output
+
+
+def find_local_maxima(
+    x: np.ndarray, min_pixel_distance: int = 5, min_expression: float = 2
+):
+    local_maxima = peak_local_max(
+        x,
+        min_distance=min_pixel_distance,
+        threshold_abs=min_expression,
+        exclude_border=False,
+    )
+
+    return local_maxima
+
+
+def kde_and_sample(coordinates: np.ndarray, sampling_coordinates: np.ndarray, **kwargs):
+    """
+    Create a kde of the data and sample at 'sampling_coordinates'.
+    """
+
+    sampling_coordinates = np.round(sampling_coordinates).astype(int)
+    n_dims = sampling_coordinates.shape[1]
+
+    kde = _kde_nd(coordinates, **kwargs)
+
+    return kde[tuple(sampling_coordinates[:, i] for i in range(n_dims))]
 
 
 def _sample_expression(
@@ -62,12 +150,10 @@ def _sample_expression(
     print("determining pseudocells")
 
     # perform a global KDE to determine local maxima:
-    kde = _utils._kde_nd(
-        coordinates[coord_columns].to_numpy(), bandwidth=1, dtype=dtype
-    )
+    kde = _kde_nd(coordinates[coord_columns].to_numpy(), bandwidth=1, dtype=dtype)
 
     min_dist = 1 + int(min_pixel_distance / kde_bandwidth)
-    local_maximum_coordinates = _utils.find_local_maxima(
+    local_maximum_coordinates = find_local_maxima(
         kde, min_pixel_distance=min_dist, min_expression=min_expression
     )
 
@@ -111,7 +197,7 @@ def _sample_expression(
 
             futures = {
                 executor.submit(
-                    _utils.kde_and_sample,
+                    kde_and_sample,
                     df[coord_columns].to_numpy(),
                     maxima,
                     size=patch_size,

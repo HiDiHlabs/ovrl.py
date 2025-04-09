@@ -9,7 +9,7 @@ from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 from umap import UMAP
 
-from ._ssam2 import find_local_maxima, kde_2d
+from ._kde import find_local_maxima, kde_2d
 
 UMAP_2D_PARAMS: dict[str, Any] = {"n_components": 2, "n_neighbors": 20, "min_dist": 0}
 """Default 2D-UMAP parameters"""
