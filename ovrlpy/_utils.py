@@ -70,13 +70,11 @@ def _fill_color_axes(rgb, pca: PCA, *, fit: bool = False) -> np.ndarray:
     return np.dot(pca.transform(rgb), _ROTATION_MATRIX)
 
 
-# normalize array
-def _min_to_max(arr: np.ndarray):
-    arr_min = arr.min(0, keepdims=True)
-    arr_max = arr.max(0, keepdims=True)
-    arr = arr - arr_min
-    arr /= arr_max - arr_min
-    return arr
+def _minmax_scaling(x: np.ndarray):
+    """scale features (rows) to unit range"""
+    x_min = x.min(axis=0)
+    x_max = x.max(axis=0)
+    return (x - x_min) / (x_max - x_min)
 
 
 # define a function that fits expression data to into the umap embeddings

@@ -24,7 +24,7 @@ from ._utils import (
     _determine_localmax_and_sample,
     _fill_color_axes,
     _knn_expression,
-    _min_to_max,
+    _minmax_scaling,
     _spatial_subset_mask,
     _transform_embeddings,
 )
@@ -245,7 +245,7 @@ class Ovrlp:
                 embedding_color.max(axis=0),
             )
 
-            self.colors = _min_to_max(embedding_color)
+            self.colors = _minmax_scaling(embedding_color)
 
     @staticmethod
     def _determine_celltype(
