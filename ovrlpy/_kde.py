@@ -15,14 +15,14 @@ _TRUNCATE = 4
 
 def kde_2d(coordinates: np.ndarray, **kwargs):
     """
-    Create a histogram of the data.
+    Calculate the 2D KDE using the first 2 columns of coordinates.
     """
     return _kde_nd(coordinates[:, :2], **kwargs)
 
 
 def kde_3d(coordinates: np.ndarray, **kwargs):
     """
-    Create a histogram of the data.
+    Calculate the 3D KDE using the first 3 columns of coordinates.
     """
     return _kde_nd(coordinates[:, :3], **kwargs)
 
@@ -35,7 +35,7 @@ def _kde_nd(
     dtype=np.float32,
 ):
     """
-    Create a histogram of the data.
+    Calculate the KDE using the coordinates.
     """
 
     if coordinates.shape[0] == 0:

@@ -479,7 +479,7 @@ class Ovrlp:
         dist_x, dist_y, dist_t = _determine_localmax_and_sample(
             (1 - integrity_map) * (self.signal_map > min_signal),
             min_distance=min_distance,
-            min_expression=1 - min_integrity,
+            min_value=1 - min_integrity,
         )
 
         doublets = pd.DataFrame(

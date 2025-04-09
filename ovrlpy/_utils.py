@@ -19,19 +19,19 @@ UMAP_RGB_PARAMS: dict[str, Any] = {"n_components": 3, "n_neighbors": 10, "min_di
 
 
 def _determine_localmax_and_sample(
-    distribution, min_distance: int = 3, min_expression: float = 5
+    x: np.ndarray, min_distance: int = 3, min_value: float = 5
 ):
     """
-    Returns a list of local maxima in a kde of the data frame.
+    Returns a list of local maxima and their corresponding values.
 
     Parameters
     ----------
-    distribution : np.ndarray
-        A 2D array of the distribution.
+    x : np.ndarray
+        A 2D array of values.
     min_distance : int, optional
         The minimum distance between local maxima.
-    min_expression : float, optional
-        The minimum expression level to include in the histogram.
+    min_value : float, optional
+        The minimum value to consider values as maxima.
 
     Returns
     -------
@@ -42,13 +42,12 @@ def _determine_localmax_and_sample(
     values
         values at local maxima.
     """
-
-    rois = find_local_maxima(distribution, min_distance, min_expression)
+    rois = find_local_maxima(x, min_distance, min_value)
 
     rois_x = rois[:, 0]
     rois_y = rois[:, 1]
 
-    return rois_x, rois_y, distribution[rois_x, rois_y]
+    return rois_x, rois_y, x[rois_x, rois_y]
 
 
 ## These functions are going to be separated into a package of their own at some point:
@@ -64,7 +63,7 @@ _ROTATION_MATRIX = np.array(
 
 
 def _fill_color_axes(rgb, pca: PCA, *, fit: bool = False) -> np.ndarray:
-    # rotate the transformed data 45° in all the dimensions
+    """rotate the transformed data 45° in all dimensions"""
     if fit:
         pca.fit(rgb)
     return np.dot(pca.transform(rgb), _ROTATION_MATRIX)
@@ -77,8 +76,8 @@ def _minmax_scaling(x: np.ndarray):
     return (x - x_min) / (x_max - x_min)
 
 
-# define a function that fits expression data to into the umap embeddings
 def _transform_embeddings(expression, pca: PCA, embedder_2d: UMAP, embedder_3d: UMAP):
+    """fit the expression data into the umap embeddings after PCA transformation"""
     factors = pca.transform(expression)
 
     embedding = embedder_2d.transform(factors)
@@ -87,10 +86,10 @@ def _transform_embeddings(expression, pca: PCA, embedder_2d: UMAP, embedder_3d: 
     return embedding, embedding_color
 
 
-# define a function that subsamples spots around x,y given a window size
 def _spatial_subset_mask(
     coordinates: pd.DataFrame, x: float, y: float, window_size: float = 5
 ):
+    """subset spots around x, y given a window size"""
     return (
         (coordinates["x"] > x - window_size)
         & (coordinates["x"] < x + window_size)
@@ -99,14 +98,13 @@ def _spatial_subset_mask(
     )
 
 
-# define a function that returns the k nearest neighbors of x,y
 def _create_knn_graph(coords, k: int = 10):
+    """k nearest neighbors distances and indices"""
     nbrs = NearestNeighbors(n_neighbors=k, algorithm="ball_tree").fit(coords)
     distances, indices = nbrs.kneighbors(coords)
     return distances, indices
 
 
-# get a kernel-weighted average of the expression values of the k nearest neighbors of x,y
 def _knn_expression(
     gene_idx: NDArray[np.integer],
     distances: np.ndarray,
@@ -114,6 +112,7 @@ def _knn_expression(
     gene_list: Iterable,
     bandwidth: float = 2.5,
 ) -> pd.DataFrame:
+    """kernel-weighted average of the expression values of the k nearest neighbors"""
     weights = (1 / ((2 * np.pi) ** (3 / 2) * bandwidth**3)) * np.exp(
         -(distances**2) / (2 * bandwidth**2)
     )
@@ -127,14 +126,26 @@ def _knn_expression(
 
 
 def _compute_embedding_vectors(
-    df: np.ndarray, mask: np.ndarray, factor: np.ndarray, **kwargs
+    coordinates: np.ndarray, mask: np.ndarray, factor: np.ndarray, **kwargs
 ):
-    if len(df) < 2:
+    """
+    calculate top and bottom embedding
+
+    Parameters
+    ----------
+    coordinates : np.ndarray
+        2D array of x, y, z and z_delim coordinates
+    mask : np.ndarray
+        binary mask for which pixels to calculate embedding
+    factor : np.ndarray
+        embedding weights
+    """
+    if len(coordinates) < 2:
         return None, None
 
     # TODO: what happens if equal?
-    top = df[df[:, 2] > df[:, 3], :2]
-    bottom = df[df[:, 2] < df[:, 3], :2]
+    top = coordinates[coordinates[:, 2] > coordinates[:, 3], :2]
+    bottom = coordinates[coordinates[:, 2] < coordinates[:, 3], :2]
 
     if len(top) == 0:
         signal_top = None
