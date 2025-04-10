@@ -5,6 +5,7 @@ from typing import Literal, Sequence
 
 import numpy as np
 import pandas as pd
+from numpy.typing import DTypeLike
 
 
 def _assign_xy(
@@ -26,8 +27,8 @@ def _assign_xy(
     df[x] -= df[x].min()
     df[y] -= df[y].min()
 
-    df["x_pixel"] = (df[x] / grid_size).astype(int)
-    df["y_pixel"] = (df[y] / grid_size).astype(int)
+    df["x_pixel"] = (df[x] / grid_size).astype(np.int32)
+    df["y_pixel"] = (df[y] / grid_size).astype(np.int32)
 
 
 def _message_passing(x: np.ndarray, /, n_iter: int) -> np.ndarray:
@@ -47,7 +48,11 @@ def _message_passing(x: np.ndarray, /, n_iter: int) -> np.ndarray:
 
 
 def _assign_z_mean_message_passing(
-    df: pd.DataFrame, /, z_column: str = "z", n_iter: int = 3
+    df: pd.DataFrame,
+    z_column: str = "z",
+    n_iter: int = 3,
+    *,
+    dtype: DTypeLike = np.float32,
 ) -> np.ndarray:
     """
     Calculates a z-split coordinate.
@@ -71,10 +76,16 @@ def _assign_z_mean_message_passing(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
 
-    pixels = df.groupby(["x_pixel", "y_pixel"]).agg({z_column: "mean"}).reset_index()
+    pixels = (
+        df.groupby(["x_pixel", "y_pixel"])
+        .agg({z_column: "mean"})
+        .astype({z_column: dtype})
+        .reset_index()
+    )
+    pixels[["x", "y"]] = pixels[["x_pixel", "y_pixel"]]
 
     elevation_map = np.full(
-        (pixels["x_pixel"].max() + 1, pixels["y_pixel"].max() + 1), np.nan
+        (pixels["x_pixel"].max() + 1, pixels["y_pixel"].max() + 1), np.nan, dtype=dtype
     )
     elevation_map[pixels["x_pixel"], pixels["y_pixel"]] = pixels[z_column]
     elevation_map = _message_passing(elevation_map, n_iter)
@@ -82,7 +93,9 @@ def _assign_z_mean_message_passing(
     return elevation_map[df["x_pixel"], df["y_pixel"]]
 
 
-def _assign_z_mean(df: pd.DataFrame, z_column: str = "z") -> np.ndarray:
+def _assign_z_mean(
+    df: pd.DataFrame, z_column: str = "z", dtype: DTypeLike = np.float32
+) -> np.ndarray:
     """
     Calculates a z-split coordinate.
 
@@ -101,10 +114,16 @@ def _assign_z_mean(df: pd.DataFrame, z_column: str = "z") -> np.ndarray:
         ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
-    return df.groupby(["x_pixel", "y_pixel"])[z_column].transform("mean").to_numpy()
+    return (
+        df.groupby(["x_pixel", "y_pixel"])[z_column]
+        .transform("mean")
+        .to_numpy(dtype=dtype)
+    )
 
 
-def _assign_z_median(df: pd.DataFrame, z_column: str = "z") -> np.ndarray:
+def _assign_z_median(
+    df: pd.DataFrame, z_column: str = "z", dtype: DTypeLike = np.float32
+) -> np.ndarray:
     """
     Calculates a z-split coordinate.
 
@@ -123,7 +142,11 @@ def _assign_z_median(df: pd.DataFrame, z_column: str = "z") -> np.ndarray:
         ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
         )
-    return df.groupby(["x_pixel", "y_pixel"])[z_column].transform("median").to_numpy()
+    return (
+        df.groupby(["x_pixel", "y_pixel"])[z_column]
+        .transform("median")
+        .to_numpy(dtype=dtype)
+    )
 
 
 def pre_process_coordinates(
@@ -134,7 +157,8 @@ def pre_process_coordinates(
     coordinate_keys: tuple[str, str, str] = ("x", "y", "z"),
     method: Literal["mean", "median", "message_passing"] = "message_passing",
     inplace: bool = True,
-    n_iter: int = 3,
+    dtype: DTypeLike = np.float32,
+    **kwargs,
 ) -> pd.DataFrame:
     """
     Runs the pre-processing routine of the coordinate dataframe.
@@ -155,9 +179,10 @@ def pre_process_coordinates(
         One of, mean, median, and message_passing.
     inplace : bool, optional
         Whether to modify the input dataframe or return a copy.
-    n_iter : int, optional
-        Only used if method is 'message_passing'.
-        Number of iterations for the message passing algorithm.
+    dtype : numpy.typing.DTypeLike, optional
+        Datatype of the z-coordinate center.
+    kwargs
+        Other keywords arguments are passed to the message_passing function.
 
     Returns
     -------
@@ -174,12 +199,12 @@ def pre_process_coordinates(
     match method:
         case "message_passing":
             z_delim = _assign_z_mean_message_passing(
-                coordinates, z_column=z, n_iter=n_iter
+                coordinates, z_column=z, dtype=dtype, **kwargs
             )
         case "mean":
-            z_delim = _assign_z_mean(coordinates, z_column=z)
+            z_delim = _assign_z_mean(coordinates, z_column=z, dtype=dtype)
         case "median":
-            z_delim = _assign_z_median(coordinates, z_column=z)
+            z_delim = _assign_z_median(coordinates, z_column=z, dtype=dtype)
         case _:
             raise ValueError(
                 "`method` must be one of 'mean', 'median', or 'message_passing'"
