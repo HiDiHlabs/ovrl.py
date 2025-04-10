@@ -33,7 +33,10 @@ XENIUM_CTRLS = [
 
 
 def read_Xenium(
-    filepath: str | os.PathLike, *, remove_features: Collection[str] = XENIUM_CTRLS
+    filepath: str | os.PathLike,
+    *,
+    min_qv: float | None = None,
+    remove_features: Collection[str] = XENIUM_CTRLS,
 ) -> pd.DataFrame:
     """
     Read a Xenium transcripts file.
@@ -42,6 +45,9 @@ def read_Xenium(
     ----------
     filepath : os.PathLike or str
         Path to the Xenium transcripts file. Both, .csv.gz and .parquet files, are supported.
+    min_qv : float | None, optional
+        Minimum Phred-scaled quality value (Q-Score) of a transcript to be included.
+        If `None` no filtering is performed.
     remove_features : collections.abc.Collection[str], optional
         List of regex patterns to filter the 'feature_name' column,
         :py:attr:`ovrlpy.io.XENIUM_CTRLS` by default.
@@ -52,6 +58,9 @@ def read_Xenium(
     """
     filepath = Path(filepath)
     columns = list(_XENIUM_COLUMNS.keys())
+
+    if min_qv is not None:
+        columns.append("qv")
 
     if filepath.suffix == ".parquet":
         transcripts = pd.read_parquet(filepath, columns=columns)
@@ -71,6 +80,9 @@ def read_Xenium(
 
     else:
         transcripts = pd.read_csv(filepath, usecols=columns, dtype={"gene": "category"})
+
+    if min_qv is not None:
+        transcripts = transcripts.loc[transcripts["qv"] >= min_qv].drop(columns="qv")
 
     transcripts = transcripts.rename(columns=_XENIUM_COLUMNS)
     transcripts = _filter_genes(transcripts, remove_features)
