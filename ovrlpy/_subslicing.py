@@ -1,7 +1,7 @@
 import warnings
 from functools import reduce
 from operator import add
-from typing import Sequence
+from typing import Literal, Sequence
 
 import numpy as np
 import pandas as pd
@@ -30,8 +30,24 @@ def _assign_xy(
     df["y_pixel"] = (df[y] / grid_size).astype(int)
 
 
+def _message_passing(x: np.ndarray, /, n_iter: int) -> np.ndarray:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        for _ in range(n_iter):
+            x = reduce(
+                add,
+                (
+                    np.nanmean([x, np.roll(x, shift, axis=ax)], axis=0)
+                    for ax in (0, 1)
+                    for shift in (1, -1)
+                ),
+            )
+            x /= 4
+    return x
+
+
 def _assign_z_mean_message_passing(
-    df: pd.DataFrame, z_column: str = "z", rounds: int = 3
+    df: pd.DataFrame, /, z_column: str = "z", n_iter: int = 3
 ) -> np.ndarray:
     """
     Calculates a z-split coordinate.
@@ -42,13 +58,14 @@ def _assign_z_mean_message_passing(
         A dataframe of coordinates.
     z_column : str, optional
         The name of the column containing the z-coordinate.
-    rounds : int, optional
-        Number of rounds for the message passing algorithm.
+    n_iter : int, optional
+        Number of iterations for the message passing algorithm.
 
     Returns
     -------
     numpy.ndarray
     """
+
     if "pixel_id" not in df.columns:
         ValueError(
             "Please assign x,y coordinates to the dataframe first by running assign_xy(df)"
@@ -60,21 +77,7 @@ def _assign_z_mean_message_passing(
         (pixels["x_pixel"].max() + 1, pixels["y_pixel"].max() + 1), np.nan
     )
     elevation_map[pixels["x_pixel"], pixels["y_pixel"]] = pixels[z_column]
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        for _ in range(rounds):
-            elevation_map = reduce(
-                add,
-                (
-                    np.nanmean(
-                        [elevation_map, np.roll(elevation_map, shift, axis=ax)], axis=0
-                    )
-                    for ax in (0, 1)
-                    for shift in (1, -1)
-                ),
-            )
-            elevation_map /= 4
+    elevation_map = _message_passing(elevation_map, n_iter)
 
     return elevation_map[df["x_pixel"], df["y_pixel"]]
 
@@ -125,11 +128,13 @@ def _assign_z_median(df: pd.DataFrame, z_column: str = "z") -> np.ndarray:
 
 def pre_process_coordinates(
     coordinates: pd.DataFrame,
+    /,
     gridsize: float = 1,
+    *,
     coordinate_keys: tuple[str, str, str] = ("x", "y", "z"),
-    method: str = "message_passing",
+    method: Literal["mean", "median", "message_passing"] = "message_passing",
     inplace: bool = True,
-    rounds: int = 3,
+    n_iter: int = 3,
 ) -> pd.DataFrame:
     """
     Runs the pre-processing routine of the coordinate dataframe.
@@ -150,8 +155,9 @@ def pre_process_coordinates(
         One of, mean, median, and message_passing.
     inplace : bool, optional
         Whether to modify the input dataframe or return a copy.
-    rounds : int, optional
-        Only used if method is 'message_passing'. How many rounds of message passing to use.
+    n_iter : int, optional
+        Only used if method is 'message_passing'.
+        Number of iterations for the message passing algorithm.
 
     Returns
     -------
@@ -168,7 +174,7 @@ def pre_process_coordinates(
     match method:
         case "message_passing":
             z_delim = _assign_z_mean_message_passing(
-                coordinates, z_column=z, rounds=rounds
+                coordinates, z_column=z, n_iter=n_iter
             )
         case "mean":
             z_delim = _assign_z_mean(coordinates, z_column=z)
