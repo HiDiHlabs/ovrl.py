@@ -1,4 +1,4 @@
-from math import ceil
+from math import floor
 
 import numpy as np
 import pandas as pd
@@ -17,13 +17,13 @@ def _patches(
     length: int,
     padding: int,
     *,
-    size: None | tuple[int, int],
+    size: None | tuple[int, int] = None,
     coordinates: tuple[str, str] = ("x", "y"),
 ):
     x, y = coordinates
 
     if size is None:
-        size = (int(ceil(df[x].max())), int(ceil(df[y].max())))
+        size = (int(floor(df[x].max() + 1)), int(floor(df[y].max() + 1)))
 
     # ensure that patch_length is an upper-bound for the actual size
     patch_count_x = ceildiv(size[0], length) + 1
