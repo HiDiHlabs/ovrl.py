@@ -20,6 +20,16 @@ ovrlpy can be installed from `PyPI <https://pypi.org/project/ovrlpy>`_ via
    pip install ovrlpy
 
 
+bioconda
+--------
+
+ovrlpy can be installed from `bioconda <https://bioconda.github.io/recipes/ovrlpy/README.html>`_ via
+
+.. code-block:: bash
+
+   conda install bioconda::ovrlpy
+
+
 From GitHub
 -----------
 
@@ -37,6 +47,7 @@ the repository and then install with ``pip`` as follows
 
 
 .. _install-tutorial:
+
 Interactive tutorials
 ---------------------
 

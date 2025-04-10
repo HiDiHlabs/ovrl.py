@@ -17,10 +17,15 @@ Users can also use the built-in 3D visualisation tool to explore regions of sign
 
 ## installation
 
-`ovrlpy` can be installed from [PyPI](https://pypi.org)
+`ovrlpy` can be installed from [PyPI](https://pypi.org/project/ovrlpy/) or
+[bioconda](https://bioconda.github.io/recipes/ovrlpy/README.html)
 
 ```bash
+# install from PyPI
 pip install ovrlpy
+
+# or install from bioconda
+conda install bioconda::ovrlpy
 ```
 
 ## quickstart
