@@ -5,9 +5,13 @@ from pathlib import Path
 import pandas as pd
 
 
-def _filter_genes(df: pd.DataFrame, remove_features: Collection[str]) -> pd.DataFrame:
+def _filter_genes(
+    df: pd.DataFrame, remove_features: Collection[str], drop_index: bool = True
+) -> pd.DataFrame:
     if len(remove_features) > 0:
         df = df.loc[~df["gene"].str.contains(f"{'|'.join(remove_features)}")]
+        if drop_index:
+            df = df.reset_index(drop=True)
         df = df.assign(
             gene=lambda df: df["gene"].astype("category").cat.remove_unused_categories()
         )
