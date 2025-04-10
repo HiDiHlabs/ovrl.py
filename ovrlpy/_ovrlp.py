@@ -438,7 +438,7 @@ class Ovrlp:
         """
 
         print("Running vertical adjustment")
-        self.process_coordinates(gridsize=gridsize, rounds=20)
+        self.process_coordinates(gridsize=gridsize, n_iter=20)
 
         print("Creating gene expression embeddings for visualization")
         self.fit_transcripts(genes=genes, fit_umap=fit_umap)
