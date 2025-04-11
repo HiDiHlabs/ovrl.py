@@ -3,17 +3,15 @@ from collections.abc import Collection, Mapping
 from pathlib import Path
 
 import pandas as pd
+import polars as pl
 
 
 def _filter_genes(
-    df: pd.DataFrame, remove_features: Collection[str], drop_index: bool = True
-) -> pd.DataFrame:
+    df: pl.DataFrame, remove_features: Collection[str], drop_index: bool = True
+) -> pl.DataFrame:
     if len(remove_features) > 0:
-        df = df.loc[~df["gene"].str.contains(f"{'|'.join(remove_features)}")]
-        if drop_index:
-            df = df.reset_index(drop=True)
-        df = df.assign(
-            gene=lambda df: df["gene"].astype("category").cat.remove_unused_categories()
+        df = df.filter(
+            ~pl.col("gene").cast(pl.Utf8).str.contains(f"({'|'.join(remove_features)})")
         )
     return df
 
@@ -41,6 +39,7 @@ def read_Xenium(
     *,
     min_qv: float | None = None,
     remove_features: Collection[str] = XENIUM_CTRLS,
+    n_threads: int | None = None,
 ) -> pd.DataFrame:
     """
     Read a Xenium transcripts file.
@@ -55,6 +54,9 @@ def read_Xenium(
     remove_features : collections.abc.Collection[str], optional
         List of regex patterns to filter the 'feature_name' column,
         :py:attr:`ovrlpy.io.XENIUM_CTRLS` by default.
+    n_threads : int | None, optional
+        Number of threads used for parsing the input file.
+        If None, will default to number available CPUs.
 
     Returns
     -------
@@ -63,35 +65,42 @@ def read_Xenium(
     filepath = Path(filepath)
     columns = list(_XENIUM_COLUMNS.keys())
 
-    if min_qv is not None:
-        columns.append("qv")
-
     if filepath.suffix == ".parquet":
-        transcripts = pd.read_parquet(filepath, columns=columns)
-        transcripts["feature_name"] = transcripts["feature_name"].astype("category")
+        transcripts = pl.scan_parquet(filepath)
 
-        # v2/v3 versions of the XOA files encode the feature_name column as string
-        # while in v1 it is only designated as binary so we need to cast
-        # that's why we check whether the data in the column is bytes (and not string)
-        if isinstance(transcripts["feature_name"].cat.categories[0], bytes):
-            decoded_cat = transcripts["feature_name"].cat.categories.str.decode("utf-8")
-            transcripts["feature_name"] = transcripts[
-                "feature_name"
-            ].cat.rename_categories(decoded_cat)
+        # 'is_gene' column only exists for Xenium v3 which only has .parquet
+        if "is_gene" in transcripts.collect_schema().names():
+            transcripts = transcripts.filter(pl.col("is_gene"))
 
-        # TODO: 'is_gene' column exists for Xenium v3 which only has .parquet
-        # can be used to filter
+        if min_qv is not None:
+            transcripts = transcripts.filter(pl.col("qv") >= min_qv)
+
+        with pl.StringCache():
+            transcripts = (
+                transcripts.select(columns)
+                .with_columns(
+                    pl.col("feature_name").cast(pl.String).cast(pl.Categorical)
+                )
+                .collect()
+            )
 
     else:
-        transcripts = pd.read_csv(filepath, usecols=columns, dtype={"gene": "category"})
+        if min_qv is not None:
+            columns.append("qv")
+        transcripts = pl.read_csv(
+            filepath,
+            columns=columns,
+            schema_overrides={"feature_name": pl.Categorical},
+            n_threads=n_threads,
+        )
 
-    if min_qv is not None:
-        transcripts = transcripts.loc[transcripts["qv"] >= min_qv].drop(columns="qv")
+        if min_qv is not None:
+            transcripts = transcripts.filter(pl.col("qv") >= min_qv).drop("qv")
 
-    transcripts = transcripts.rename(columns=_XENIUM_COLUMNS)
+    transcripts = transcripts.rename(_XENIUM_COLUMNS)
     transcripts = _filter_genes(transcripts, remove_features)
 
-    return transcripts
+    return transcripts.to_pandas()
 
 
 # Vizgen MERFISH
@@ -106,6 +115,7 @@ def read_MERFISH(
     z_scale: float = 1.5,
     *,
     remove_genes: Collection[str] = MERFISH_CTRLS,
+    n_threads: int | None = None,
 ) -> pd.DataFrame:
     """
     Read a Vizgen transcripts file.
@@ -119,22 +129,29 @@ def read_MERFISH(
     remove_genes : collections.abc.Collection[str], optional
         List of regex patterns to filter the 'gene' column,
         :py:attr:`ovrlpy.io.MERFISH_CTRLS` by default.
+    n_threads : int | None, optional
+        Number of threads used for parsing the input file.
+        If None, will default to number available CPUs.
 
     Returns
     -------
     pandas.DataFrame
     """
 
-    transcripts = pd.read_csv(
-        Path(filepath), usecols=_MERFISH_COLUMNS.keys(), dtype={"gene": "category"}
-    ).rename(columns=_MERFISH_COLUMNS)
+    transcripts = pl.read_csv(
+        Path(filepath),
+        columns=list(_MERFISH_COLUMNS.keys()),
+        schema_overrides={"gene": pl.Categorical},
+        n_threads=n_threads,
+    ).rename(_MERFISH_COLUMNS)
 
     transcripts = _filter_genes(transcripts, remove_genes)
 
     # convert plane to um
-    transcripts["z"] *= z_scale
 
-    return transcripts
+    transcripts.with_columns(pl.col("z") * z_scale)
+
+    return transcripts.to_pandas()
 
 
 # Nanostring CosMx
@@ -149,6 +166,7 @@ def read_CosMx(
     scale: Mapping[str, float] = {"xy": 0.12028, "z": 0.8},
     *,
     remove_targets: Collection[str] = COSMX_CTRLS,
+    n_threads: int | None = None,
 ) -> pd.DataFrame:
     """
     Read a Nanostring CosMx transcripts file.
@@ -162,20 +180,25 @@ def read_CosMx(
     remove_targets : collections.abc.Collection[str], optional
         List of regex patterns to filter the 'target' column,
         :py:attr:`ovrlpy.io.COSMX_CTRLS` by default.
+    n_threads : int | None, optional
+        Number of threads used for parsing the input file.
+        If None, will default to number available CPUs.
 
     Returns
     -------
     pandas.DataFrame
     """
 
-    transcripts = pd.read_csv(
-        Path(filepath), usecols=_COSMX_COLUMNS.keys(), dtype={"target": "category"}
-    ).rename(columns=_COSMX_COLUMNS)
+    transcripts = pl.read_csv(
+        Path(filepath),
+        columns=list(_COSMX_COLUMNS.keys()),
+        schema_overrides={"target": pl.Categorical},
+        n_threads=n_threads,
+    ).rename(_COSMX_COLUMNS)
 
     transcripts = _filter_genes(transcripts, remove_targets)
 
     # convert pixel to um
-    transcripts[["x", "y"]] *= scale["xy"]
-    transcripts["z"] *= scale["z"]
+    transcripts.with_columns(pl.col(["x", "y"]) * scale["xy"], pl.col("z") * scale["z"])
 
-    return transcripts
+    return transcripts.to_pandas()
