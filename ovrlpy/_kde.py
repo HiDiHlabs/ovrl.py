@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from math import floor
-from typing import Iterable
+from typing import Iterable, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -12,54 +12,69 @@ from ._patching import _patches, n_patches
 
 _TRUNCATE = 4
 
+N = TypeVar("N", bound=int)
+Shape1D = tuple[N]
 
-def kde_2d(coordinates: np.ndarray, **kwargs):
+Shape2DAny = tuple[int, int]
+Shape3DAny = tuple[int, int, int]
+
+T = TypeVar("T", bound=np.dtype)
+
+Array1D_T = np.ndarray[Shape1D, T]
+
+
+def kde_2d(x: Array1D_T, y: Array1D_T, **kwargs) -> np.ndarray[Shape2DAny, np.dtype]:
     """
     Calculate the 2D KDE using the first 2 columns of coordinates.
     """
-    return _kde_nd(coordinates[:, :2], **kwargs)
+    return _kde_nd(x, y, **kwargs)
 
 
-def kde_3d(coordinates: np.ndarray, **kwargs):
+def kde_3d(
+    x: Array1D_T, y: Array1D_T, z: Array1D_T, **kwargs
+) -> np.ndarray[Shape3DAny, np.dtype]:
     """
     Calculate the 3D KDE using the first 3 columns of coordinates.
     """
-    return _kde_nd(coordinates[:, :3], **kwargs)
+    return _kde_nd(x, y, z, **kwargs)
 
 
 def _kde_nd(
-    coordinates: np.ndarray,
-    size=None,
+    *coordinates: Array1D_T,
+    size: tuple[int, ...] | None = None,
     bandwidth: float = 1.5,
     truncate: float = _TRUNCATE,
     dtype=np.float32,
-):
+) -> np.ndarray:
     """
     Calculate the KDE using the coordinates.
     """
+    assert len(coordinates) >= 1
 
-    if coordinates.shape[0] == 0:
+    n = coordinates[0].shape[0]
+    if not all(x.shape[0] == n for x in coordinates[1:]):
+        raise ValueError("All coordinates must have the same number of rows")
+
+    if n == 0:
         if size is None:
             raise ValueError("If no coordinates are provided, size must be provided.")
         else:
             return np.zeros(size, dtype=dtype)
 
     if size is None:
-        size = np.floor(np.max(coordinates, axis=0) + 1).astype(int)
+        size = tuple(int(floor(c.max() + 1)) for c in coordinates)
 
     output = np.zeros(size, dtype=dtype)
 
     dim_bins = list()
-    for i in range(coordinates.shape[1]):
-        c_min = int(np.min(coordinates[:, i]))
+    for c in coordinates:
+        c_min = int(c.min())
         # the last interval of np.histogram is closed (while the rest is half-open)
         # therefore we add an additional bin if the max is an int
-        c_max = int(floor(np.max(coordinates[:, i]) + 1))
+        c_max = int(floor(c.max() + 1))
         dim_bins.append(np.linspace(c_min, c_max, c_max - c_min + 1))
 
-    histogram, bins = np.histogramdd(
-        [coordinates[:, i] for i in range(coordinates.shape[1])], bins=dim_bins
-    )
+    histogram, bins = np.histogramdd(coordinates, bins=dim_bins)
 
     kde = gaussian_filter(
         histogram, sigma=bandwidth, truncate=truncate, mode="constant", output=dtype
@@ -85,21 +100,23 @@ def find_local_maxima(
     return local_maxima
 
 
-def kde_and_sample(coordinates: np.ndarray, sampling_coordinates: np.ndarray, **kwargs):
+def kde_and_sample(
+    *coordinates: Array1D_T, sampling_coordinates: np.ndarray, gene: str, **kwargs
+) -> tuple[str, np.ndarray]:
     """
     Create a kde of the data and sample at 'sampling_coordinates'.
     """
 
-    sampling_coordinates = np.round(sampling_coordinates).astype(int)
+    sampling_coordinates = np.rint(sampling_coordinates, dtype=int)
     n_dims = sampling_coordinates.shape[1]
 
-    kde = _kde_nd(coordinates, **kwargs)
+    kde = _kde_nd(*coordinates, **kwargs)
 
-    return kde[tuple(sampling_coordinates[:, i] for i in range(n_dims))]
+    return gene, kde[tuple(sampling_coordinates[:, i] for i in range(n_dims))]
 
 
 def _sample_expression(
-    coordinates: pd.DataFrame,
+    transcripts: pd.DataFrame,
     kde_bandwidth: float = 2.5,
     min_expression: float = 2,
     min_pixel_distance: float = 5,
@@ -110,12 +127,12 @@ def _sample_expression(
     dtype=np.float32,
 ) -> tuple[pd.DataFrame, np.ndarray]:
     """
-    Sample expression from a coordinate dataframe.
+    Sample expression from a transcripts dataframe.
 
     Parameters
     ----------
-        coordinates : Optional[pandas.DataFrame]
-            The input coordinate dataframe.
+        transcripts : pandas.DataFrame
+            The input transcripts dataframe.
         kde_bandwidth : float
             Bandwidth for kernel density estimation.
         minimum_expression : int
@@ -142,15 +159,17 @@ def _sample_expression(
 
     coord_columns = list(coord_columns)
     assert len(coord_columns) == 3 or len(coord_columns) == 2
-    coordinates = coordinates[coord_columns + [gene_column]].copy()
+    transcripts = transcripts[coord_columns + [gene_column]].copy()
 
     # lower resolution instead of increasing bandwidth!
-    coordinates[coord_columns] /= kde_bandwidth
+    transcripts[coord_columns] /= kde_bandwidth
 
     print("determining pseudocells")
 
     # perform a global KDE to determine local maxima:
-    kde = _kde_nd(coordinates[coord_columns].to_numpy(), bandwidth=1, dtype=dtype)
+    kde = _kde_nd(
+        *(transcripts[c].to_numpy() for c in coord_columns), bandwidth=1, dtype=dtype
+    )
 
     min_dist = 1 + int(min_pixel_distance / kde_bandwidth)
     local_maximum_coordinates = find_local_maxima(
@@ -170,9 +189,10 @@ def _sample_expression(
     coords = []
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
         for patch_df, offset, patch_size in tqdm.tqdm(
-            _patches(coordinates, patch_length, padding, size=size),
+            _patches(transcripts, patch_length, padding, size=size),
             total=n_patches(patch_length, size),
         ):
+            assert isinstance(patch_df, pd.DataFrame)
             patch_maxima = local_maximum_coordinates[
                 (local_maximum_coordinates[:, 0] >= offset[0])
                 & (local_maximum_coordinates[:, 0] < offset[0] + patch_size[0])
@@ -195,24 +215,25 @@ def _sample_expression(
                 *size[2:],
             )
 
-            futures = {
+            futures = set(
                 executor.submit(
                     kde_and_sample,
-                    df[coord_columns].to_numpy(),
-                    maxima,
+                    *(df[c].to_numpy() for c in coord_columns),
+                    sampling_coordinates=maxima,
+                    gene=gene,
                     size=patch_size,
                     bandwidth=1,
                     dtype=dtype,
-                ): gene
+                )
                 for gene, df in patch_df.groupby(gene_column, observed=True)
-            }
+            )
 
             patches.append(
-                pd.DataFrame({futures[f]: f.result() for f in as_completed(futures)})
+                pd.DataFrame(dict(f.result() for f in as_completed(futures)))
             )
             del futures
 
-    gene_list = sorted(coordinates[gene_column].unique())
+    gene_list = sorted(transcripts[gene_column].unique())
     locations = np.vstack(coords) * kde_bandwidth
     expression = pd.concat(patches).reset_index(drop=True)[gene_list].fillna(0)
 

@@ -152,9 +152,6 @@ class Ovrlp:
         self.embedding = None
         self.colors = None
 
-        self.integrity_map = None
-        self.signal_map = None
-
     def process_coordinates(self, gridsize: float = 1, **kwargs):
         """
         Process the coordinates of the transcripts dataframe.
@@ -326,7 +323,8 @@ class Ovrlp:
         n_tasks = 2 * self.n_workers
 
         signal = kde_2d(
-            self.transcripts[["x", "y"]].to_numpy(),
+            self.transcripts["x"].to_numpy(),
+            self.transcripts["y"].to_numpy(),
             bandwidth=self.KDE_bandwidth,
             dtype=self.dtype,
         )
@@ -340,11 +338,14 @@ class Ovrlp:
                 ),
                 total=n_patches(self.patch_length, signal.shape),
             ):
+                assert isinstance(patch_df, pd.DataFrame)
+
                 if len(patch_df) == 0:
                     continue
 
                 patch_signal = kde_2d(
-                    patch_df[["x", "y"]].to_numpy(),
+                    patch_df["x"].to_numpy(),
+                    patch_df["y"].to_numpy(),
                     bandwidth=self.KDE_bandwidth,
                     dtype=self.dtype,
                 )
@@ -363,7 +364,7 @@ class Ovrlp:
                 )
 
                 gene_coords = {
-                    gene: df.to_numpy()
+                    gene: df
                     for gene, df in patch_df.groupby("gene", observed=True)[
                         ["x", "y", "z", "z_delim"]
                     ]

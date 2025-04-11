@@ -126,36 +126,41 @@ def _knn_expression(
 
 
 def _compute_embedding_vectors(
-    coordinates: np.ndarray, mask: np.ndarray, factor: np.ndarray, **kwargs
+    df: pd.DataFrame, mask: np.ndarray, factor: np.ndarray, **kwargs
 ):
     """
     calculate top and bottom embedding
 
     Parameters
     ----------
-    coordinates : np.ndarray
-        2D array of x, y, z and z_delim coordinates
-    mask : np.ndarray
+    df : pandas.DataFrame
+        DataFrame of x, y, z and z_delim coordinates
+    mask : numpy.ndarray
         binary mask for which pixels to calculate embedding
-    factor : np.ndarray
+    factor : numpy.ndarray
         embedding weights
     """
-    if len(coordinates) < 2:
+    if len(df) < 2:
         return None, None
 
     # TODO: what happens if equal?
-    top = coordinates[coordinates[:, 2] > coordinates[:, 3], :2]
-    bottom = coordinates[coordinates[:, 2] < coordinates[:, 3], :2]
+    top = df.loc[df["z"] > df["z_delim"], ["x", "y"]]
+    bottom = df.loc[df["z"] < df["z_delim"], ["x", "y"]]
 
     if len(top) == 0:
         signal_top = None
     else:
-        signal_top = kde_2d(top, size=mask.shape, **kwargs)[mask]
+        signal_top = kde_2d(
+            top["x"].to_numpy(), top["y"].to_numpy(), size=mask.shape, **kwargs
+        )[mask]
         signal_top = signal_top[:, None] * factor[None, :]
+
     if len(bottom) == 0:
         signal_bottom = None
     else:
-        signal_bottom = kde_2d(bottom, size=mask.shape, **kwargs)[mask]
+        signal_bottom = kde_2d(
+            bottom["x"].to_numpy(), bottom["y"].to_numpy(), size=mask.shape, **kwargs
+        )[mask]
         signal_bottom = signal_bottom[:, None] * factor[None, :]
 
     return signal_top, signal_bottom
