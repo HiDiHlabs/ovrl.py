@@ -16,6 +16,7 @@ authors = [
     { name = "Nikla Müller-Bötticher", email = "niklas.mueller-boetticher@bih-charite.de" },
 ]
 dependencies = [
+    "anndata>=0.10",
     "matplotlib~=3.8",
     "matplotlib-scalebar",
     "numpy>=1.25,<3",

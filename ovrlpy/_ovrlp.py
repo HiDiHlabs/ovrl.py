@@ -8,6 +8,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import tqdm
+from anndata import AnnData
 from scipy.linalg import norm
 from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
@@ -67,11 +68,7 @@ class Ovrlp:
         The bandwidth of the KDE.
     min_distance : int
         Minimum distance between pseudocells (local maxima).
-    pseudocell_locations_x : numpy.ndarray
-        x-coordinates obtained through gene expression localmax sampling.
-    pseudocell_locations_y : numpy.ndarray
-        y-coordinates obtained through gene expression localmax sampling.
-    pseudocells : pandas.DataFrame
+    pseudocells : anndata.AnnData
         Gene expression matrix of the pseudcells.
     signatures : pandas.DataFrame
         A matrix of celltypes x gene signatures to use to annotate the UMAP.
@@ -89,10 +86,6 @@ class Ovrlp:
         The UMAP object used for the 3D RGB embedding.
     genes : list
         A list of genes to utilize in the model.
-    embedding : numpy.ndarray
-        The 2D embedding of pseudocell gene expression .
-    colors : numpy.ndarray
-        The RGB embedding.
     integrity_map : numpy.ndarray
         The integrity map of the tissue.
     signal_map : numpy.ndarray
@@ -131,11 +124,6 @@ class Ovrlp:
         self.patch_length = patch_length
 
         self.min_distance = min_distance
-        self.pseudocell_locations_x, self.pseudocell_locations_y = None, None
-        self.pseudocells = None
-        self.signatures = None
-        self.celltype_centers = None
-        self.celltype_assignments = None
 
         if "random_state" not in umap_kwargs and "n_jobs" not in umap_kwargs:
             umap_kwargs = {"n_jobs": n_workers} | umap_kwargs
@@ -147,10 +135,6 @@ class Ovrlp:
         self.embedder_2d = UMAP(**(umap_kwargs | {"n_components": 2}))
         self.pca_3d = PCA(n_components=3)
         self.embedder_3d = UMAP(**(cumap_kwargs | {"n_components": 3}))
-
-        self.genes: list | None = None
-        self.embedding = None
-        self.colors = None
 
     def process_coordinates(self, gridsize: float = 1, **kwargs):
         """
@@ -196,7 +180,7 @@ class Ovrlp:
             genes = sorted(self.transcripts["gene"].unique())
         self.genes = genes
 
-        local_maxima, coordinates = _sample_expression(
+        local_maxima = _sample_expression(
             self.transcripts,
             min_expression=self._expression_threshold(min_transcript),
             kde_bandwidth=self.KDE_bandwidth,
@@ -206,31 +190,30 @@ class Ovrlp:
             dtype=self.dtype,
         )
 
-        self.pseudocell_locations_x, self.pseudocell_locations_y, _ = coordinates.T
-
         self.fit_pseudocells(local_maxima, fit_umap=fit_umap)
 
-    def fit_pseudocells(self, pseudocells: pd.DataFrame, *, fit_umap: bool = True):
+    def fit_pseudocells(self, pseudocells: AnnData, *, fit_umap: bool = True):
         """
         Fits the expression of pseudocells.
 
         Parameters
         ----------
-        pseudocells : pandas.DataFrame
-            A cell x gene matrix of gene expression
+        pseudocells : anndata.AnnData
+            Gene expression to use for fitting.
         fit_umap : bool
             Whether to fit the UMAP to the data.
         """
 
         self.pseudocells = pseudocells
-        self.pca_2d.fit(pseudocells)
+        X = pseudocells[:, self.genes].X
+        self.pca_2d.fit(X)
 
         if fit_umap:
-            factors = self.pca_2d.transform(pseudocells)
+            factors = self.pca_2d.transform(X)
 
             print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
 
-            self.embedding = self.embedder_2d.fit_transform(factors)
+            self.pseudocells.obsm["2D_UMAP"] = self.embedder_2d.fit_transform(factors)
 
             embedding_color = self.embedder_3d.fit_transform(
                 factors / norm(factors, axis=1)[..., None]
@@ -242,19 +225,17 @@ class Ovrlp:
                 embedding_color.max(axis=0),
             )
 
-            self.colors = _minmax_scaling(embedding_color)
+            self.pseudocells.obsm["RGB"] = _minmax_scaling(embedding_color)
 
     @staticmethod
-    def _determine_celltype(
-        samples: pd.DataFrame, signatures: pd.DataFrame
-    ) -> np.ndarray:
-        samples = samples.loc[:, signatures.columns]
+    def _determine_celltype(samples: AnnData, signatures: pd.DataFrame) -> np.ndarray:
+        X = samples[:, signatures.columns].X
         signature_mtx = signatures.to_numpy()
         # TODO: this is quite inefficient?
         # it calculates all pairwise correlation coefficients even if not needed.
         correlations = np.array(
             [
-                np.corrcoef(samples.iloc[i, :], signature_mtx)[0, 1:]
+                np.corrcoef(X[i, :], signature_mtx)[0, 1:]
                 for i in range(samples.shape[0])
             ]
         )
@@ -289,7 +270,7 @@ class Ovrlp:
 
         if self.pseudocells is None:
             raise Exception("`fit_pseudocells` must be run before fitting signatures")
-        if self.embedding is None:
+        if "2D_UMAP" not in self.pseudocells.obsm:
             raise Exception("Signature can only be fitted if a UMAP has been fit")
 
         self.signatures = signatures
@@ -300,7 +281,9 @@ class Ovrlp:
 
         # determine the center of gravity of each celltype in the embedding:
         self.celltype_centers = self._coordinate_center(
-            self.embedding, self.celltype_assignments, len(signatures.columns)
+            self.pseudocells.obsm["2D_UMAP"],
+            self.celltype_assignments,
+            len(signatures.columns),
         )
 
     def compute_VSI(self, *, min_transcript: float = 2):
@@ -577,7 +560,7 @@ class Ovrlp:
 
         return embedding, embedding_color
 
-    def get_pseudocells(self) -> pd.DataFrame:
+    def pseudocell_integrity(self) -> pd.DataFrame:
         """
         Returns a DataFrame containing the gene-count matrix of the fitted
         tissue's determined pseudo-cells.
@@ -586,18 +569,17 @@ class Ovrlp:
         -------
         pandas.DataFrame
         """
+        assert self.pseudocells is not None
         pseudocells = pd.DataFrame(
-            {"x": self.pseudocell_locations_x, "y": self.pseudocell_locations_y}
+            self.pseudocells.obsm["spatial"][:, :2], columns=["x", "y"]
         )
 
         if self.signal_map is not None:
-            pseudocells["signal"] = self.signal_map[
-                pseudocells["y"].astype(int), pseudocells["x"].astype(int)
-            ]
+            pseudocells["signal"] = self.signal_map[pseudocells["y"], pseudocells["x"]]
 
         if self.integrity_map is not None:
             pseudocells["integrity"] = self.integrity_map[
-                pseudocells["y"].astype(int), pseudocells["x"].astype(int)
+                pseudocells["y"], pseudocells["x"]
             ]
 
         return pseudocells

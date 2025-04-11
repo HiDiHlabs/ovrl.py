@@ -5,6 +5,7 @@ from typing import Iterable, TypeVar
 import numpy as np
 import pandas as pd
 import tqdm
+from anndata import AnnData
 from scipy.ndimage import gaussian_filter
 from skimage.feature import peak_local_max
 
@@ -107,7 +108,7 @@ def kde_and_sample(
     Create a kde of the data and sample at 'sampling_coordinates'.
     """
 
-    sampling_coordinates = np.rint(sampling_coordinates, dtype=int)
+    sampling_coordinates = np.rint(sampling_coordinates).astype(int)
     n_dims = sampling_coordinates.shape[1]
 
     kde = _kde_nd(*coordinates, **kwargs)
@@ -125,7 +126,7 @@ def _sample_expression(
     n_workers: int = 8,
     patch_length: int = 500,
     dtype=np.float32,
-) -> tuple[pd.DataFrame, np.ndarray]:
+) -> AnnData:
     """
     Sample expression from a transcripts dataframe.
 
@@ -153,8 +154,7 @@ def _sample_expression(
 
     Returns
     -------
-        pandas.DataFrame: Gene expression KDE of local maxima.
-        numpy.ndarray: Coordinates of local maxima
+        anndata.AnnData
     """
 
     coord_columns = list(coord_columns)
@@ -234,7 +234,7 @@ def _sample_expression(
             del futures
 
     gene_list = sorted(transcripts[gene_column].unique())
-    locations = np.vstack(coords) * kde_bandwidth
-    expression = pd.concat(patches).reset_index(drop=True)[gene_list].fillna(0)
-
-    return expression, locations
+    # TODO: sparse?
+    adata = AnnData(pd.concat(patches).reset_index(drop=True)[gene_list].fillna(0))
+    adata.obsm["spatial"] = np.rint(np.vstack(coords) * kde_bandwidth).astype(np.int32)
+    return adata

@@ -112,11 +112,16 @@ def plot_umap(ovrlp: Ovrlp, *, annotate: bool = True, ax: Axes | None = None, **
     if ax is None:
         _, ax = plt.subplots()
     annotation = (
-        ovrlp.signatures.index if annotate and ovrlp.signatures is not None else None
+        ovrlp.signatures.index if annotate and hasattr(ovrlp, "signatures") else None
     )
-    assert ovrlp.embedding is not None and ovrlp.colors is not None
+    assert ("2D_UMAP" in ovrlp.pseudocells.obsm) and ("RGB" in ovrlp.pseudocells.obsm)
     _plot_embeddings(
-        ax, ovrlp.embedding, ovrlp.colors, ovrlp.celltype_centers, annotation, **kwargs
+        ax,
+        ovrlp.pseudocells.obsm["2D_UMAP"],
+        ovrlp.pseudocells.obsm["RGB"],
+        ovrlp.celltype_centers,
+        annotation,
+        **kwargs,
     )
 
 
@@ -183,11 +188,12 @@ def plot_tissue(
     """
     if ax is None:
         _, ax = plt.subplots()
+
     _plot_tissue_scatter(
         ax,
-        ovrlp.pseudocell_locations_x,
-        ovrlp.pseudocell_locations_y,
-        ovrlp.colors,
+        ovrlp.pseudocells.obsm["spatial"][:, 0],
+        ovrlp.pseudocells.obsm["spatial"][:, 1],
+        ovrlp.pseudocells.obsm["RGB"],
         marker=".",
         **kwargs,
     )
@@ -268,7 +274,6 @@ def plot_signal_integrity(
     """
     integrity = ovrlp.integrity_map
     signal = ovrlp.signal_map
-    assert isinstance(signal, np.ndarray) and isinstance(integrity, np.ndarray)
 
     cmap = Colormap(cmap) if isinstance(cmap, str) else cmap
 
@@ -354,13 +359,7 @@ def plot_region_of_interest(
     """
     integrity = ovrlp.integrity_map
     signal = ovrlp.signal_map
-    embedding = ovrlp.embedding
-    assert (
-        isinstance(signal, np.ndarray)
-        and isinstance(integrity, np.ndarray)
-        and isinstance(embedding, np.ndarray)
-        and isinstance(ovrlp.colors, np.ndarray)
-    )
+    embedding = ovrlp.pseudocells.obsm["2D_UMAP"]
 
     # first, create and color-embed the subsample of the region of interest
     roi_transcripts = ovrlp.subset_transcripts(x, y, window_size=window_size)
@@ -401,7 +400,7 @@ def plot_region_of_interest(
 
     # UMAP
     ax_umap = fig.add_subplot(gs[0, 0], label="umap")
-    _plot_embeddings(ax_umap, embedding, ovrlp.colors)
+    _plot_embeddings(ax_umap, embedding, ovrlp.pseudocells.obsm["RGB"])
     ax_umap.set_title("UMAP")
 
     # tissue map
