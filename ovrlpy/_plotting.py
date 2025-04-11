@@ -115,11 +115,12 @@ def plot_umap(ovrlp: Ovrlp, *, annotate: bool = True, ax: Axes | None = None, **
         ovrlp.signatures.index if annotate and hasattr(ovrlp, "signatures") else None
     )
     assert ("2D_UMAP" in ovrlp.pseudocells.obsm) and ("RGB" in ovrlp.pseudocells.obsm)
+    ct_center = ovrlp.celltype_centers if hasattr(ovrlp, "celltype_centers") else None
     _plot_embeddings(
         ax,
         ovrlp.pseudocells.obsm["2D_UMAP"],
         ovrlp.pseudocells.obsm["RGB"],
-        ovrlp.celltype_centers,
+        ct_center,
         annotation,
         **kwargs,
     )
@@ -363,7 +364,7 @@ def plot_region_of_interest(
 
     # first, create and color-embed the subsample of the region of interest
     roi_transcripts = ovrlp.subset_transcripts(x, y, window_size=window_size)
-    roi_transcripts = roi_transcripts.sort_values("z")
+    roi_transcripts = roi_transcripts.sort("z")
     _, embedding_color = ovrlp.transform_transcripts(roi_transcripts)
 
     if x is None:
@@ -423,7 +424,7 @@ def plot_region_of_interest(
 
     ax_roi_top = fig.add_subplot(gs[1, 0], label="top_map")
     top_mask = roi_transcripts["z"] > roi_transcripts["z_delim"]
-    roi_top = roi_transcripts[top_mask]
+    roi_top = roi_transcripts.filter(top_mask)
     _plot_tissue_scatter(
         ax_roi_top,
         roi_top["x"],
@@ -437,7 +438,7 @@ def plot_region_of_interest(
     # bottom view of ROI
     ax_roi_bottom = fig.add_subplot(gs[1, 1], label="bottom_map")
     bottom_mask = roi_transcripts["z"] < roi_transcripts["z_delim"]
-    roi_bottom = roi_transcripts[bottom_mask][::-1]
+    roi_bottom = roi_transcripts.filter(bottom_mask)[::-1]
     _plot_tissue_scatter(
         ax_roi_bottom,
         roi_bottom["x"],
@@ -464,8 +465,8 @@ def plot_region_of_interest(
 
     _plot_tissue_scatter(
         ax_side_x,
-        roi_transcripts.loc[halving_mask, ["x"]],
-        roi_transcripts.loc[halving_mask, ["z"]],
+        roi_transcripts["x"].filter(halving_mask),
+        roi_transcripts["z"].filter(halving_mask),
         embedding_color[halving_mask],
         title="ROI, vertical, x-cut",
         **roi_side_scatter_kwargs,
@@ -476,8 +477,8 @@ def plot_region_of_interest(
 
     _plot_tissue_scatter(
         ax_side_y,
-        roi_transcripts.loc[halving_mask, ["y"]],
-        roi_transcripts.loc[halving_mask, ["z"]],
+        roi_transcripts["y"].filter(halving_mask),
+        roi_transcripts["z"].filter(halving_mask),
         embedding_color[halving_mask],
         title="ROI, vertical, y-cut",
         **roi_side_scatter_kwargs,

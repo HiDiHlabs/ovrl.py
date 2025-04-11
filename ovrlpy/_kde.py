@@ -1,11 +1,13 @@
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from math import floor
 from typing import Iterable, TypeVar
 
 import numpy as np
 import pandas as pd
+import polars as pl
 import tqdm
-from anndata import AnnData
+from anndata import AnnData, ImplicitModificationWarning
 from scipy.ndimage import gaussian_filter
 from skimage.feature import peak_local_max
 
@@ -102,8 +104,8 @@ def find_local_maxima(
 
 
 def kde_and_sample(
-    *coordinates: Array1D_T, sampling_coordinates: np.ndarray, gene: str, **kwargs
-) -> tuple[str, np.ndarray]:
+    *coordinates: Array1D_T, sampling_coordinates: np.ndarray, gene: object, **kwargs
+) -> tuple[object, np.ndarray]:
     """
     Create a kde of the data and sample at 'sampling_coordinates'.
     """
@@ -117,7 +119,7 @@ def kde_and_sample(
 
 
 def _sample_expression(
-    transcripts: pd.DataFrame,
+    transcripts: pl.DataFrame,
     kde_bandwidth: float = 2.5,
     min_expression: float = 2,
     min_pixel_distance: float = 5,
@@ -159,10 +161,11 @@ def _sample_expression(
 
     coord_columns = list(coord_columns)
     assert len(coord_columns) == 3 or len(coord_columns) == 2
-    transcripts = transcripts[coord_columns + [gene_column]].copy()
 
     # lower resolution instead of increasing bandwidth!
-    transcripts[coord_columns] /= kde_bandwidth
+    transcripts = transcripts.select(coord_columns + [gene_column]).with_columns(
+        pl.col(c) / kde_bandwidth for c in coord_columns
+    )
 
     print("determining pseudocells")
 
@@ -192,7 +195,7 @@ def _sample_expression(
             _patches(transcripts, patch_length, padding, size=size),
             total=n_patches(patch_length, size),
         ):
-            assert isinstance(patch_df, pd.DataFrame)
+            assert isinstance(patch_df, pl.DataFrame)
             patch_maxima = local_maximum_coordinates[
                 (local_maximum_coordinates[:, 0] >= offset[0])
                 & (local_maximum_coordinates[:, 0] < offset[0] + patch_size[0])
@@ -220,14 +223,15 @@ def _sample_expression(
                     kde_and_sample,
                     *(df[c].to_numpy() for c in coord_columns),
                     sampling_coordinates=maxima,
-                    gene=gene,
+                    gene=gene[0],
                     size=patch_size,
                     bandwidth=1,
                     dtype=dtype,
                 )
-                for gene, df in patch_df.groupby(gene_column, observed=True)
+                for gene, df in patch_df.group_by(gene_column)
             )
 
+            # TODO: improve
             patches.append(
                 pd.DataFrame(dict(f.result() for f in as_completed(futures)))
             )
@@ -235,6 +239,8 @@ def _sample_expression(
 
     gene_list = sorted(transcripts[gene_column].unique())
     # TODO: sparse?
-    adata = AnnData(pd.concat(patches).reset_index(drop=True)[gene_list].fillna(0))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=ImplicitModificationWarning)
+        adata = AnnData(pd.concat(patches).reset_index(drop=True)[gene_list].fillna(0))
     adata.obsm["spatial"] = np.rint(np.vstack(coords) * kde_bandwidth).astype(np.int32)
     return adata

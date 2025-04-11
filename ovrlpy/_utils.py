@@ -3,6 +3,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from numpy.typing import NDArray
 from scipy.linalg import norm
 from sklearn.decomposition import PCA
@@ -86,18 +87,6 @@ def _transform_embeddings(expression, pca: PCA, embedder_2d: UMAP, embedder_3d: 
     return embedding, embedding_color
 
 
-def _spatial_subset_mask(
-    coordinates: pd.DataFrame, x: float, y: float, window_size: float = 5
-):
-    """subset spots around x, y given a window size"""
-    return (
-        (coordinates["x"] > x - window_size)
-        & (coordinates["x"] < x + window_size)
-        & (coordinates["y"] > y - window_size)
-        & (coordinates["y"] < y + window_size)
-    )
-
-
 def _create_knn_graph(coords, k: int = 10):
     """k nearest neighbors distances and indices"""
     nbrs = NearestNeighbors(n_neighbors=k, algorithm="ball_tree").fit(coords)
@@ -126,14 +115,14 @@ def _knn_expression(
 
 
 def _compute_embedding_vectors(
-    df: pd.DataFrame, mask: np.ndarray, factor: np.ndarray, **kwargs
+    df: pl.DataFrame, mask: np.ndarray, factor: np.ndarray, **kwargs
 ):
     """
     calculate top and bottom embedding
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : polars.DataFrame
         DataFrame of x, y, z and z_delim coordinates
     mask : numpy.ndarray
         binary mask for which pixels to calculate embedding
@@ -144,8 +133,8 @@ def _compute_embedding_vectors(
         return None, None
 
     # TODO: what happens if equal?
-    top = df.loc[df["z"] > df["z_delim"], ["x", "y"]]
-    bottom = df.loc[df["z"] < df["z_delim"], ["x", "y"]]
+    top = df.filter(pl.col("z") > pl.col("z_delim")).select(["x", "y"])
+    bottom = df.filter(pl.col("z") < pl.col("z_delim")).select(["x", "y"])
 
     if len(top) == 0:
         signal_top = None

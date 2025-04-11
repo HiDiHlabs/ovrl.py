@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import polars as pl
 import tqdm
 from anndata import AnnData
 from scipy.linalg import norm
@@ -26,7 +27,6 @@ from ._utils import (
     _fill_color_axes,
     _knn_expression,
     _minmax_scaling,
-    _spatial_subset_mask,
     _transform_embeddings,
 )
 
@@ -37,7 +37,7 @@ class Ovrlp:
 
     Parameters
     ----------
-    transcripts : pandas.DataFrame
+    transcripts : polars.DataFrame | pandas.DataFrame
         Transcript information containing coordinates and gene name/id.
     KDE_bandwidth : float, optional
         The bandwidth of the KDE.
@@ -62,7 +62,7 @@ class Ovrlp:
 
     Attributes
     ----------
-    transcripts : pandas.DataFrame
+    transcripts : polars.DataFrame
         Transcript information containing coordinates and gene name/id.
     KDE_bandwidth : float
         The bandwidth of the KDE.
@@ -100,7 +100,7 @@ class Ovrlp:
 
     def __init__(
         self,
-        transcripts: pd.DataFrame,
+        transcripts: pl.DataFrame | pd.DataFrame,
         /,
         KDE_bandwidth: float = 2.5,
         min_distance: float = 8,
@@ -115,7 +115,9 @@ class Ovrlp:
         cumap_kwargs: dict[str, Any] = UMAP_RGB_PARAMS,
     ) -> None:
         columns = {gene_key: "gene"} | dict(zip(coordinate_keys, ["x", "y", "z"]))
-        self.transcripts = transcripts.rename(columns=columns)
+        if isinstance(transcripts, pd.DataFrame):
+            transcripts = pl.from_pandas(transcripts)
+        self.transcripts = transcripts.rename(columns)
 
         self.KDE_bandwidth = KDE_bandwidth
         self.dtype = dtype
@@ -234,12 +236,9 @@ class Ovrlp:
         # TODO: this is quite inefficient?
         # it calculates all pairwise correlation coefficients even if not needed.
         correlations = np.array(
-            [
-                np.corrcoef(X[i, :], signature_mtx)[0, 1:]
-                for i in range(samples.shape[0])
-            ]
+            [np.corrcoef(X[i, :], signature_mtx)[0, 1:] for i in range(X.shape[0])]
         )
-        return np.argmax(correlations, -1)
+        return np.argmax(correlations, axis=-1)
 
     @staticmethod
     def _coordinate_center(
@@ -317,24 +316,24 @@ class Ovrlp:
         with ThreadPoolExecutor(max_workers=self.n_workers) as executor:
             for patch_df, offset, size in tqdm.tqdm(
                 _patches(
-                    self.transcripts, self.patch_length, padding, size=signal.shape
+                    self.transcripts.select(["gene", "x", "y", "z", "z_delim"]),
+                    self.patch_length,
+                    padding,
+                    size=signal.shape,
                 ),
                 total=n_patches(self.patch_length, signal.shape),
             ):
-                assert isinstance(patch_df, pd.DataFrame)
+                assert isinstance(patch_df, pl.DataFrame)
 
                 if len(patch_df) == 0:
                     continue
 
-                patch_signal = kde_2d(
-                    patch_df["x"].to_numpy(),
-                    patch_df["y"].to_numpy(),
-                    bandwidth=self.KDE_bandwidth,
-                    dtype=self.dtype,
-                )
-
-                patch_signal_mask = patch_signal > min_expression
-                n_pixels = patch_signal_mask.sum()
+                patch_signal = signal[
+                    offset[0] : offset[0] + size[0] + 2 * padding,
+                    offset[1] : offset[1] + size[1] + 2 * padding,
+                ]
+                patch_mask = patch_signal > min_expression
+                n_pixels = patch_mask.sum()
 
                 if n_pixels == 0:
                     continue
@@ -347,10 +346,7 @@ class Ovrlp:
                 )
 
                 gene_coords = {
-                    gene: df
-                    for gene, df in patch_df.groupby("gene", observed=True)[
-                        ["x", "y", "z", "z_delim"]
-                    ]
+                    gene[0]: df.drop("gene") for gene, df in patch_df.group_by("gene")
                 }
 
                 futures: set[Future] = set()
@@ -365,7 +361,7 @@ class Ovrlp:
                                 executor.submit(
                                     _compute_embedding_vectors,
                                     gene_coords.pop(gene),
-                                    patch_signal_mask,
+                                    patch_mask,
                                     self.pca_2d.components_[:, i],
                                     bandwidth=self.KDE_bandwidth,
                                     dtype=self.dtype,
@@ -386,7 +382,7 @@ class Ovrlp:
                 patch_norm[patch_norm == 0] = np.inf
 
                 patch_cosine_similarity = np.zeros_like(patch_signal)
-                patch_cosine_similarity[patch_signal_mask] = (
+                patch_cosine_similarity[patch_mask] = (
                     np.sum(patch_embedding_top * patch_embedding_bottom, axis=1)
                     / patch_norm
                 )
@@ -397,10 +393,10 @@ class Ovrlp:
 
                 x_pad = offset[0] + padding
                 y_pad = offset[1] + padding
-                cosine_similarity[
-                    x_pad : x_pad + patch_cosine_similarity.shape[0],
-                    y_pad : y_pad + patch_cosine_similarity.shape[1],
-                ] = patch_cosine_similarity
+
+                cosine_similarity[x_pad : x_pad + size[0], y_pad : y_pad + size[1]] = (
+                    patch_cosine_similarity
+                )
 
         self.signal_map = signal.T
         self.integrity_map = cosine_similarity.T
@@ -455,7 +451,7 @@ class Ovrlp:
             which leads to the detection of overlap regions with larger spatial extent.
         """
 
-        if self.signal_map is None or self.integrity_map is None:
+        if not hasattr(self, "signal_map") or not hasattr(self, "integrity_map"):
             raise Exception("Run `compute_VSI` before detecting doublets")
 
         if integrity_sigma is not None:
@@ -482,7 +478,7 @@ class Ovrlp:
 
     def subset_transcripts(
         self, x: float, y: float, *, window_size: int = 30
-    ) -> pd.DataFrame:
+    ) -> pl.DataFrame:
         """
         Subset the transcript dataframe spatially based on given x, y coordinates and window
         size.
@@ -497,13 +493,14 @@ class Ovrlp:
             The window size of the region. Molecules within this window around (x, y)
             are returned as a new DataFrame.
         """
-
-        mask = _spatial_subset_mask(self.transcripts, x, y, window_size=window_size)
-        return self.transcripts[mask].copy()
+        return self.transcripts.filter(
+            pl.col("x").is_between(x - window_size, x + window_size)
+            & pl.col("y").is_between(y - window_size, y + window_size)
+        ).clone()
 
     def transform_transcripts(
         self,
-        transcripts: pd.DataFrame,
+        transcripts: pl.DataFrame | pd.DataFrame,
         *,
         gene_key: str = "gene",
         coordinate_keys: Sequence[str] = ["x", "y", "z"],
@@ -513,7 +510,7 @@ class Ovrlp:
 
         Parameters
         ----------
-        transcripts : pandas.DataFrame
+        transcripts : polars.DataFrame
             Data frame of transcript coordinates to transform.
         gene_key : str
             Name of the gene column.
@@ -536,14 +533,14 @@ class Ovrlp:
         return self.transform_pseudocells(expression)
 
     def transform_pseudocells(
-        self, pseudocells: pd.DataFrame
+        self, pseudocells: pl.DataFrame | pd.DataFrame
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Transforms a matrix of gene expression to the 2D and 3D embedding space.
 
         Parameters
         ----------
-        pseudocells : pandas.DataFrame
+        pseudocells : polars.DataFrame | pandas.DataFrame
             A cell x gene matrix of gene expression
         """
 

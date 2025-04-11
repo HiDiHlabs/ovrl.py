@@ -1,7 +1,7 @@
 from math import floor
 
 import numpy as np
-import pandas as pd
+import polars as pl
 
 
 def ceildiv(a: int, b: int):
@@ -13,7 +13,7 @@ def n_patches(length: int, size: tuple[int, int]):
 
 
 def _patches(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     length: int,
     padding: int,
     *,
@@ -39,12 +39,11 @@ def _patches(
             _x = x_patches[i + 1] + padding
             _y = y_patches[j + 1] + padding
 
-            size_x = _x - x_ - padding * 2
-            size_y = _y - y_ - padding * 2
+            size_x = x_patches[i + 1] - x_patches[i]
+            size_y = y_patches[j + 1] - y_patches[j]
 
-            patch = df[
-                (df[x] >= x_) & (df[x] < _x) & (df[y] >= y_) & (df[y] < _y)
-            ].copy()
-            patch[x] -= x_
-            patch[y] -= y_
+            patch = df.filter(
+                pl.col(x).is_between(x_, _x, closed="left")
+                & pl.col(y).is_between(y_, _y, closed="left")
+            ).with_columns(pl.col(x) - x_, pl.col(y) - y_)
             yield patch, (x_, y_), (size_x, size_y)

@@ -2,7 +2,6 @@ import os
 from collections.abc import Collection, Mapping
 from pathlib import Path
 
-import pandas as pd
 import polars as pl
 
 
@@ -40,7 +39,7 @@ def read_Xenium(
     min_qv: float | None = None,
     remove_features: Collection[str] = XENIUM_CTRLS,
     n_threads: int | None = None,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """
     Read a Xenium transcripts file.
 
@@ -56,11 +55,11 @@ def read_Xenium(
         :py:attr:`ovrlpy.io.XENIUM_CTRLS` by default.
     n_threads : int | None, optional
         Number of threads used for parsing the input file.
-        If None, will default to number available CPUs.
+        If None, will default to number of available CPUs.
 
     Returns
     -------
-    pandas.DataFrame
+    polars.DataFrame
     """
     filepath = Path(filepath)
     columns = list(_XENIUM_COLUMNS.keys())
@@ -100,7 +99,7 @@ def read_Xenium(
     transcripts = transcripts.rename(_XENIUM_COLUMNS)
     transcripts = _filter_genes(transcripts, remove_features)
 
-    return transcripts.to_pandas()
+    return transcripts
 
 
 # Vizgen MERFISH
@@ -116,7 +115,7 @@ def read_MERFISH(
     *,
     remove_genes: Collection[str] = MERFISH_CTRLS,
     n_threads: int | None = None,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """
     Read a Vizgen transcripts file.
 
@@ -131,11 +130,11 @@ def read_MERFISH(
         :py:attr:`ovrlpy.io.MERFISH_CTRLS` by default.
     n_threads : int | None, optional
         Number of threads used for parsing the input file.
-        If None, will default to number available CPUs.
+        If None, will default to number of available CPUs.
 
     Returns
     -------
-    pandas.DataFrame
+    polars.DataFrame
     """
 
     transcripts = pl.read_csv(
@@ -151,7 +150,7 @@ def read_MERFISH(
 
     transcripts.with_columns(pl.col("z") * z_scale)
 
-    return transcripts.to_pandas()
+    return transcripts
 
 
 # Nanostring CosMx
@@ -167,7 +166,7 @@ def read_CosMx(
     *,
     remove_targets: Collection[str] = COSMX_CTRLS,
     n_threads: int | None = None,
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     """
     Read a Nanostring CosMx transcripts file.
 
@@ -182,11 +181,11 @@ def read_CosMx(
         :py:attr:`ovrlpy.io.COSMX_CTRLS` by default.
     n_threads : int | None, optional
         Number of threads used for parsing the input file.
-        If None, will default to number available CPUs.
+        If None, will default to number of available CPUs.
 
     Returns
     -------
-    pandas.DataFrame
+    polars.DataFrame
     """
 
     transcripts = pl.read_csv(
@@ -201,4 +200,4 @@ def read_CosMx(
     # convert pixel to um
     transcripts.with_columns(pl.col(["x", "y"]) * scale["xy"], pl.col("z") * scale["z"])
 
-    return transcripts.to_pandas()
+    return transcripts
