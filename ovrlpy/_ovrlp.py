@@ -327,11 +327,12 @@ class Ovrlp:
 
                 if len(patch_df) == 0:
                     continue
-
-                patch_signal = signal[
-                    offset[0] : offset[0] + size[0] + 2 * padding,
-                    offset[1] : offset[1] + size[1] + 2 * padding,
-                ]
+                patch_signal = kde_2d(
+                    patch_df["x"].to_numpy(),
+                    patch_df["y"].to_numpy(),
+                    bandwidth=self.KDE_bandwidth,
+                    dtype=self.dtype,
+                )
                 patch_mask = patch_signal > min_expression
                 n_pixels = patch_mask.sum()
 
@@ -394,9 +395,10 @@ class Ovrlp:
                 x_pad = offset[0] + padding
                 y_pad = offset[1] + padding
 
-                cosine_similarity[x_pad : x_pad + size[0], y_pad : y_pad + size[1]] = (
-                    patch_cosine_similarity
-                )
+                cosine_similarity[
+                    x_pad : x_pad + patch_cosine_similarity.shape[0],
+                    y_pad : y_pad + patch_cosine_similarity.shape[1],
+                ] = patch_cosine_similarity
 
         self.signal_map = signal.T
         self.integrity_map = cosine_similarity.T
