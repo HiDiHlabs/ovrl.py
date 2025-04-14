@@ -20,14 +20,14 @@ UMAP_RGB_PARAMS: dict[str, Any] = {"n_components": 3, "n_neighbors": 10, "min_di
 
 
 def _determine_localmax_and_sample(
-    x: np.ndarray, min_distance: int = 3, min_value: float = 5
+    values: np.ndarray, min_distance: int = 3, min_value: float = 5
 ):
     """
     Returns a list of local maxima and their corresponding values.
 
     Parameters
     ----------
-    x : np.ndarray
+    values : np.ndarray
         A 2D array of values.
     min_distance : int, optional
         The minimum distance between local maxima.
@@ -43,12 +43,12 @@ def _determine_localmax_and_sample(
     values
         values at local maxima.
     """
-    rois = find_local_maxima(x, min_distance, min_value)
+    rois = find_local_maxima(values, min_distance, min_value)
 
     rois_x = rois[:, 0]
     rois_y = rois[:, 1]
 
-    return rois_x, rois_y, x[rois_x, rois_y]
+    return rois_x, rois_y, values[rois_x, rois_y]
 
 
 ## These functions are going to be separated into a package of their own at some point:
