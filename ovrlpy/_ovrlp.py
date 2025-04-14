@@ -22,6 +22,7 @@ from ._utils import (
     UMAP_2D_PARAMS,
     UMAP_RGB_PARAMS,
     _compute_embedding_vectors,
+    _cosine_similarity,
     _create_knn_graph,
     _determine_localmax_and_sample,
     _fill_color_axes,
@@ -377,15 +378,9 @@ class Ovrlp:
                             patch_embedding_bottom += bottom_
                     del finished
 
-                patch_norm_top = np.linalg.norm(patch_embedding_top, axis=1)
-                patch_norm_bottom = np.linalg.norm(patch_embedding_bottom, axis=1)
-                patch_norm = patch_norm_top * patch_norm_bottom
-                patch_norm[patch_norm == 0] = np.inf
-
                 patch_cosine_similarity = np.zeros_like(patch_signal)
-                patch_cosine_similarity[patch_mask] = (
-                    np.sum(patch_embedding_top * patch_embedding_bottom, axis=1)
-                    / patch_norm
+                patch_cosine_similarity[patch_mask] = _cosine_similarity(
+                    patch_embedding_top, patch_embedding_bottom
                 )
                 # remove padding
                 patch_cosine_similarity = patch_cosine_similarity[

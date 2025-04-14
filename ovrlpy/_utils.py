@@ -153,3 +153,9 @@ def _compute_embedding_vectors(
         signal_bottom = signal_bottom[:, None] * factor[None, :]
 
     return signal_top, signal_bottom
+
+
+def _cosine_similarity(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    norm_ = np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
+    norm_[norm_ == 0] = np.inf
+    return np.sum(x * y, axis=1) / norm_
