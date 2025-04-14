@@ -4,11 +4,11 @@ import numpy as np
 import polars as pl
 
 
-def ceildiv(a: int, b: int):
+def ceildiv(a: int, b: int) -> int:
     return -(a // -b)
 
 
-def n_patches(length: int, size: tuple[int, int]):
+def n_patches(length: int, size: tuple[int, int]) -> int:
     return ceildiv(size[0], length) * ceildiv(size[1], length)
 
 
@@ -26,11 +26,11 @@ def _patches(
         size = (int(floor(df[x].max() + 1)), int(floor(df[y].max() + 1)))
 
     # ensure that patch_length is an upper-bound for the actual size
-    patch_count_x = ceildiv(size[0], length) + 1
-    patch_count_y = ceildiv(size[1], length) + 1
+    patch_count_x = ceildiv(size[0], length)
+    patch_count_y = ceildiv(size[1], length)
 
-    x_patches = np.linspace(0, size[0], patch_count_x, dtype=int)
-    y_patches = np.linspace(0, size[1], patch_count_y, dtype=int)
+    x_patches = np.linspace(0, size[0], patch_count_x + 1, dtype=int)
+    y_patches = np.linspace(0, size[1], patch_count_y + 1, dtype=int)
 
     for i in range(len(x_patches) - 1):
         for j in range(len(y_patches) - 1):
