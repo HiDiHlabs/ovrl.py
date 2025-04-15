@@ -8,6 +8,7 @@ import pandas as pd
 import polars as pl
 import tqdm
 from anndata import AnnData, ImplicitModificationWarning
+from numpy.typing import DTypeLike
 from scipy.ndimage import gaussian_filter
 from skimage.feature import peak_local_max
 
@@ -47,7 +48,7 @@ def _kde_nd(
     bandwidth: float,
     size: tuple[int, ...] | None = None,
     truncate: float = _TRUNCATE,
-    dtype=np.float32,
+    dtype: DTypeLike = np.float32,
 ) -> np.ndarray:
     """
     Calculate the KDE using the coordinates.
@@ -127,7 +128,7 @@ def _sample_expression(
     gene_column: str = "gene",
     n_workers: int = 8,
     patch_length: int = 500,
-    dtype=np.float32,
+    dtype: DTypeLike = np.float32,
 ) -> AnnData:
     """
     Sample expression from a transcripts dataframe.
@@ -151,7 +152,7 @@ def _sample_expression(
         patch_length : int
             Size of the length in each dimension when calculating signal integrity in patches.
             Smaller values will use less memory, but may take longer to compute.
-        dtype
+        dtype : numpy.typing.DTypeLike
             Datatype for the KDE.
 
     Returns
