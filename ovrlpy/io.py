@@ -146,7 +146,7 @@ def read_MERFISH(
 
     # convert plane to um
 
-    transcripts.with_columns(pl.col("z") * z_scale)
+    transcripts = transcripts.with_columns(pl.col("z") * z_scale)
 
     return transcripts
 
@@ -196,6 +196,8 @@ def read_CosMx(
     transcripts = _filter_genes(transcripts, remove_targets)
 
     # convert pixel to um
-    transcripts.with_columns(pl.col(["x", "y"]) * scale["xy"], pl.col("z") * scale["z"])
+    transcripts = transcripts.with_columns(
+        pl.col(["x", "y"]) * scale["xy"], pl.col("z") * scale["z"]
+    )
 
     return transcripts
