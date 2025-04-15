@@ -395,7 +395,11 @@ class Ovrlp:
         self.integrity_map = cosine_similarity.T
 
     def analyse(
-        self, gridsize: float = 1, genes: list | None = None, fit_umap: bool = True
+        self,
+        gridsize: float = 1,
+        min_transcripts: float = 10,
+        genes: list | None = None,
+        fit_umap: bool = True,
     ):
         """
         Run main ovrlpy analysis.
@@ -404,6 +408,9 @@ class Ovrlp:
         ----------
         gridsize : float, optional
             The size of the pixel grid.
+        min_transcripts : float
+            Minimum expression for a local maximum to be considered. Expressed in terms
+            of transcripts.
         genes : list
             A list of genes to utilize in the model. `None` uses all genes.
         fit_umap : bool
@@ -414,7 +421,7 @@ class Ovrlp:
         self.process_coordinates(gridsize=gridsize, n_iter=20)
 
         print("Creating gene expression embeddings for visualization")
-        self.fit_transcripts(genes=genes, fit_umap=fit_umap)
+        self.fit_transcripts(min_transcripts, genes=genes, fit_umap=fit_umap)
 
         print("Creating signal integrity map")
         self.compute_VSI()
