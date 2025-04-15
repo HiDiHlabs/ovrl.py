@@ -23,11 +23,14 @@ def _assign_xy(
     gridsize : float, optional
         The size of the grid.
     """
-    df = df.with_columns(
-        (pl.col(xy) - pl.col(xy).min() for xy in xy_columns)
-    ).with_columns(
-        (pl.col(xy_columns[0]) / gridsize).cast(Int32).alias("x_pixel"),
-        (pl.col(xy_columns[1]) / gridsize).cast(Int32).alias("y_pixel"),
+    df = (
+        df.lazy()
+        .with_columns(((pl.col(xy) - pl.col(xy).min()) / gridsize for xy in xy_columns))
+        .with_columns(
+            pl.col(xy_columns[0]).cast(Int32).alias("x_pixel"),
+            pl.col(xy_columns[1]).cast(Int32).alias("y_pixel"),
+        )
+        .collect()
     )
     return df
 
@@ -193,7 +196,4 @@ def pre_process_coordinates(
             raise ValueError(
                 "`method` must be one of 'mean', 'median', or 'message_passing'"
             )
-    coordinates = coordinates.drop(["x_pixel", "y_pixel"]).with_columns(
-        pl.Series("z_delim", z_delim)
-    )
-    return coordinates
+    return coordinates.with_columns(pl.Series("z_delim", z_delim))

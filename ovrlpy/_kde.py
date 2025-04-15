@@ -1,7 +1,7 @@
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from math import floor
-from typing import Iterable, TypeVar
+from typing import Iterable
 
 import numpy as np
 import pandas as pd
@@ -9,49 +9,73 @@ import polars as pl
 import tqdm
 from anndata import AnnData, ImplicitModificationWarning
 from numpy.typing import DTypeLike
+from polars.datatypes import Int32
 from scipy.ndimage import gaussian_filter
+from scipy.sparse import coo_array
 from skimage.feature import peak_local_max
 
 from ._patching import _patches, n_patches
 
 _TRUNCATE = 4
 
-N = TypeVar("N", bound=int)
-Shape1D = tuple[N]
+Shape1D = tuple[int]
+Shape2D = tuple[int, int]
 
-Shape2DAny = tuple[int, int]
-Shape3DAny = tuple[int, int, int]
-
-T = TypeVar("T", bound=np.dtype)
-
-Array1D_T = np.ndarray[Shape1D, T]
+Array1D = np.ndarray[Shape1D, np.dtype]
+Array1D_Int = np.ndarray[Shape1D, np.dtype[np.integer]]
 
 
-def kde_2d(x: Array1D_T, y: Array1D_T, **kwargs) -> np.ndarray[Shape2DAny, np.dtype]:
+def kde_2d_discrete(
+    x: Array1D_Int,
+    y: Array1D_Int,
+    bandwidth: float,
+    size: tuple[int, int] | None = None,
+    dtype: DTypeLike = np.float32,
+    **kwargs,
+) -> np.ndarray[Shape2D, np.dtype]:
     """
-    Calculate the 2D KDE using the first 2 columns of coordinates.
+    Calculate the 2D KDE using discrete (i.e. integer) coordinates.
     """
-    return _kde_nd(x, y, **kwargs)
+    n = x.shape[0]
+    if x.shape[0] != y.shape[0]:
+        raise ValueError("All coordinates must have the same number of rows")
+
+    if n == 0:
+        if size is None:
+            raise ValueError("If no coordinates are provided, size must be provided.")
+        else:
+            return np.zeros(size, dtype=dtype)
+
+    if size is None:
+        size = (x.max() + 1, y.max() + 1)
+
+    min_x = x.min()
+    min_y = y.min()
+    if min_x != 0:
+        x = x - min_x
+    if min_y != 0:
+        y = y - min_y
+
+    counts = coo_array((np.ones(n, dtype=np.uint32), (x, y))).toarray()
+    kde = _kde(counts, bandwidth, dtype=dtype, **kwargs)
+
+    if kde.shape != size:
+        output = np.zeros(size, dtype=dtype)
+        output[min_x : kde.shape[0] + min_x, min_y : kde.shape[1] + min_y] = kde
+        return output
+    else:
+        return kde
 
 
-def kde_3d(
-    x: Array1D_T, y: Array1D_T, z: Array1D_T, **kwargs
-) -> np.ndarray[Shape3DAny, np.dtype]:
-    """
-    Calculate the 3D KDE using the first 3 columns of coordinates.
-    """
-    return _kde_nd(x, y, z, **kwargs)
-
-
-def _kde_nd(
-    *coordinates: Array1D_T,
+def kde_nd(
+    *coordinates: Array1D,
     bandwidth: float,
     size: tuple[int, ...] | None = None,
-    truncate: float = _TRUNCATE,
     dtype: DTypeLike = np.float32,
+    **kwargs,
 ) -> np.ndarray:
     """
-    Calculate the KDE using the coordinates.
+    Calculate the KDE using the (continuous) coordinates.
     """
     assert len(coordinates) >= 1
 
@@ -72,9 +96,7 @@ def _kde_nd(
         np.arange(int(c.min()), int(floor(c.max() + 1)) + 1) for c in coordinates
     ]
     counts, bins = np.histogramdd(coordinates, bins=dim_bins)
-    kde = gaussian_filter(
-        counts, sigma=bandwidth, truncate=truncate, mode="constant", output=dtype
-    )
+    kde = _kde(counts, bandwidth, dtype=dtype, **kwargs)
 
     if kde.shape != size:
         output = np.zeros(size, dtype=dtype)
@@ -82,6 +104,18 @@ def _kde_nd(
         return output
     else:
         return kde
+
+
+def _kde(
+    x: np.ndarray,
+    bandwidth: float,
+    truncate: float = _TRUNCATE,
+    dtype: DTypeLike = np.float32,
+) -> np.ndarray:
+    kde = gaussian_filter(
+        x, sigma=bandwidth, truncate=truncate, mode="constant", output=dtype
+    )
+    return kde
 
 
 def find_local_maxima(
@@ -98,7 +132,7 @@ def find_local_maxima(
 
 
 def kde_and_sample(
-    *coordinates: Array1D_T, sampling_coordinates: np.ndarray, gene: object, **kwargs
+    *coordinates: Array1D, sampling_coordinates: np.ndarray, gene: object, **kwargs
 ) -> tuple[object, np.ndarray]:
     """
     Create a kde of the data and sample at 'sampling_coordinates'.
@@ -107,7 +141,7 @@ def kde_and_sample(
     sampling_coordinates = np.rint(sampling_coordinates).astype(int)
     n_dims = sampling_coordinates.shape[1]
 
-    kde = _kde_nd(*coordinates, **kwargs)
+    kde = kde_nd(*coordinates, **kwargs)
 
     return gene, kde[tuple(sampling_coordinates[:, i] for i in range(n_dims))]
 
@@ -158,13 +192,13 @@ def _sample_expression(
 
     # lower resolution instead of increasing bandwidth!
     transcripts = transcripts.select(coord_columns + [gene_column]).with_columns(
-        pl.col(c) / kde_bandwidth for c in coord_columns
+        (pl.col(c) / kde_bandwidth).cast(Int32) for c in coord_columns
     )
 
     print("determining pseudocells")
 
     # perform a global KDE to determine local maxima:
-    kde = _kde_nd(
+    kde = kde_nd(
         *(transcripts[c].to_numpy() for c in coord_columns), bandwidth=1, dtype=dtype
     )
 
@@ -185,16 +219,16 @@ def _sample_expression(
     patches = []
     coords = []
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
-        for patch_df, offset, patch_size in tqdm.tqdm(
+        for patch_df, padded, unpadded in tqdm.tqdm(
             _patches(transcripts, patch_length, padding, size=size),
             total=n_patches(patch_length, size),
         ):
             assert isinstance(patch_df, pl.DataFrame)
             patch_maxima = local_maximum_coordinates[
-                (local_maximum_coordinates[:, 0] >= offset[0])
-                & (local_maximum_coordinates[:, 0] < offset[0] + patch_size[0])
-                & (local_maximum_coordinates[:, 1] >= offset[1])
-                & (local_maximum_coordinates[:, 1] < offset[1] + patch_size[1]),
+                (local_maximum_coordinates[:, 0] >= unpadded[0].start)
+                & (local_maximum_coordinates[:, 0] < unpadded[0].stop)
+                & (local_maximum_coordinates[:, 1] >= unpadded[1].start)
+                & (local_maximum_coordinates[:, 1] < unpadded[1].stop),
                 :,
             ]
             coords.append(patch_maxima)
@@ -202,13 +236,13 @@ def _sample_expression(
             # we need to shift the maximum coordinates so they are in the correct
             # relative position of the patch
             maxima = patch_maxima.copy()
-            maxima[:, 0] -= offset[0]
-            maxima[:, 1] -= offset[1]
+            maxima[:, 0] -= padded[0].start
+            maxima[:, 1] -= padded[1].start
 
             # patch_size is 2D, make 3D if KDE is calculated as 3D
             patch_size = (
-                patch_size[0] + 2 * padding,
-                patch_size[1] + 2 * padding,
+                padded[0].stop - padded[0].start,
+                padded[1].stop - padded[1].start,
                 *size[2:],
             )
 

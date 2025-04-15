@@ -11,7 +11,7 @@ from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 from umap import UMAP
 
-from ._kde import find_local_maxima, kde_2d
+from ._kde import find_local_maxima, kde_2d_discrete
 
 UMAP_2D_PARAMS: dict[str, Any] = {"n_components": 2, "n_neighbors": 20, "min_dist": 0}
 """Default 2D-UMAP parameters"""
@@ -115,8 +115,12 @@ def _knn_expression(
     )
 
 
-def _compute_embedding_vectors(
-    df: pl.DataFrame, mask: np.ndarray, factor: np.ndarray, **kwargs
+def _gene_embedding(
+    df: pl.DataFrame,
+    mask: np.ndarray,
+    factor: np.ndarray,
+    xy: tuple[str, str] = ("x_pixel", "y_pixel"),
+    **kwargs,
 ):
     """
     calculate top and bottom embedding
@@ -133,23 +137,25 @@ def _compute_embedding_vectors(
     if len(df) < 2:
         return None, None
 
+    x, y = xy
+
     # TODO: what happens if equal?
-    top = df.filter(pl.col("z") > pl.col("z_delim")).select(["x", "y"])
-    bottom = df.filter(pl.col("z") < pl.col("z_delim")).select(["x", "y"])
+    top = df.select(xy).filter(df["z"] > df["z_delim"])
+    bottom = df.select(xy).filter(df["z"] < df["z_delim"])
 
     if len(top) == 0:
         signal_top = None
     else:
-        signal_top = kde_2d(
-            top["x"].to_numpy(), top["y"].to_numpy(), size=mask.shape, **kwargs
+        signal_top = kde_2d_discrete(
+            top[x].to_numpy(), top[y].to_numpy(), size=mask.shape, **kwargs
         )[mask]
         signal_top = signal_top[:, None] * factor[None, :]
 
     if len(bottom) == 0:
         signal_bottom = None
     else:
-        signal_bottom = kde_2d(
-            bottom["x"].to_numpy(), bottom["y"].to_numpy(), size=mask.shape, **kwargs
+        signal_bottom = kde_2d_discrete(
+            bottom[x].to_numpy(), bottom[y].to_numpy(), size=mask.shape, **kwargs
         )[mask]
         signal_bottom = signal_bottom[:, None] * factor[None, :]
 
@@ -171,7 +177,7 @@ def _calculate_embedding(
         except Empty:
             break
 
-        top, bottom = _compute_embedding_vectors(gene, mask, components[:, i], **kwargs)
+        top, bottom = _gene_embedding(gene, mask, components[:, i], **kwargs)
         if top is not None:
             embedding_top += top
         if bottom is not None:

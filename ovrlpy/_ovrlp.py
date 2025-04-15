@@ -17,7 +17,7 @@ from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 from umap import UMAP
 
-from ._kde import _TRUNCATE, _sample_expression, kde_2d
+from ._kde import _TRUNCATE, _sample_expression, kde_2d_discrete
 from ._patching import _patches, n_patches
 from ._subslicing import pre_process_coordinates
 from ._utils import (
@@ -306,36 +306,50 @@ class Ovrlp:
 
         gene2idx = {gene: i for i, gene in enumerate(self.genes)}
 
-        signal = kde_2d(
-            self.transcripts["x"].to_numpy(),
-            self.transcripts["y"].to_numpy(),
+        signal = kde_2d_discrete(
+            self.transcripts["x_pixel"].to_numpy(),
+            self.transcripts["y_pixel"].to_numpy(),
             bandwidth=self.KDE_bandwidth,
             dtype=self.dtype,
         )
+        shape = signal.shape
 
         cosine_similarity = np.zeros_like(signal)
 
         with ThreadPoolExecutor(max_workers=self.n_workers) as executor:
-            for patch_df, offset, size in tqdm.tqdm(
+            for patch_df, padded, unpadded in tqdm.tqdm(
                 _patches(
-                    self.transcripts.select(["gene", "x", "y", "z", "z_delim"]),
+                    self.transcripts.select(
+                        ["gene", "x_pixel", "y_pixel", "z", "z_delim"]
+                    ),
                     self.patch_length,
                     padding,
-                    size=signal.shape,
+                    size=shape,
+                    coordinates=("x_pixel", "y_pixel"),
                 ),
-                total=n_patches(self.patch_length, signal.shape),
+                total=n_patches(self.patch_length, shape),
             ):
                 assert isinstance(patch_df, pl.DataFrame)
 
                 if len(patch_df) == 0:
                     continue
-                patch_signal = kde_2d(
-                    patch_df["x"].to_numpy(),
-                    patch_df["y"].to_numpy(),
-                    bandwidth=self.KDE_bandwidth,
-                    dtype=self.dtype,
+
+                # remove padding
+                left_pad = unpadded[0].start - padded[0].start
+                bottom_pad = unpadded[1].start - padded[1].start
+                x_size = unpadded[0].stop - unpadded[0].start
+                y_size = unpadded[1].stop - unpadded[1].start
+                remove_pad = (
+                    slice(left_pad, left_pad + x_size),
+                    slice(bottom_pad, bottom_pad + y_size),
                 )
-                patch_mask = patch_signal > min_expression
+
+                patch_signal = signal[padded]
+
+                not_padding = np.zeros(patch_signal.shape, dtype=bool)
+                not_padding[remove_pad] = True
+
+                patch_mask = (patch_signal > min_expression) & not_padding
                 n_pixels = patch_mask.sum()
 
                 if n_pixels == 0:
@@ -375,18 +389,7 @@ class Ovrlp:
                 patch_cosine_similarity[patch_mask] = _cosine_similarity(
                     embedding_top, embedding_bottom
                 )
-                # remove padding
-                patch_cosine_similarity = patch_cosine_similarity[
-                    padding : padding + size[0], padding : padding + size[1]
-                ]
-
-                x_pad = offset[0] + padding
-                y_pad = offset[1] + padding
-
-                cosine_similarity[
-                    x_pad : x_pad + patch_cosine_similarity.shape[0],
-                    y_pad : y_pad + patch_cosine_similarity.shape[1],
-                ] = patch_cosine_similarity
+                cosine_similarity[unpadded] = patch_cosine_similarity[remove_pad]
 
         self.signal_map = signal.T
         self.integrity_map = cosine_similarity.T

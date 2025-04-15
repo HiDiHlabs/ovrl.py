@@ -20,10 +20,10 @@ def _patches(
     size: None | tuple[int, int] = None,
     coordinates: tuple[str, str] = ("x", "y"),
 ):
-    x, y = coordinates
+    x_key, y_key = coordinates
 
     if size is None:
-        size = (int(floor(df[x].max() + 1)), int(floor(df[y].max() + 1)))
+        size = (int(floor(df[x_key].max() + 1)), int(floor(df[y_key].max() + 1)))
 
     # ensure that patch_length is an upper-bound for the actual size
     patch_count_x = ceildiv(size[0], length)
@@ -34,16 +34,22 @@ def _patches(
 
     for i in range(len(x_patches) - 1):
         for j in range(len(y_patches) - 1):
-            x_ = x_patches[i] - padding
-            y_ = y_patches[j] - padding
-            _x = x_patches[i + 1] + padding
-            _y = y_patches[j + 1] + padding
+            # coordinates with padding
+            x_ = max(0, x_patches[i] - padding)
+            y_ = max(0, y_patches[j] - padding)
+            _x = min(size[0], x_patches[i + 1] + padding)
+            _y = min(size[1], y_patches[j + 1] + padding)
 
-            size_x = x_patches[i + 1] - x_patches[i]
-            size_y = y_patches[j + 1] - y_patches[j]
+            padded_range = (slice(x_, _x), slice(y_, _y))
 
             patch = df.filter(
-                pl.col(x).is_between(x_, _x, closed="left")
-                & pl.col(y).is_between(y_, _y, closed="left")
-            ).with_columns(pl.col(x) - x_, pl.col(y) - y_)
-            yield patch, (x_, y_), (size_x, size_y)
+                pl.col(x_key).is_between(x_, _x, closed="left")
+                & pl.col(y_key).is_between(y_, _y, closed="left")
+            ).with_columns(pl.col(x_key) - x_, pl.col(y_key) - y_)
+
+            unpadded_range = (
+                slice(x_patches[i], x_patches[i + 1]),
+                slice(y_patches[j], y_patches[j + 1]),
+            )
+
+            yield patch, padded_range, unpadded_range
