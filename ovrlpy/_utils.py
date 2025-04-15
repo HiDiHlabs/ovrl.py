@@ -1,5 +1,6 @@
 from collections.abc import Iterable
-from typing import Any
+from queue import Empty, SimpleQueue
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -153,6 +154,30 @@ def _compute_embedding_vectors(
         signal_bottom = signal_bottom[:, None] * factor[None, :]
 
     return signal_top, signal_bottom
+
+
+def _calculate_embedding(
+    genes: SimpleQueue[tuple[int, pl.DataFrame]],
+    mask: np.ndarray,
+    components: np.ndarray,
+    **kwargs,
+) -> tuple[np.ndarray | Literal[0], np.ndarray | Literal[0]]:
+    embedding_top: Literal[0] | np.ndarray = 0
+    embedding_bottom: Literal[0] | np.ndarray = 0
+
+    while True:
+        try:
+            i, gene = genes.get(block=False)
+        except Empty:
+            break
+
+        top, bottom = _compute_embedding_vectors(gene, mask, components[:, i], **kwargs)
+        if top is not None:
+            embedding_top += top
+        if bottom is not None:
+            embedding_bottom += bottom
+
+    return embedding_top, embedding_bottom
 
 
 def _cosine_similarity(x: np.ndarray, y: np.ndarray) -> np.ndarray:

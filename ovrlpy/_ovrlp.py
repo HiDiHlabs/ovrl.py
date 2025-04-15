@@ -1,7 +1,9 @@
 import os
 from collections.abc import Sequence
-from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import reduce
 from math import ceil
+from queue import SimpleQueue
 from typing import Any
 
 import numpy as np
@@ -21,7 +23,7 @@ from ._subslicing import pre_process_coordinates
 from ._utils import (
     UMAP_2D_PARAMS,
     UMAP_RGB_PARAMS,
-    _compute_embedding_vectors,
+    _calculate_embedding,
     _cosine_similarity,
     _create_knn_graph,
     _determine_localmax_and_sample,
@@ -302,8 +304,7 @@ class Ovrlp:
 
         padding = int(ceil(_TRUNCATE * self.KDE_bandwidth))
 
-        n_components = self.pca_2d.n_components_
-        n_tasks = 2 * self.n_workers
+        gene2idx = {gene: i for i, gene in enumerate(self.genes)}
 
         signal = kde_2d(
             self.transcripts["x"].to_numpy(),
@@ -340,47 +341,39 @@ class Ovrlp:
                 if n_pixels == 0:
                     continue
 
-                patch_embedding_top = np.zeros(
-                    (n_pixels, n_components), dtype=self.dtype
-                )
-                patch_embedding_bottom = np.zeros(
-                    (n_pixels, n_components), dtype=self.dtype
-                )
+                patch_df = patch_df.filter(pl.col("gene").is_in(gene2idx))
+                gene_queue: SimpleQueue[tuple[int, pl.DataFrame]] = SimpleQueue()
+                for (gene, *_), df in patch_df.group_by("gene"):
+                    if gene in gene2idx:
+                        gene_queue.put((gene2idx[gene], df.drop("gene")))
 
-                gene_coords = {
-                    gene[0]: df.drop("gene") for gene, df in patch_df.group_by("gene")
-                }
-
-                futures: set[Future] = set()
-                genes = list(enumerate(self.genes))
-                while len(futures) > 0 or len(genes) > 0:
-                    finished, futures = wait(futures, return_when=FIRST_COMPLETED)
-                    # submit a new batch of tasks
-                    while len(futures) < n_tasks and len(genes) > 0:
-                        i, gene = genes.pop()
-                        if gene in gene_coords:
-                            futures.add(
-                                executor.submit(
-                                    _compute_embedding_vectors,
-                                    gene_coords.pop(gene),
-                                    patch_mask,
-                                    self.pca_2d.components_[:, i],
-                                    bandwidth=self.KDE_bandwidth,
-                                    dtype=self.dtype,
-                                )
+                embedding_top, embedding_bottom = reduce(
+                    lambda x, y: (x[0] + y[0], x[1] + y[1]),  # type: ignore
+                    map(
+                        lambda x: x.result(),
+                        as_completed(
+                            executor.submit(
+                                _calculate_embedding,
+                                gene_queue,
+                                patch_mask,
+                                self.pca_2d.components_,
+                                bandwidth=self.KDE_bandwidth,
+                                dtype=self.dtype,
                             )
-                    # process finished tasks
-                    for gene_embedding in finished:
-                        top_, bottom_ = gene_embedding.result()
-                        if top_ is not None:
-                            patch_embedding_top += top_
-                        if bottom_ is not None:
-                            patch_embedding_bottom += bottom_
-                    del finished
+                            for _ in range(self.n_workers)
+                        ),
+                    ),
+                )
 
+                if (isinstance(embedding_top, int) and embedding_top == 0) or (
+                    isinstance(embedding_bottom, int) and embedding_bottom == 0
+                ):
+                    continue
+                assert isinstance(embedding_top, np.ndarray)
+                assert isinstance(embedding_bottom, np.ndarray)
                 patch_cosine_similarity = np.zeros_like(patch_signal)
                 patch_cosine_similarity[patch_mask] = _cosine_similarity(
-                    patch_embedding_top, patch_embedding_bottom
+                    embedding_top, embedding_bottom
                 )
                 # remove padding
                 patch_cosine_similarity = patch_cosine_similarity[
