@@ -68,27 +68,20 @@ def _kde_nd(
     if size is None:
         size = tuple(int(floor(c.max() + 1)) for c in coordinates)
 
-    output = np.zeros(size, dtype=dtype)
-
-    dim_bins = list()
-    for c in coordinates:
-        c_min = int(c.min())
-        # the last interval of np.histogram is closed (while the rest is half-open)
-        # therefore we add an additional bin if the max is an int
-        c_max = int(floor(c.max() + 1))
-        dim_bins.append(np.linspace(c_min, c_max, c_max - c_min + 1))
-
-    histogram, bins = np.histogramdd(coordinates, bins=dim_bins)
-
+    dim_bins = [
+        np.arange(int(c.min()), int(floor(c.max() + 1)) + 1) for c in coordinates
+    ]
+    counts, bins = np.histogramdd(coordinates, bins=dim_bins)
     kde = gaussian_filter(
-        histogram, sigma=bandwidth, truncate=truncate, mode="constant", output=dtype
+        counts, sigma=bandwidth, truncate=truncate, mode="constant", output=dtype
     )
 
-    output[
-        tuple(slice(int(bins[i].min()), int(bins[i].max())) for i in range(len(bins)))
-    ] = kde
-
-    return output
+    if kde.shape != size:
+        output = np.zeros(size, dtype=dtype)
+        output[tuple(slice(b[0], b[-1]) for b in bins)] = kde
+        return output
+    else:
+        return kde
 
 
 def find_local_maxima(
