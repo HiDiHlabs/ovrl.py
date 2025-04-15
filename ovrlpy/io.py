@@ -5,9 +5,7 @@ from pathlib import Path
 import polars as pl
 
 
-def _filter_genes(
-    df: pl.DataFrame, remove_features: Collection[str], drop_index: bool = True
-) -> pl.DataFrame:
+def _filter_genes(df: pl.DataFrame, remove_features: Collection[str]) -> pl.DataFrame:
     if len(remove_features) > 0:
         df = df.filter(
             ~pl.col("gene").cast(pl.Utf8).str.contains(f"({'|'.join(remove_features)})")
