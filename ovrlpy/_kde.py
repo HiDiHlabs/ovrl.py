@@ -44,8 +44,8 @@ def kde_3d(
 
 def _kde_nd(
     *coordinates: Array1D_T,
+    bandwidth: float,
     size: tuple[int, ...] | None = None,
-    bandwidth: float = 1.5,
     truncate: float = _TRUNCATE,
     dtype=np.float32,
 ) -> np.ndarray:
