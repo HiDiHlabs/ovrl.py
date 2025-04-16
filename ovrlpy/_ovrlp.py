@@ -319,9 +319,7 @@ class Ovrlp:
         with ThreadPoolExecutor(max_workers=self.n_workers) as executor:
             for patch_df, padded, unpadded in tqdm.tqdm(
                 _patches(
-                    self.transcripts.select(
-                        ["gene", "x_pixel", "y_pixel", "z", "z_delim"]
-                    ),
+                    self.transcripts[["gene", "x_pixel", "y_pixel", "z", "z_delim"]],
                     self.patch_length,
                     padding,
                     size=shape,
