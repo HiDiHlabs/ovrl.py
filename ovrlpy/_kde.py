@@ -1,7 +1,7 @@
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from math import floor
-from typing import Iterable
+from typing import Iterable, TypeAlias, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -19,10 +19,13 @@ from ._patching import _patches, n_patches
 _TRUNCATE = 4
 
 Shape1D = tuple[int]
-Shape2D = tuple[int, int]
-
 Array1D = np.ndarray[Shape1D, np.dtype]
 Array1D_Int = np.ndarray[Shape1D, np.dtype[np.integer]]
+
+Coordinate: TypeAlias = Array1D | pl.Series
+
+KDE_2D = np.ndarray[tuple[int, int], np.dtype[np.floating]]
+KDE_ND = np.ndarray[tuple[int, ...], np.dtype[np.floating]]
 
 
 def kde_2d_discrete(
@@ -32,7 +35,7 @@ def kde_2d_discrete(
     size: tuple[int, int] | None = None,
     dtype: DTypeLike = np.float32,
     **kwargs,
-) -> np.ndarray[Shape2D, np.dtype]:
+) -> KDE_2D:
     """
     Calculate the 2D KDE using discrete (i.e. integer) coordinates.
     """
@@ -68,12 +71,12 @@ def kde_2d_discrete(
 
 
 def kde_nd(
-    *coordinates: Array1D,
+    *coordinates: Coordinate,
     bandwidth: float,
     size: tuple[int, ...] | None = None,
     dtype: DTypeLike = np.float32,
     **kwargs,
-) -> np.ndarray:
+) -> KDE_ND:
     """
     Calculate the KDE using the (continuous) coordinates.
     """
@@ -131,9 +134,12 @@ def find_local_maxima(
     return local_maxima
 
 
+T = TypeVar("T")
+
+
 def kde_and_sample(
-    *coordinates: Array1D, sampling_coordinates: np.ndarray, gene: object, **kwargs
-) -> tuple[object, np.ndarray]:
+    *coordinates: Coordinate, sampling_coordinates: np.ndarray, gene: T, **kwargs
+) -> tuple[T, np.ndarray]:
     """
     Create a kde of the data and sample at 'sampling_coordinates'.
     """

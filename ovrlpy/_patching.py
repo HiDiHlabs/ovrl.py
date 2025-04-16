@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from math import floor
 
 import numpy as np
@@ -8,7 +9,7 @@ def ceildiv(a: int, b: int) -> int:
     return -(a // -b)
 
 
-def n_patches(length: int, size: tuple[int, int]) -> int:
+def n_patches(length: int, size: Sequence[int]) -> int:
     return ceildiv(size[0], length) * ceildiv(size[1], length)
 
 
@@ -17,7 +18,7 @@ def _patches(
     length: int,
     padding: int,
     *,
-    size: None | tuple[int, int] = None,
+    size: None | Sequence[int] = None,
     coordinates: tuple[str, str] = ("x", "y"),
 ):
     x_key, y_key = coordinates

@@ -17,7 +17,7 @@ from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
 from umap import UMAP
 
-from ._kde import _TRUNCATE, _sample_expression, kde_2d_discrete
+from ._kde import _TRUNCATE, KDE_2D, _sample_expression, kde_2d_discrete
 from ._patching import _patches, n_patches
 from ._subslicing import pre_process_coordinates
 from ._utils import (
@@ -344,7 +344,7 @@ class Ovrlp:
                     slice(bottom_pad, bottom_pad + y_size),
                 )
 
-                patch_signal = signal[padded]
+                patch_signal: KDE_2D = signal[padded]
 
                 not_padding = np.zeros(patch_signal.shape, dtype=bool)
                 not_padding[remove_pad] = True

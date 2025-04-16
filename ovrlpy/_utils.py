@@ -164,8 +164,8 @@ def _gene_embedding(
 
 def _calculate_embedding(
     genes: SimpleQueue[tuple[int, pl.DataFrame]],
-    mask: np.ndarray,
-    components: np.ndarray,
+    mask: np.ndarray[tuple[int, int], np.dtype[np.bool_]],
+    components: np.ndarray[tuple[int, int], np.dtype[np.floating]],
     **kwargs,
 ) -> tuple[np.ndarray | Literal[0], np.ndarray | Literal[0]]:
     embedding_top: Literal[0] | np.ndarray = 0
