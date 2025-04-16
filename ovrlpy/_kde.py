@@ -9,7 +9,6 @@ import polars as pl
 import tqdm
 from anndata import AnnData, ImplicitModificationWarning
 from numpy.typing import DTypeLike
-from polars.datatypes import Int32
 from scipy.ndimage import gaussian_filter
 from scipy.sparse import coo_array
 from skimage.feature import peak_local_max
@@ -198,15 +197,13 @@ def _sample_expression(
 
     # lower resolution instead of increasing bandwidth!
     transcripts = transcripts.select(coord_columns + [gene_column]).with_columns(
-        (pl.col(c) / kde_bandwidth).cast(Int32) for c in coord_columns
+        pl.col(c) / kde_bandwidth for c in coord_columns
     )
 
     print("determining pseudocells")
 
     # perform a global KDE to determine local maxima:
-    kde = kde_nd(
-        *(transcripts[c].to_numpy() for c in coord_columns), bandwidth=1, dtype=dtype
-    )
+    kde = kde_nd(*(transcripts[c] for c in coord_columns), bandwidth=1, dtype=dtype)
 
     min_dist = 1 + int(min_pixel_distance / kde_bandwidth)
     local_maximum_coordinates = find_local_maxima(
@@ -255,7 +252,7 @@ def _sample_expression(
             futures = set(
                 executor.submit(
                     kde_and_sample,
-                    *(df[c].to_numpy() for c in coord_columns),
+                    *(df[c] for c in coord_columns),
                     sampling_coordinates=maxima,
                     gene=gene[0],
                     size=patch_size,
