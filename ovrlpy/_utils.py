@@ -120,7 +120,8 @@ def _weighted_average_expression(
 
     if normalize:
         expression = expression.select(
-            pl.col(c) / pl.col(c).pow(2).sum().sqrt() for c in expression.columns
+            pl.col(gene) / pl.col(gene).pow(2).sum().sqrt()
+            for gene in genes_idx.columns
         )
 
     expression = expression.with_columns(
