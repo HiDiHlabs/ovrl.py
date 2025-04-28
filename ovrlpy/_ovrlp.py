@@ -27,7 +27,7 @@ from ._utils import (
     _cosine_similarity,
     _determine_localmax_and_sample,
     _fill_color_axes,
-    _gaussian_weighted_knn_graph,
+    _gaussian_weighted_neighbors,
     _minmax_scaling,
     _transform_embeddings,
     _weighted_average_expression,
@@ -517,9 +517,9 @@ class Ovrlp:
         """
         assert self.genes is not None
 
-        neighbors = _gaussian_weighted_knn_graph(
+        neighbors = _gaussian_weighted_neighbors(
             transcripts[list(coordinate_keys)],
-            90,
+            self.KDE_bandwidth * _TRUNCATE,
             self.KDE_bandwidth,
             n_workers=self.n_workers,
         )

@@ -7,7 +7,7 @@ import polars as pl
 from scipy.linalg import norm
 from scipy.sparse import csr_array
 from sklearn.decomposition import PCA
-from sklearn.neighbors import kneighbors_graph
+from sklearn.neighbors import radius_neighbors_graph
 from umap import UMAP
 
 from ._kde import find_local_maxima, kde_2d_discrete
@@ -87,12 +87,12 @@ def _transform_embeddings(expression, pca: PCA, embedder_2d: UMAP, embedder_3d: 
     return embedding, embedding_color
 
 
-def _gaussian_weighted_knn_graph(
-    coords, k: int, bandwidth: float, *, n_workers: int | None = None
+def _gaussian_weighted_neighbors(
+    coords, radius: float, bandwidth: float, *, n_workers: int | None = None
 ) -> csr_array:
-    """gaussian-weighted k nearest neighbor distances"""
-    neighbors = kneighbors_graph(
-        coords, k, mode="distance", include_self=True, n_jobs=n_workers
+    """gaussian-weighted radius-based neighbors graph"""
+    neighbors = radius_neighbors_graph(
+        coords, radius, mode="distance", include_self=True, n_jobs=n_workers
     )
     neighbors = csr_array(neighbors)
     neighbors.data = (1 / ((2 * np.pi) ** (3 / 2) * bandwidth**3)) * np.exp(
