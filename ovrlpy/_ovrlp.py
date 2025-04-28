@@ -19,7 +19,7 @@ from umap import UMAP
 
 from ._kde import _TRUNCATE, KDE_2D, _sample_expression, kde_2d_discrete
 from ._patching import _patches, n_patches
-from ._subslicing import pre_process_coordinates
+from ._subslicing import process_coordinates
 from ._utils import (
     UMAP_2D_PARAMS,
     UMAP_RGB_PARAMS,
@@ -152,7 +152,7 @@ class Ovrlp:
         kwargs
             Other keyword arguments are passed to :py:func:`ovrlpy.pre_process_coordinates`
         """
-        self.transcripts = pre_process_coordinates(
+        self.transcripts = process_coordinates(
             self.transcripts, gridsize=gridsize, **kwargs
         )
 
@@ -319,7 +319,7 @@ class Ovrlp:
         with ThreadPoolExecutor(max_workers=self.n_workers) as executor:
             for patch_df, padded, unpadded in tqdm.tqdm(
                 _patches(
-                    self.transcripts[["gene", "x_pixel", "y_pixel", "z", "z_delim"]],
+                    self.transcripts[["gene", "x_pixel", "y_pixel", "z", "z_center"]],
                     self.patch_length,
                     padding,
                     size=shape,

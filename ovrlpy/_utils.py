@@ -128,7 +128,7 @@ def _gene_embedding(
     Parameters
     ----------
     df : polars.DataFrame
-        DataFrame of x, y, z and z_delim coordinates
+        DataFrame of x, y, z, and z_center coordinates
     mask : numpy.ndarray
         binary mask for which pixels to calculate embedding
     factor : numpy.ndarray
@@ -140,8 +140,8 @@ def _gene_embedding(
     x, y = xy
 
     # TODO: what happens if equal?
-    top = df.select(xy).filter(df["z"] > df["z_delim"])
-    bottom = df.select(xy).filter(df["z"] < df["z_delim"])
+    top = df.select(xy).filter(df["z"] > df["z_center"])
+    bottom = df.select(xy).filter(df["z"] < df["z_center"])
 
     if len(top) == 0:
         signal_top = None

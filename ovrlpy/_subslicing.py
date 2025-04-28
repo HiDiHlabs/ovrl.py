@@ -1,11 +1,12 @@
 import warnings
 from functools import reduce
 from operator import add
-from typing import Literal, Sequence
+from typing import Callable, Literal, Sequence, get_args
 
 import numpy as np
 import polars as pl
 from polars.datatypes import DataType, Float32, Int32
+from scipy.sparse import coo_array
 
 
 def _assign_xy(
@@ -37,6 +38,7 @@ def _assign_xy(
 
 def _message_passing(x: np.ndarray, /, n_iter: int) -> np.ndarray:
     with warnings.catch_warnings():
+        # ignore 'mean of empty slice' warning if all values are nan
         warnings.simplefilter("ignore", category=RuntimeWarning)
         for _ in range(n_iter):
             x = reduce(
@@ -52,111 +54,67 @@ def _message_passing(x: np.ndarray, /, n_iter: int) -> np.ndarray:
 
 
 def _mean_elevation(
-    df: pl.DataFrame, z_column: str, dtype: DataType
+    df: pl.DataFrame, z_key: str, *, dtype: type[DataType]
 ) -> np.ndarray[tuple[int, int], np.dtype]:
-    pixels = df.group_by(["x_pixel", "y_pixel"]).agg(
-        pl.col(z_column).mean().cast(dtype)
-    )
-    z = pixels.drop_in_place(z_column).to_numpy()
+    x = df["x_pixel"].to_numpy()
+    y = df["y_pixel"].to_numpy()
 
-    elevation_map = np.full(
-        (pixels["x_pixel"].max() + 1, pixels["y_pixel"].max() + 1),
-        np.nan,
-        dtype=z.dtype,
-    )
-    elevation_map[pixels["x_pixel"], pixels["y_pixel"]] = z
-    return elevation_map
+    z = coo_array((df[z_key].cast(dtype).to_numpy(), (x, y))).toarray()
+    n = coo_array((np.ones(len(df), dtype=np.uint16), (x, y))).toarray()
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        # ignore zero division warnings as we want to transform 0 to nan
+        z /= n
+
+    return z
 
 
 def _assign_z_mean_message_passing(
-    df: pl.DataFrame,
-    z_column: str = "z",
-    n_iter: int = 3,
-    *,
-    dtype: DataType = Float32,
+    df: pl.DataFrame, n_iter: int, z_key: str = "z", *, dtype: type[DataType] = Float32
 ) -> pl.Series:
-    """
-    Calculates a z-split coordinate.
-
-    Parameters
-    ----------
-    df : polars.DataFrame
-        A dataframe of coordinates.
-    z_column : str, optional
-        The name of the column containing the z-coordinate.
-    n_iter : int, optional
-        Number of iterations for the message passing algorithm.
-
-    Returns
-    -------
-    numpy.ndarray
-    """
-    elevation_map = _mean_elevation(df, z_column, dtype)
+    elevation_map = _mean_elevation(df, z_key, dtype=dtype)
     elevation_map = _message_passing(elevation_map, n_iter)
     return pl.Series("z", elevation_map[df["x_pixel"], df["y_pixel"]])
 
 
-def _assign_z_mean(
-    df: pl.DataFrame, z_column: str = "z", dtype: DataType = Float32
+def _transform(
+    df: pl.DataFrame,
+    f: Callable[[str], pl.Expr],
+    z_key: str = "z",
+    dtype: type[DataType] = Float32,
 ) -> pl.Series:
-    """
-    Calculates a z-split coordinate.
-
-    Parameters
-    ----------
-    df : polars.DataFrame
-        A dataframe of coordinates.
-    z_column : str, optional
-        The name of the column containing the z-coordinate.
-
-    Returns
-    -------
-    polars.Series
-    """
-
-    return df.select(
-        pl.col(z_column).mean().over(["x_pixel", "y_pixel"]).cast(dtype)
-    ).to_series()
+    # transforming over the on-the-fly created pixel-id is more efficient than
+    # using the two pixel columns
+    z = (
+        df.lazy()
+        .select(
+            f(z_key)
+            .over(pl.col("x_pixel") + pl.col("y_pixel") * (pl.col("x_pixel").max() + 1))
+            .cast(dtype)
+        )
+        .collect()
+    )
+    return z.to_series()
 
 
-def _assign_z_median(
-    df: pl.DataFrame, z_column: str = "z", dtype: DataType = Float32
-) -> pl.Series:
-    """
-    Calculates a z-split coordinate.
-
-    Parameters
-    ----------
-    df : polars.DataFrame
-        A dataframe of coordinates.
-    z_column : str, optional
-        The name of the column containing the z-coordinate.
-
-    Returns
-    -------
-    polars.Series
-    """
-
-    return df.select(
-        pl.col(z_column).median().over(["x_pixel", "y_pixel"]).cast(dtype)
-    ).to_series()
+_METHODS = Literal["mean", "median", "message_passing"]
 
 
-def pre_process_coordinates(
+def process_coordinates(
     coordinates: pl.DataFrame,
     /,
     gridsize: float = 1,
     *,
     coordinate_keys: tuple[str, str, str] = ("x", "y", "z"),
-    method: Literal["mean", "median", "message_passing"] = "message_passing",
-    dtype: DataType = Float32,
-    **kwargs,
+    method: _METHODS = "message_passing",
+    n_iter: int = 20,
+    dtype: type[DataType] = Float32,
 ) -> pl.DataFrame:
     """
     Runs the pre-processing routine of the coordinate dataframe.
 
-    It assigns x,y coordinate pixels to all molecules in the data frame and
-    determines a z-coordinate-center for each pixel.
+    x,y coordinates are rescaled by the gridsize and x,y pixels assigned to all
+    molecules. A z-coordinate-center for each pixel is calculated.
 
     Parameters
     ----------
@@ -169,31 +127,32 @@ def pre_process_coordinates(
     method : bool, optional
         The measure to use to determine the z-dimension threshold for subslicing.
         One of, mean, median, and message_passing.
-    dtype : numpy.typing.DTypeLike, optional
+    n_iter : int, optional
+        Number of iterations. Only used if the method is message_passing.
+    dtype : type[polars.DataType], optional
         Datatype of the z-coordinate center.
-    kwargs
-        Other keywords arguments are passed to the message_passing function.
-
     Returns
     -------
     polars.DataFrame:
-        A dataframe with added z_delim column.
+        A dataframe with added x_pixel, y_pixel, and z_center column.
     """
+    if method not in get_args(_METHODS):
+        raise ValueError(f"`method` must be one of {get_args(_METHODS)} not '{method}'")
+
     *xy, z = coordinate_keys
 
     coordinates = _assign_xy(coordinates, xy_columns=xy, gridsize=gridsize)
 
-    match method:
-        case "message_passing":
-            z_delim = _assign_z_mean_message_passing(
-                coordinates, z_column=z, dtype=dtype, **kwargs
-            )
-        case "mean":
-            z_delim = _assign_z_mean(coordinates, z_column=z, dtype=dtype)
-        case "median":
-            z_delim = _assign_z_median(coordinates, z_column=z, dtype=dtype)
-        case _:
-            raise ValueError(
-                "`method` must be one of 'mean', 'median', or 'message_passing'"
-            )
-    return coordinates.with_columns(pl.Series("z_delim", z_delim))
+    if method == "message_passing":
+        z_center = _assign_z_mean_message_passing(
+            coordinates, n_iter=n_iter, z_key=z, dtype=dtype
+        )
+    else:
+        if method == "mean":
+            f = pl.mean
+        elif method == "median":
+            f = pl.median
+
+        z_center = _transform(coordinates, f, z, dtype=dtype)
+
+    return coordinates.with_columns(pl.Series("z_center", z_center))

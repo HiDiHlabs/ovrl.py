@@ -423,7 +423,7 @@ def plot_region_of_interest(
     roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=1.5e5 / window_size**2)
 
     ax_roi_top = fig.add_subplot(gs[1, 0], label="top_map")
-    top_mask = roi_transcripts["z"] > roi_transcripts["z_delim"]
+    top_mask = roi_transcripts["z"] > roi_transcripts["z_center"]
     roi_top = roi_transcripts.filter(top_mask)
     _plot_tissue_scatter(
         ax_roi_top,
@@ -437,7 +437,7 @@ def plot_region_of_interest(
 
     # bottom view of ROI
     ax_roi_bottom = fig.add_subplot(gs[1, 1], label="bottom_map")
-    bottom_mask = roi_transcripts["z"] < roi_transcripts["z_delim"]
+    bottom_mask = roi_transcripts["z"] < roi_transcripts["z_center"]
     roi_bottom = roi_transcripts.filter(bottom_mask)[::-1]
     _plot_tissue_scatter(
         ax_roi_bottom,
