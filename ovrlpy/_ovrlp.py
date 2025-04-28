@@ -378,7 +378,9 @@ class Ovrlp:
                 if n_pixels == 0:
                     continue
 
-                patch_df = patch_df.filter(pl.col("gene").is_in(gene2idx))
+                patch_df = patch_df.filter(
+                    pl.col("gene").cast(pl.String).is_in(gene2idx)
+                )
                 gene_queue: SimpleQueue[tuple[int, pl.DataFrame]] = SimpleQueue()
                 for (gene, *_), df in patch_df.group_by("gene"):
                     if gene in gene2idx:
