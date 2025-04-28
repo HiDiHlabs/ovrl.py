@@ -3,12 +3,11 @@ from queue import Empty, SimpleQueue
 from typing import Any, Literal
 
 import numpy as np
-import pandas as pd
 import polars as pl
-from numpy.typing import NDArray
 from scipy.linalg import norm
+from scipy.sparse import csr_array
 from sklearn.decomposition import PCA
-from sklearn.neighbors import NearestNeighbors
+from sklearn.neighbors import kneighbors_graph
 from umap import UMAP
 
 from ._kde import find_local_maxima, kde_2d_discrete
@@ -88,31 +87,47 @@ def _transform_embeddings(expression, pca: PCA, embedder_2d: UMAP, embedder_3d: 
     return embedding, embedding_color
 
 
-def _create_knn_graph(coords, k: int = 10):
-    """k nearest neighbors distances and indices"""
-    nbrs = NearestNeighbors(n_neighbors=k, algorithm="ball_tree").fit(coords)
-    distances, indices = nbrs.kneighbors(coords)
-    return distances, indices
+def _gaussian_weighted_knn_graph(
+    coords, k: int, bandwidth: float, *, n_workers: int | None = None
+) -> csr_array:
+    """gaussian-weighted k nearest neighbor distances"""
+    neighbors = kneighbors_graph(
+        coords, k, mode="distance", include_self=True, n_jobs=n_workers
+    )
+    neighbors = csr_array(neighbors)
+    neighbors.data = (1 / ((2 * np.pi) ** (3 / 2) * bandwidth**3)) * np.exp(
+        -(neighbors.data**2) / (2 * bandwidth**2)
+    )
+    return neighbors
 
 
-def _knn_expression(
-    gene_idx: NDArray[np.integer],
-    distances: np.ndarray,
-    neighbor_indices: np.ndarray,
-    gene_list: Iterable,
-    bandwidth: float = 2.5,
-) -> pd.DataFrame:
-    """kernel-weighted average of the expression values of the k nearest neighbors"""
-    weights = (1 / ((2 * np.pi) ** (3 / 2) * bandwidth**3)) * np.exp(
-        -(distances**2) / (2 * bandwidth**2)
+def _weighted_average_expression(
+    genes: pl.Series,
+    weights: np.ndarray | csr_array,
+    gene_list: Iterable[str],
+    normalize: bool = True,
+) -> pl.DataFrame:
+    """weighted average of the expression values of the neighbors"""
+
+    # one-hot encoded genes
+    genes_idx = (
+        genes.rename("").cast(pl.Enum(gene_list), strict=False).to_dummies(separator="")
     )
 
-    return pd.DataFrame(
-        {
-            gene: ((gene_idx[neighbor_indices] == i) * weights).sum(axis=1)
-            for i, gene in enumerate(gene_list)
-        }
-    )
+    expression = pl.DataFrame(
+        {gene: weights @ genes_idx[gene].to_numpy() for gene in genes_idx.columns}
+    ).lazy()
+
+    if normalize:
+        expression = expression.select(
+            pl.col(c) / pl.col(c).pow(2).sum().sqrt() for c in expression.columns
+        )
+
+    expression = expression.with_columns(
+        pl.lit(0.0).alias(gene) for gene in gene_list if gene not in genes_idx.columns
+    ).select(gene_list)
+
+    return expression.collect()
 
 
 def _gene_embedding(

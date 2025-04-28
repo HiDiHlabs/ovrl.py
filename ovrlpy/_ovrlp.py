@@ -25,12 +25,12 @@ from ._utils import (
     UMAP_RGB_PARAMS,
     _calculate_embedding,
     _cosine_similarity,
-    _create_knn_graph,
     _determine_localmax_and_sample,
     _fill_color_axes,
-    _knn_expression,
+    _gaussian_weighted_knn_graph,
     _minmax_scaling,
     _transform_embeddings,
+    _weighted_average_expression,
 )
 
 
@@ -508,8 +508,8 @@ class Ovrlp:
 
         Parameters
         ----------
-        transcripts : polars.DataFrame
-            Data frame of transcript coordinates to transform.
+        transcripts : polars.DataFrame | pandas.DataFrame
+            Dataframe of transcript coordinates to transform.
         gene_key : str
             Name of the gene column.
         coordinate_keys : collections.abc.Sequence[str]
@@ -517,17 +517,16 @@ class Ovrlp:
         """
         assert self.genes is not None
 
-        distances, neighbor_indices = _create_knn_graph(
-            transcripts[list(coordinate_keys)].to_numpy(), k=90
+        neighbors = _gaussian_weighted_knn_graph(
+            transcripts[list(coordinate_keys)],
+            90,
+            self.KDE_bandwidth,
+            n_workers=self.n_workers,
         )
 
-        # ensure the gene categories have the same order as the previously fit transcripts
-        genes = pd.Categorical(transcripts[gene_key], categories=self.genes).codes
-
-        expression = _knn_expression(
-            genes, distances, neighbor_indices, self.genes, bandwidth=self.KDE_bandwidth
+        expression = _weighted_average_expression(
+            pl.Series(transcripts[gene_key]), neighbors, self.genes
         )
-        expression /= np.linalg.norm(expression, axis=1)[:, None]
         return self.transform_pseudocells(expression)
 
     def transform_pseudocells(
