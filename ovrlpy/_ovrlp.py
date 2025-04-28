@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import reduce
@@ -57,7 +56,7 @@ class Ovrlp:
     coordinate_keys : collections.abc.Sequence[str]
         Names of the coordinate columns.
     n_workers : int
-        Number of threads sed in parallel processing.
+        Number of threads used in parallel processing.
     dtype : numpy.typing.DTypeLike
         Datatype used for KDE calculations.
     patch_length : int
@@ -115,7 +114,7 @@ class Ovrlp:
         *,
         gene_key: str = "gene",
         coordinate_keys: tuple[str, str, str] = ("x", "y", "z"),
-        n_workers: int = min(8, len(os.sched_getaffinity(0))),
+        n_workers: int = 1,
         dtype: npt.DTypeLike = np.float32,
         patch_length: int = 500,
         umap_kwargs: dict[str, Any] = UMAP_2D_PARAMS,
