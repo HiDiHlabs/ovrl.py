@@ -1,14 +1,15 @@
+from __future__ import annotations
+
 import os
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import reduce
 from math import ceil
 from queue import SimpleQueue
-from typing import Any
+from typing import TYPE_CHECKING, Any, overload
 
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
 import polars as pl
 import tqdm
 from anndata import AnnData
@@ -33,6 +34,9 @@ from ._utils import (
     _weighted_average_expression,
 )
 
+if TYPE_CHECKING:
+    import pandas as pd
+
 
 class Ovrlp:
     """
@@ -55,7 +59,7 @@ class Ovrlp:
     n_workers : int
         Number of threads sed in parallel processing.
     dtype : numpy.typing.DTypeLike
-        Datatype used for KDE calcculations.
+        Datatype used for KDE calculations.
     patch_length : int
         Upper bound for size of each patch. (Only relevant for processing)
     umap_kwargs : dict, optional
@@ -73,8 +77,8 @@ class Ovrlp:
         Minimum distance between pseudocells (local maxima).
     pseudocells : anndata.AnnData
         Gene expression matrix of the pseudcells.
-    signatures : pandas.DataFrame
-        A matrix of celltypes x gene signatures to use to annotate the UMAP.
+    signatures : polars.DataFrame
+        A dataframe of celltypes x gene signatures used to annotate the UMAP.
     celltype_centers : numpy.ndarray
         The center of gravity of each celltype in the 2D embedding, used for UMAP annotation.
     celltype_assignments : numpy.ndarray
@@ -94,7 +98,7 @@ class Ovrlp:
     signal_map : numpy.ndarray
         A pixel map of overall signal strength in the tissue, used to mask out low-signal regions.
     dtype : numpy.typing.DTypeLike
-        Datatype used for KDE calcculations.
+        Datatype used for KDE calculations.
     patch_length : int
         Upper bound for size of each patch. (Only relevant for processing)
     n_workers : int
@@ -118,7 +122,7 @@ class Ovrlp:
         cumap_kwargs: dict[str, Any] = UMAP_RGB_PARAMS,
     ) -> None:
         columns = {gene_key: "gene"} | dict(zip(coordinate_keys, ["x", "y", "z"]))
-        if isinstance(transcripts, pd.DataFrame):
+        if not isinstance(transcripts, pl.DataFrame):
             transcripts = pl.from_pandas(transcripts)
         self.transcripts = transcripts.rename(columns)
 
@@ -233,7 +237,7 @@ class Ovrlp:
             self.pseudocells.obsm["RGB"] = _minmax_scaling(embedding_color)
 
     @staticmethod
-    def _determine_celltype(samples: AnnData, signatures: pd.DataFrame) -> np.ndarray:
+    def _determine_celltype(samples: AnnData, signatures: pl.DataFrame) -> np.ndarray:
         X = samples[:, signatures.columns].X
         signature_mtx = signatures.to_numpy()
         # TODO: this is quite inefficient?
@@ -260,14 +264,25 @@ class Ovrlp:
             ]
         )
 
-    def fit_signatures(self, signatures: pd.DataFrame):
+    @overload
+    def fit_signatures(self, signatures: pl.DataFrame, key: str): ...
+    @overload
+    def fit_signatures(self, signatures: pd.DataFrame, key: None = None): ...
+
+    def fit_signatures(
+        self, signatures: pl.DataFrame | pd.DataFrame, key: None | str = None
+    ):
         """
         Fits a signature matrix.
 
         Parameters
         ----------
-        signatures : pandas.DataFrame
+        signatures : polars.DataFrame | pandas.DataFrame
             A matrix of celltypes x gene signatures to use to annotate the UMAP.
+        key : str | None
+            Name of the column with name of the signature.
+            Only used if `signatures` is a :py:class:`polars.DataFrame`,
+            for :py:class:`pandas.DataFrame` the names are expected as index.
         """
 
         if self.pseudocells is None:
@@ -275,17 +290,27 @@ class Ovrlp:
         if "2D_UMAP" not in self.pseudocells.obsm:
             raise Exception("Signature can only be fitted if a UMAP has been fit")
 
+        if isinstance(signatures, pl.DataFrame):
+            assert key is not None
+            # ensure annotation as first column
+            signatures = signatures.select(key, pl.exclude(key))
+        else:
+            key = str(signatures.index.name)
+            signatures = pl.from_pandas(signatures.reset_index())
+
+        assert key is not None
+
         self.signatures = signatures
 
         self.celltype_assignments = self._determine_celltype(
-            self.pseudocells, signatures
+            self.pseudocells, signatures.drop(key)
         )
 
         # determine the center of gravity of each celltype in the embedding:
         self.celltype_centers = self._coordinate_center(
             self.pseudocells.obsm["2D_UMAP"],
             self.celltype_assignments,
-            len(signatures.columns),
+            signatures.shape[0],
         )
 
     def compute_VSI(self, *, min_transcript: float = 2):
@@ -430,7 +455,7 @@ class Ovrlp:
         min_integrity: float = 0.7,
         min_signal: float = 3,
         integrity_sigma: float | None = None,
-    ) -> pd.DataFrame:
+    ) -> pl.DataFrame:
         """
         This function is used to find individual low peaks of signal integrity in the tissue
         map as an indicator of single occurrences overlapping cells.
@@ -447,6 +472,10 @@ class Ovrlp:
         integrity_sigma : float, optional
             Optional sigma value for gaussian filtering of the integrity map,
             which leads to the detection of overlap regions with larger spatial extent.
+
+        Returns
+        -------
+        polars.DataFrame
         """
 
         if not hasattr(self, "signal_map") or not hasattr(self, "integrity_map"):
@@ -463,14 +492,14 @@ class Ovrlp:
             min_value=1 - min_integrity,
         )
 
-        doublets = pd.DataFrame(
+        doublets = pl.DataFrame(
             {
                 "x": dist_y,
                 "y": dist_x,
                 "integrity": 1 - dist_t,
                 "signal": self.signal_map[dist_x, dist_y],
             }
-        ).sort_values("integrity")
+        ).sort("integrity")
 
         return doublets
 
@@ -542,7 +571,7 @@ class Ovrlp:
         """
 
         embedding, embedding_color = _transform_embeddings(
-            pseudocells.to_numpy(),
+            pseudocells,
             self.pca_2d,
             embedder_2d=self.embedder_2d,
             embedder_3d=self.embedder_3d,
@@ -554,7 +583,7 @@ class Ovrlp:
 
         return embedding, embedding_color
 
-    def pseudocell_integrity(self) -> pd.DataFrame:
+    def pseudocell_integrity(self) -> pl.DataFrame:
         """
         Returns a DataFrame containing the gene-count matrix of the fitted
         tissue's determined pseudo-cells.
@@ -564,16 +593,18 @@ class Ovrlp:
         pandas.DataFrame
         """
         assert self.pseudocells is not None
-        pseudocells = pd.DataFrame(
-            self.pseudocells.obsm["spatial"][:, :2], columns=["x", "y"]
+        pseudocells = pl.DataFrame(
+            self.pseudocells.obsm["spatial"][:, :2], schema=["x", "y"]
         )
 
         if self.signal_map is not None:
-            pseudocells["signal"] = self.signal_map[pseudocells["y"], pseudocells["x"]]
+            pseudocells = pseudocells.with_columns(
+                signal=self.signal_map[pseudocells["y"], pseudocells["x"]]
+            )
 
         if self.integrity_map is not None:
-            pseudocells["integrity"] = self.integrity_map[
-                pseudocells["y"], pseudocells["x"]
-            ]
+            pseudocells = pseudocells.with_columns(
+                integrity=self.integrity_map[pseudocells["y"], pseudocells["x"]]
+            )
 
         return pseudocells

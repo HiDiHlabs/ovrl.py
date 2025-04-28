@@ -1,8 +1,9 @@
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+import polars as pl
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, LinearSegmentedColormap
 from matplotlib.figure import Figure
@@ -112,7 +113,7 @@ def plot_umap(ovrlp: Ovrlp, *, annotate: bool = True, ax: Axes | None = None, **
     if ax is None:
         _, ax = plt.subplots()
     annotation = (
-        ovrlp.signatures.index if annotate and hasattr(ovrlp, "signatures") else None
+        ovrlp.signatures[:, 0] if annotate and hasattr(ovrlp, "signatures") else None
     )
     assert ("2D_UMAP" in ovrlp.pseudocells.obsm) and ("RGB" in ovrlp.pseudocells.obsm)
     ct_center = ovrlp.celltype_centers if hasattr(ovrlp, "celltype_centers") else None
@@ -132,7 +133,7 @@ def _plot_embeddings(
     embedding: np.ndarray,
     color: np.ndarray,
     celltype_centers: np.ndarray | None = None,
-    celltypes: np.ndarray | None = None,
+    celltypes: Iterable[str] | None = None,
     scatter_kwargs: dict[str, Any] = {"alpha": 0.1, "marker": "."},
 ):
     ax.axis("off")
@@ -363,9 +364,9 @@ def plot_region_of_interest(
     embedding = ovrlp.pseudocells.obsm["2D_UMAP"]
 
     # first, create and color-embed the subsample of the region of interest
-    roi_transcripts = ovrlp.subset_transcripts(x, y, window_size=window_size)
-    roi_transcripts = roi_transcripts.sort("z")
+    roi_transcripts = ovrlp.subset_transcripts(x, y, window_size=window_size).sort("z")
     _, embedding_color = ovrlp.transform_transcripts(roi_transcripts)
+    roi_transcripts = roi_transcripts.with_columns(RGB=embedding_color)
 
     if x is None:
         x = (roi_transcripts["x"].max() + roi_transcripts["x"].min()) / 2
@@ -423,13 +424,12 @@ def plot_region_of_interest(
     roi_scatter_kwargs = dict(marker=".", alpha=0.8, s=1.5e5 / window_size**2)
 
     ax_roi_top = fig.add_subplot(gs[1, 0], label="top_map")
-    top_mask = roi_transcripts["z"] > roi_transcripts["z_center"]
-    roi_top = roi_transcripts.filter(top_mask)
+    roi_top = roi_transcripts.filter(pl.col("z") > pl.col("z_center"))
     _plot_tissue_scatter(
         ax_roi_top,
         roi_top["x"],
         roi_top["y"],
-        embedding_color[top_mask],
+        roi_top["RGB"].to_numpy(),
         title="ROI celltype map, top",
         **roi_scatter_kwargs,
     )
@@ -437,13 +437,12 @@ def plot_region_of_interest(
 
     # bottom view of ROI
     ax_roi_bottom = fig.add_subplot(gs[1, 1], label="bottom_map")
-    bottom_mask = roi_transcripts["z"] < roi_transcripts["z_center"]
-    roi_bottom = roi_transcripts.filter(bottom_mask)[::-1]
+    roi_bottom = roi_transcripts.filter(pl.col("z") < pl.col("z_center"))[::-1]
     _plot_tissue_scatter(
         ax_roi_bottom,
         roi_bottom["x"],
         roi_bottom["y"],
-        embedding_color[bottom_mask][::-1],
+        roi_bottom["RGB"].to_numpy(),
         title="ROI celltype map, bottom",
         **roi_scatter_kwargs,
     )
@@ -461,25 +460,25 @@ def plot_region_of_interest(
     sub_gs = gs[1, 2].subgridspec(2, 1)
 
     ax_side_x = fig.add_subplot(sub_gs[0, 0], label="x_cut")
-    halving_mask = (roi_transcripts["y"] < (y + 4)) & (roi_transcripts["y"] > (y - 4))
+    roi_side_x = roi_transcripts.filter(pl.col("y") < (y + 4), pl.col("y") > (y - 4))
 
     _plot_tissue_scatter(
         ax_side_x,
-        roi_transcripts["x"].filter(halving_mask),
-        roi_transcripts["z"].filter(halving_mask),
-        embedding_color[halving_mask],
+        roi_side_x["x"],
+        roi_side_x["z"],
+        roi_side_x["RGB"].to_numpy(),
         title="ROI, vertical, x-cut",
         **roi_side_scatter_kwargs,
     )
 
     ax_side_y = fig.add_subplot(sub_gs[1, 0], label="y_cut")
-    halving_mask = (roi_transcripts["x"] < (x + 4)) & (roi_transcripts["x"] > (x - 4))
+    roi_side_y = roi_transcripts.filter(pl.col("x") < (x + 4), pl.col("x") > (x - 4))
 
     _plot_tissue_scatter(
         ax_side_y,
-        roi_transcripts["y"].filter(halving_mask),
-        roi_transcripts["z"].filter(halving_mask),
-        embedding_color[halving_mask],
+        roi_side_y["y"],
+        roi_side_y["z"],
+        roi_side_y["RGB"].to_numpy(),
         title="ROI, vertical, y-cut",
         **roi_side_scatter_kwargs,
     )
