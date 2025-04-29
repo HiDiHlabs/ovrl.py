@@ -86,16 +86,9 @@ def _transform(
 ) -> pl.Series:
     # transforming over the on-the-fly created pixel-id is more efficient than
     # using the two pixel columns
-    z = (
-        df.lazy()
-        .select(
-            f(z_key)
-            .over(pl.col("x_pixel") + pl.col("y_pixel") * (pl.col("x_pixel").max() + 1))
-            .cast(dtype)
-        )
-        .collect()
-    )
-    return z.to_series()
+    _pixel_id = pl.col("x_pixel") + pl.col("y_pixel") * (pl.col("x_pixel").max() + 1)
+    z = df.lazy().select(f(z_key).over(_pixel_id).cast(dtype)).collect().to_series()
+    return z
 
 
 _METHODS = Literal["mean", "median", "message_passing"]
