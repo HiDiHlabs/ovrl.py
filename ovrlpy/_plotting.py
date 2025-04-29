@@ -235,6 +235,10 @@ def plot_pseudocells(
         Keyword arguments for :py:func:`ovrlpy.plot_tissue`.
     kwargs
         Other keyword arguments will be passed to :py:func:`matplotlib.pyplot.subplots`
+
+    Returns
+    -------
+    matplotlib.figure.Figure
     """
 
     fig, axs = plt.subplots(ncols=2, **kwargs)
@@ -273,6 +277,10 @@ def plot_signal_integrity(
         By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
     kwargs
         Other keyword arguments are passed to :py:func:`matplotlib.pyplot.subplots`
+
+    Returns
+    -------
+    matplotlib.figure.Figure
     """
     integrity = ovrlp.integrity_map
     signal = ovrlp.signal_map
@@ -358,6 +366,10 @@ def plot_region_of_interest(
         By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
     kwargs
         Other keyword arguments are passed to :py:func:`matplotlib.pyplot.figure`
+
+    Returns
+    -------
+    matplotlib.figure.Figure
     """
     integrity = ovrlp.integrity_map
     signal = ovrlp.signal_map
