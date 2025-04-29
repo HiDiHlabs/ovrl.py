@@ -109,26 +109,28 @@ def _weighted_average_expression(
 ) -> pl.DataFrame:
     """weighted average of the expression values of the neighbors"""
 
+    assert weights.shape[0] == weights.shape[1] == len(genes)
+
+    # drop name which makes having correct names after to_dummies easier
+    genes = genes.rename("")
+    # first cast to string for correct comparison
+    genes = genes.cast(pl.String).cast(pl.Enum(gene_list), strict=False)
     # one-hot encoded genes
-    genes_idx = (
-        genes.rename("").cast(pl.Enum(gene_list), strict=False).to_dummies(separator="")
-    )
+    genes_idx = genes.to_dummies(separator="").drop("null", strict=False)
 
     expression = pl.DataFrame(
         {gene: weights @ genes_idx[gene].to_numpy() for gene in genes_idx.columns}
-    ).lazy()
+    )
 
     if normalize:
-        expression = expression.select(
-            pl.col(gene) / pl.col(gene).pow(2).sum().sqrt()
-            for gene in genes_idx.columns
-        )
+        l2_norms = np.linalg.norm(expression.to_numpy(), axis=1)
+        expression = expression.with_columns(pl.all().truediv(l2_norms))
 
     expression = expression.with_columns(
         pl.lit(0.0).alias(gene) for gene in gene_list if gene not in genes_idx.columns
     ).select(gene_list)
 
-    return expression.collect()
+    return expression
 
 
 def _gene_embedding(
