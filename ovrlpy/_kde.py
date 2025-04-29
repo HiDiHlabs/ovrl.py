@@ -1,7 +1,8 @@
 import warnings
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from math import floor
-from typing import Iterable, TypeAlias, TypeVar
+from typing import TypeAlias, TypeVar
 
 import numpy as np
 import pandas as pd

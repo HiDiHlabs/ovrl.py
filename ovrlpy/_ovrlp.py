@@ -11,7 +11,6 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 import tqdm
-from anndata import AnnData
 from scipy.linalg import norm
 from scipy.ndimage import gaussian_filter
 from sklearn.decomposition import PCA
@@ -35,6 +34,7 @@ from ._utils import (
 
 if TYPE_CHECKING:
     import pandas as pd
+    from anndata import AnnData
 
 
 class Ovrlp:

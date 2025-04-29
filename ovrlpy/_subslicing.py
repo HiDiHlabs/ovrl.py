@@ -1,7 +1,8 @@
 import warnings
+from collections.abc import Callable, Sequence
 from functools import reduce
 from operator import add
-from typing import Callable, Literal, Sequence, get_args
+from typing import Literal, get_args
 
 import numpy as np
 import polars as pl
