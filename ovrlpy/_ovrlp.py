@@ -165,7 +165,7 @@ class Ovrlp:
     def fit_transcripts(
         self,
         /,
-        min_transcript: float = 10,
+        min_transcripts: float = 10,
         *,
         genes: list | None = None,
         fit_umap: bool = True,
@@ -175,7 +175,7 @@ class Ovrlp:
 
         Parameters
         ----------
-        min_transcript : float
+        min_transcripts : float
             Minimum expression for a local maximum to be considered. Expressed in terms
             of transcripts.
         genes : list
@@ -190,7 +190,7 @@ class Ovrlp:
 
         local_maxima = _sample_expression(
             self.transcripts,
-            min_expression=self._expression_threshold(min_transcript),
+            min_expression=self._expression_threshold(min_transcripts),
             kde_bandwidth=self.KDE_bandwidth,
             n_workers=self.n_workers,
             min_pixel_distance=self.min_distance,
@@ -312,19 +312,19 @@ class Ovrlp:
             signatures.shape[0],
         )
 
-    def compute_VSI(self, *, min_transcript: float = 2):
+    def compute_VSI(self, *, min_transcripts: float = 2):
         """
         Calculate the vertical signal integrity (VSI).
 
         Parameters
         ----------
-        min_transcript : float | None, optional
+        min_transcripts : float | None, optional
             Minimum expression value to consider in calculation.
             Defaults to the 110% of the maximum expression profile of two molecules in the KDE.
         """
         assert self.genes is not None
 
-        min_expression = self._expression_threshold(min_transcript)
+        min_expression = self._expression_threshold(min_transcripts)
 
         padding = int(ceil(_TRUNCATE * self.KDE_bandwidth))
 
