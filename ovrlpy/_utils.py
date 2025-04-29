@@ -1,3 +1,4 @@
+import warnings
 from collections.abc import Iterable
 from queue import Empty, SimpleQueue
 from typing import Any, Literal
@@ -91,9 +92,11 @@ def _gaussian_weighted_neighbors(
     coords, radius: float, bandwidth: float, *, n_workers: int | None = None
 ) -> csr_array:
     """gaussian-weighted radius-based neighbors graph"""
-    neighbors = radius_neighbors_graph(
-        coords, radius, mode="distance", include_self=True, n_jobs=n_workers
-    )
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="X does not have valid feature names")
+        neighbors = radius_neighbors_graph(
+            coords, radius, mode="distance", include_self=True, n_jobs=n_workers
+        )
     neighbors = csr_array(neighbors)
     neighbors.data = (1 / ((2 * np.pi) ** (3 / 2) * bandwidth**3)) * np.exp(
         -(neighbors.data**2) / (2 * bandwidth**2)

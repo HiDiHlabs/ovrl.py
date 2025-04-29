@@ -590,7 +590,7 @@ class Ovrlp:
         """
 
         embedding, embedding_color = _transform_embeddings(
-            pseudocells,
+            pseudocells.to_numpy(),
             self.pca_2d,
             embedder_2d=self.embedder_2d,
             embedder_3d=self.embedder_3d,
