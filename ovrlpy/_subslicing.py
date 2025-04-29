@@ -6,7 +6,7 @@ from typing import Literal, get_args
 
 import numpy as np
 import polars as pl
-from polars.datatypes import DataType, Float32, Int32
+from polars.datatypes import DataType, Float32
 from scipy.sparse import coo_array
 
 
@@ -29,8 +29,8 @@ def _assign_xy(
         df.lazy()
         .with_columns(((pl.col(xy) - pl.col(xy).min()) / gridsize for xy in xy_columns))
         .with_columns(
-            pl.col(xy_columns[0]).cast(Int32).alias("x_pixel"),
-            pl.col(xy_columns[1]).cast(Int32).alias("y_pixel"),
+            pl.col(xy_columns[0]).cast(int).shrink_dtype().alias("x_pixel"),
+            pl.col(xy_columns[1]).cast(int).shrink_dtype().alias("y_pixel"),
         )
         .collect()
     )
