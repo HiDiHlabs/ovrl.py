@@ -157,6 +157,7 @@ def _sample_expression(
     kde_bandwidth: float = 2.5,
     min_expression: float = 2,
     min_pixel_distance: float = 5,
+    genes: list[str] | None = None,
     coord_columns: Iterable[str] = ["x", "y", "z"],
     gene_column: str = "gene",
     n_workers: int = 8,
@@ -168,29 +169,32 @@ def _sample_expression(
 
     Parameters
     ----------
-        transcripts : pandas.DataFrame
-            The input transcripts dataframe.
-        kde_bandwidth : float
-            Bandwidth for kernel density estimation.
-        minimum_expression : int
-            Minimum expression value for local maxima determination.
-        min_pixel_distance : int
-            Minimum pixel distance for local maxima determination.
-        coord_columns : Iterable[str], optional
-            Name of the coordinate columns in the coordinate dataframe.
-        gene_column : str, optional
-            Name of the gene column in the coordinate dataframe.
-        n_workers : int, optional
-            Number of parallel workers for sampling.
-        patch_length : int
-            Size of the length in each dimension when calculating signal integrity in patches.
-            Smaller values will use less memory, but may take longer to compute.
-        dtype : numpy.typing.DTypeLike
-            Datatype for the KDE.
+    transcripts : pandas.DataFrame
+        The input transcripts dataframe.
+    kde_bandwidth : float
+        Bandwidth for kernel density estimation.
+    minimum_expression : int
+        Minimum expression value for local maxima determination.
+    min_pixel_distance : int
+        Minimum pixel distance for local maxima determination.
+    genes : list[str] | None
+        Which genes to use in sampling of the local maxima. Detection of local maxima
+        will be done on all genes.
+    coord_columns : Iterable[str], optional
+        Name of the coordinate columns in the coordinate dataframe.
+    gene_column : str, optional
+        Name of the gene column in the coordinate dataframe.
+    n_workers : int, optional
+        Number of parallel workers for sampling.
+    patch_length : int
+        Size of the length in each dimension when calculating signal integrity in patches.
+        Smaller values will use less memory, but may take longer to compute.
+    dtype : numpy.typing.DTypeLike
+        Datatype for the KDE.
 
     Returns
     -------
-        anndata.AnnData
+    anndata.AnnData
     """
 
     coord_columns = list(coord_columns)
@@ -215,6 +219,9 @@ def _sample_expression(
 
     size = kde.shape
     del kde
+
+    if genes is not None:
+        transcripts = transcripts.filter(pl.col("gene").cast(pl.String).is_in(genes))
 
     # truncate * bandwidth -> _TRUNCATE * 1
     padding = _TRUNCATE

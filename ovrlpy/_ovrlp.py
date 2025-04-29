@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import reduce
 from math import ceil
@@ -167,7 +167,7 @@ class Ovrlp:
         /,
         min_transcripts: float = 10,
         *,
-        genes: list | None = None,
+        genes: Iterable[str] | None = None,
         fit_umap: bool = True,
     ):
         """
@@ -178,20 +178,23 @@ class Ovrlp:
         min_transcripts : float
             Minimum expression for a local maximum to be considered. Expressed in terms
             of transcripts.
-        genes : list
+        genes : collections.abc.Iterable[str] | None
             A list of genes to utilize in the model. `None` uses all genes.
+            Local maxima are always detected based on all genes.
         fit_umap : bool
             Whether to fit the UMAP to the data.
         """
 
         if genes is None:
-            genes = sorted(self.transcripts["gene"].unique())
-        self.genes = genes
+            self.genes = sorted(self.transcripts["gene"].unique())
+        else:
+            self.genes = list(genes)
 
         local_maxima = _sample_expression(
             self.transcripts,
             min_expression=self._expression_threshold(min_transcripts),
             kde_bandwidth=self.KDE_bandwidth,
+            genes=self.genes,
             n_workers=self.n_workers,
             min_pixel_distance=self.min_distance,
             patch_length=self.patch_length,
@@ -322,7 +325,6 @@ class Ovrlp:
             Minimum expression value to consider in calculation.
             Defaults to the 110% of the maximum expression profile of two molecules in the KDE.
         """
-        assert self.genes is not None
 
         min_expression = self._expression_threshold(min_transcripts)
 
@@ -422,7 +424,7 @@ class Ovrlp:
         self,
         gridsize: float = 1,
         min_transcripts: float = 10,
-        genes: list | None = None,
+        genes: Iterable[str] | None = None,
         fit_umap: bool = True,
     ):
         """
@@ -435,8 +437,9 @@ class Ovrlp:
         min_transcripts : float
             Minimum expression for a local maximum to be considered. Expressed in terms
             of transcripts.
-        genes : list
+        genes : collections.abc.Iterable[str] | None
             A list of genes to utilize in the model. `None` uses all genes.
+            Local maxima are always detected based on all genes.
         fit_umap : bool
             Whether to fit the UMAP to the data.
         """
@@ -556,7 +559,6 @@ class Ovrlp:
         rgb : numpy.ndarray
             3D RGB UMAP embedding
         """
-        assert self.genes is not None
 
         neighbors = _gaussian_weighted_neighbors(
             transcripts[list(coordinate_keys)],
