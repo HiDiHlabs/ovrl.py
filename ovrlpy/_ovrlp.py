@@ -227,7 +227,7 @@ class Ovrlp:
             self.pseudocells.obsm["2D_UMAP"] = self.embedder_2d.fit_transform(factors)
 
             embedding_color = self.embedder_3d.fit_transform(
-                factors / norm(factors, axis=1)[..., None]
+                factors / norm(factors, axis=1, keepdims=True)
             )
             embedding_color = _fill_color_axes(embedding_color, self.pca_3d, fit=True)
 

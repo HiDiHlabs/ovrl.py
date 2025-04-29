@@ -83,7 +83,9 @@ def _transform_embeddings(expression, pca: PCA, embedder_2d: UMAP, embedder_3d: 
     factors = pca.transform(expression)
 
     embedding = embedder_2d.transform(factors)
-    embedding_color = embedder_3d.transform(factors / norm(factors, axis=1)[..., None])
+    embedding_color = embedder_3d.transform(
+        factors / norm(factors, axis=1, keepdims=True)
+    )
 
     return embedding, embedding_color
 
@@ -126,7 +128,7 @@ def _weighted_average_expression(
     )
 
     if normalize:
-        l2_norms = np.linalg.norm(expression.to_numpy(), axis=1)
+        l2_norms = norm(expression.to_numpy(), axis=1)
         expression = expression.with_columns(pl.all().truediv(l2_norms))
 
     expression = expression.with_columns(
@@ -208,6 +210,6 @@ def _calculate_embedding(
 
 
 def _cosine_similarity(x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    norm_ = np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
+    norm_ = norm(x, axis=1) * norm(y, axis=1)
     norm_[norm_ == 0] = np.inf
     return np.sum(x * y, axis=1) / norm_
