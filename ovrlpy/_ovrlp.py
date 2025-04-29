@@ -153,7 +153,7 @@ class Ovrlp:
         gridsize : float, optional
             The size of the pixel grid.
         kwargs
-            Other keyword arguments are passed to :py:func:`ovrlpy.pre_process_coordinates`
+            Other keyword arguments are passed to :py:func:`ovrlpy.process_coordinates`
         """
         self.transcripts = process_coordinates(
             self.transcripts, gridsize=gridsize, **kwargs
@@ -520,6 +520,10 @@ class Ovrlp:
         window_size : int, optional
             The window size of the region. Molecules within this window around (x, y)
             are returned as a new DataFrame.
+
+        Returns
+        -------
+        polars.DataFrame
         """
         return self.transcripts.filter(
             pl.col("x").is_between(x - window_size, x + window_size)
@@ -544,6 +548,13 @@ class Ovrlp:
             Name of the gene column.
         coordinate_keys : collections.abc.Sequence[str]
             Names of the coordinate columns.
+
+        Returns
+        -------
+        embedding : numpy.ndarray
+            2D UMAP embedding
+        rgb : numpy.ndarray
+            3D RGB UMAP embedding
         """
         assert self.genes is not None
 
@@ -569,6 +580,13 @@ class Ovrlp:
         ----------
         pseudocells : polars.DataFrame | pandas.DataFrame
             A cell x gene matrix of gene expression
+
+        Returns
+        -------
+        embedding : numpy.ndarray
+            2D UMAP embedding
+        rgb : numpy.ndarray
+            3D RGB UMAP embedding
         """
 
         embedding, embedding_color = _transform_embeddings(
@@ -591,7 +609,7 @@ class Ovrlp:
 
         Returns
         -------
-        pandas.DataFrame
+        polars.DataFrame
         """
         assert self.pseudocells is not None
         pseudocells = pl.DataFrame(

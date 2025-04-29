@@ -54,6 +54,7 @@ nitpicky = True
 nitpick_ignore = [
     ("py:class", "numpy.typing.DTypeLike"),
     ("py:class", "polars.DataFrame"),
+    ("py:class", "polars.DataType"),
     ("py:class", "umap.UMAP"),
     ("py:class", "optional"),
 ]

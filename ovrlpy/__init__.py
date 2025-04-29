@@ -10,6 +10,7 @@ from ._plotting import (
     plot_tissue,
     plot_umap,
 )
+from ._subslicing import process_coordinates
 from ._utils import UMAP_2D_PARAMS, UMAP_RGB_PARAMS
 
 try:
@@ -28,6 +29,7 @@ __all__ = [
     "plot_signal_integrity",
     "plot_tissue",
     "plot_umap",
+    "process_coordinates",
     "SCALEBAR_PARAMS",
     "UMAP_2D_PARAMS",
     "UMAP_RGB_PARAMS",
