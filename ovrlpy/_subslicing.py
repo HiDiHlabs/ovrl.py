@@ -32,7 +32,7 @@ def _assign_xy(
             pl.col(xy_columns[0]).cast(int).shrink_dtype().alias("x_pixel"),
             pl.col(xy_columns[1]).cast(int).shrink_dtype().alias("y_pixel"),
         )
-        .collect()
+        .collect(engine="streaming")  # reduce memory usage by using streaming
     )
     return df
 
@@ -130,6 +130,7 @@ def process_coordinates(
         Number of iterations. Only used if the method is message_passing.
     dtype : type[polars.DataType], optional
         Datatype of the z-coordinate center.
+
     Returns
     -------
     polars.DataFrame:
