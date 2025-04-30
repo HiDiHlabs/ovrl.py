@@ -2,7 +2,7 @@ import warnings
 from collections.abc import Callable, Sequence
 from functools import reduce
 from operator import add
-from typing import Literal, get_args
+from typing import Literal, TypeVar, get_args
 
 import numpy as np
 import polars as pl
@@ -37,7 +37,12 @@ def _assign_xy(
     return df
 
 
-def _message_passing(x: np.ndarray, /, n_iter: int) -> np.ndarray:
+Shape = TypeVar("Shape", bound=tuple[int, ...])
+
+
+def _message_passing(
+    x: np.ndarray[Shape, np.dtype], /, n_iter: int
+) -> np.ndarray[Shape, np.dtype]:
     with warnings.catch_warnings():
         # ignore 'mean of empty slice' warning if all values are nan
         warnings.simplefilter("ignore", category=RuntimeWarning)
@@ -45,8 +50,8 @@ def _message_passing(x: np.ndarray, /, n_iter: int) -> np.ndarray:
             x = reduce(
                 add,
                 (
-                    np.nanmean([x, np.roll(x, shift, axis=ax)], axis=0)
-                    for ax in (0, 1)
+                    np.nanmean([x, np.roll(x, shift, axis=axis)], axis=0)  # type: ignore
+                    for axis in (0, 1)
                     for shift in (1, -1)
                 ),
             )
