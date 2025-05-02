@@ -17,8 +17,8 @@ Functions to read the data in the correct format are available for common file f
    import ovrlpy
 
    # Define analysis parameters for ovrlpy
-   kde_bandwidth = 2  # The smoothness of the kernel density estimation (KDE)
-   n_expected_celltypes = 20  # Number of expected cell types in the data
+   kde_bandwidth = 2.5  # smoothness of the kernel density estimation (KDE)
+   n_components = 20  # number of principal components, depends on the data complexity
 
    # Load your spatial transcriptomics data from a CSV file
    coordinate_df = pd.read_csv('path/to/coordinate_file.csv')
@@ -26,7 +26,7 @@ Functions to read the data in the correct format are available for common file f
 
 In this step, we load the dataset and configure the model parameters, such as
 `kde_bandwidth` (to control smoothness) and
-`n_expected_celltypes` (to set the expected number of cell types).
+`n_components` (to set the number of prinicpal components that will be used).
 
 2. Fit the ovrlpy Model
 _______________________
@@ -36,17 +36,13 @@ Fit the **ovrlpy** model to generate the signal integrity map.
 .. code-block:: python
 
    # Fit the ovrlpy model to the spatial data
-   integrity, signal, visualizer = ovrlpy.run(
-       df=coordinate_df,
+   dataset = ovrlpy.Ovrlp(
+       coordinate_df,
        KDE_bandwidth=kde_bandwidth,
-       n_expected_celltypes=n_expected_celltypes
+       n_components=n_components,
+       n_workers=4,  # number of threads to use for processing
    )
-
-This function generates:
-
-- **integrity**: The signal integrity map.
-- **signal**: The signal map representing the strength of spatial expression signals.
-- **visualizer**: A visualizer object that helps to plot and explore the results.
+   dataset.analyse()
 
 3. Visualize the Model Fit
 __________________________
@@ -55,8 +51,7 @@ Once the model is fitted, you can visualize how well it matches your spatial dat
 
 .. code-block:: python
 
-   # Use the visualizer object to plot the fitted signal map
-   visualizer.plot_fit()
+   fig = ovrlpy.plot_pseudocells(dataset)
 
 This plot gives you a visual representation of the models fit to the spatial transcriptomics data.
 
@@ -67,8 +62,7 @@ Now, plot the signal integrity map using a threshold to highlight areas with str
 
 .. code-block:: python
 
-   # Plot the signal integrity map with a signal threshold
-   fig, ax = ovrlpy.plot_signal_integrity(integrity, signal, signal_threshold=4.0)
+   fig = ovrlpy.plot_signal_integrity(dataset, signal_threshold=4)
 
 
 5. Detect and Visualize Overlaps (Doublets)
@@ -79,39 +73,29 @@ Identify overlapping signals (doublets) in the tissue and visualize them.
 .. code-block:: python
 
    # Detect doublet events (overlapping signals) in the dataset
-   doublet_df = ovrlpy.detect_doublets(
-       integrity,
-       signal,
-       signal_cutoff=4,  # Threshold for signal strength
-       integrity_sigma=1  # Controls the coherence of the signals
+   doublets = dataset.detect_doublets(
+       min_signal=4,  # threshold for signal strength
+       integrity_sigma=1,  # controls the coherence of the signals
    )
 
-   # Display the detected doublets
-   doublet_df.head()
+   doublets.head()
 
 6. 3D Visualization of a Doublet Event
 ______________________________________
 
-Visualize a specific overlap event (doublet) in 3D to see how it looks in the tissue.
+Visualize a specific overlap event (doublet) to see how it looks in the tissue.
 
 .. code-block:: python
 
-   # Parameters for 3D visualization
+   # Parameters for the visualization
    window_size = 60  # Size of the visualization window around the doublet
    doublet_to_show = 0  # Index of the doublet to visualize
 
-   # Get the coordinates of the doublet event
-   x, y = doublet_df.loc[doublet_to_show, ["x", "y"]]
+   # Coordinates of the doublet event
+   x, y = doublets["x", "y"].row(doublet_to_show)
 
    # Plot the doublet event with 3D visualization
-   _ = ovrlpy.plot_region_of_interest(
-      x, y,
-      coordinate_df,
-      visualizer,
-      signal_integrity,
-      signal_strength,
-      window_size=window_size,
-   )
+   fig = ovrlpy.plot_region_of_interest(dataset, x, y, window_size=window_size)
 
-This visualization shows a 3D representation of the spatial overlap event, giving more
-insight into the structure and coherence of the signals.
+This visualization shows a top/bottom/side representation of the spatial overlap event,
+giving more insight into the structure and coherence of the signals.

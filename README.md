@@ -37,8 +37,8 @@ In a first step, we define a number of parameters for the analysis:
 import pandas as pd
 import ovrlpy
 
-# define ovrlpy analysis parameters:
-n_expected_celltypes = 20
+# define ovrlpy analysis parameters
+n_components = 20
 
 # load the data
 coordinate_df = pd.read_csv('path/to/coordinate_file.csv')
@@ -51,23 +51,27 @@ you can then fit an ovrlpy model to the data and create a signal integrity map:
 
 ```python
 # fit the ovrlpy model to the data
-signal_integrity, signal_strength, visualizer = ovrlpy.run(
-    coordinate_df, n_expected_celltypes=n_expected_celltypes
+dataset = ovrlpy.Ovrlp(
+    coordinate_df,
+    n_components=n_components,
+    n_workers=4,  # number of threads to use for processing
 )
+
+dataset.analyse()
 ```
 
-returns a signal integrity map, a signal map and a visualizer object that can be used to visualize the data:
+after fitting we can visualize the data ...
 
 ```python
-visualizer.plot_fit()
+fig = ovrlpy.plot_pseudocells(dataset)
 ```
 ![plot_fit output](docs/resources/plot_fit.png)
 
 
-and visualize the signal integrity map:
+... and the signal integrity map
 
 ```python
-fig, ax = ovrlpy.plot_signal_integrity(signal_integrity, signal_strength, signal_threshold=4)
+fig = ovrlpy.plot_signal_integrity(dataset, signal_threshold=4)
 ```
 
 ![plot_signal_integrity output](docs/resources/xenium_integrity_with_highlights.svg)
@@ -75,29 +79,18 @@ fig, ax = ovrlpy.plot_signal_integrity(signal_integrity, signal_strength, signal
 Ovrlpy can also identify individual overlap events in the data:
 
 ```python
-doublet_df = ovrlpy.detect_doublets(
-    signal_integrity, signal_strength, minimum_signal_strength=3, integrity_sigma=2
-)
-
-doublet_df.head()
+doublets = dataset.detect_doublets(min_signal=4, integrity_sigma=1)
 ```
 
-And use the visualizer to show a 3D visualization of the overlaps in the tissue:
+And plot a multi-view visualization of the overlaps in the tissue:
 
 ```python
 # Which doublet do you want to visualize?
-n_doublet_case = 0
+doublet_to_show = 0
 
-x, y = doublet_df.loc[doublet_case, ["x", "y"]]
+x, y = doublets["x", "y"].row(doublet_to_show)
 
-ovrlpy.plot_region_of_interest(
-    x,
-    y,
-    coordinate_df,
-    visualizer,
-    signal_integrity,
-    signal_strength,
-)
+fig = ovrlpy.plot_region_of_interest(dataset, x, y, window_size=window_size)
 ```
 
 ![plot_region_of_interest output](docs/resources/plot_roi.png)
