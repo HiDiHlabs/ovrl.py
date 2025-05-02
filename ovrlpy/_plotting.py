@@ -414,7 +414,7 @@ def plot_region_of_interest(
         vmax=1,
     )
 
-    ax_integrity.set_title("signal integrity")
+    ax_integrity.set_title("ROI, signal integrity")
     ax_integrity.invert_yaxis()
     fig.colorbar(img)
 
