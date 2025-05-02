@@ -65,6 +65,8 @@ class Ovrlp:
         Keyword arguments for 2D UMAP embedding.
     cumap_kwargs : dict, optional
         Keyword arguments for 3D UMAP embedding.
+    random_state : int | numpy.random.RandomState | None
+        Random state used to seed UMAP and PCA.
 
     Attributes
     ----------
@@ -119,6 +121,7 @@ class Ovrlp:
         patch_length: int = 500,
         umap_kwargs: dict[str, Any] = UMAP_2D_PARAMS,
         cumap_kwargs: dict[str, Any] = UMAP_RGB_PARAMS,
+        random_state: int | np.random.RandomState | None = None,
     ) -> None:
         columns = {gene_key: "gene"} | dict(zip(coordinate_keys, ["x", "y", "z"]))
         if not isinstance(transcripts, pl.DataFrame):
@@ -133,15 +136,20 @@ class Ovrlp:
 
         self.min_distance = min_distance
 
-        if "random_state" not in umap_kwargs and "n_jobs" not in umap_kwargs:
-            umap_kwargs = {"n_jobs": n_workers} | umap_kwargs
+        umap_kwargs = {"random_state": random_state} | umap_kwargs
+        cumap_kwargs = {"random_state": random_state} | cumap_kwargs
 
-        if "random_state" not in cumap_kwargs and "n_jobs" not in cumap_kwargs:
-            cumap_kwargs = {"n_jobs": n_workers} | cumap_kwargs
+        if "n_jobs" not in umap_kwargs:
+            # umap_kwargs["random_state"] is not necessarily == random_state
+            n_jobs = n_workers if umap_kwargs.get("random_state") is None else 1
+            umap_kwargs["n_jobs"] = n_jobs
+        if "n_jobs" not in cumap_kwargs:
+            n_jobs = n_workers if cumap_kwargs.get("random_state") is None else 1
+            cumap_kwargs["n_jobs"] = n_jobs
 
-        self.pca_2d = PCA(n_components=n_components)
+        self.pca_2d = PCA(n_components=n_components, random_state=random_state)
         self.embedder_2d = UMAP(**(umap_kwargs | {"n_components": 2}))
-        self.pca_3d = PCA(n_components=3)
+        self.pca_3d = PCA(n_components=3, random_state=random_state)
         self.embedder_3d = UMAP(**(cumap_kwargs | {"n_components": 3}))
 
     def process_coordinates(self, gridsize: float = 1, **kwargs):
