@@ -305,10 +305,11 @@ class Ovrlp:
             # ensure annotation as first column
             signatures = signatures.select(key, pl.exclude(key))
         else:
-            key = str(signatures.index.name)
+            if signatures.index.name is None:
+                key = "index"
+            else:
+                key = str(signatures.index.name)
             signatures = pl.from_pandas(signatures.reset_index())
-
-        assert key is not None
 
         self.signatures = signatures
 
