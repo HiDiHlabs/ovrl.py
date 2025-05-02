@@ -221,6 +221,7 @@ def plot_pseudocells(
     *,
     umap_kwargs: Mapping[str, Any] = {"scatter_kwargs": {"s": 1}},
     tissue_kwargs: Mapping[str, Any] = {"s": 1},
+    figsize: tuple[float, float] = (12, 6),
     **kwargs,
 ) -> Figure:
     """
@@ -233,6 +234,8 @@ def plot_pseudocells(
         Keyword arguments for :py:func:`ovrlpy.plot_umap`.
     tissue_kwargs
         Keyword arguments for :py:func:`ovrlpy.plot_tissue`.
+    figsize : tuple[float, float]
+        Size of the figure in inches.
     kwargs
         Other keyword arguments will be passed to :py:func:`matplotlib.pyplot.subplots`
 
@@ -241,7 +244,7 @@ def plot_pseudocells(
     matplotlib.figure.Figure
     """
 
-    fig, axs = plt.subplots(ncols=2, **kwargs)
+    fig, axs = plt.subplots(figsize=figsize, ncols=2, **kwargs)
 
     plot_umap(ovrlp, ax=axs[0], **umap_kwargs)
     plot_tissue(ovrlp, ax=axs[1], **tissue_kwargs)
@@ -256,6 +259,7 @@ def plot_signal_integrity(
     cmap: str | Colormap = BIH_CMAP,
     histogram: bool = True,
     scalebar: dict | None = SCALEBAR_PARAMS,
+    figsize: tuple[float, float] = (9, 6),
     **kwargs,
 ) -> Figure:
     """
@@ -275,6 +279,8 @@ def plot_signal_integrity(
         If `None` no scalebar will be plotted. Otherwise a dictionary with
         additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
         By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
+    figsize : tuple[float, float]
+        Size of the figure in inches.
     kwargs
         Other keyword arguments are passed to :py:func:`matplotlib.pyplot.subplots`
 
@@ -290,11 +296,11 @@ def plot_signal_integrity(
     with plt.style.context("dark_background"):
         if histogram:
             kwargs = {"width_ratios": [6, 1]} | kwargs
-            fig, axs = plt.subplots(ncols=2, **kwargs)
+            fig, axs = plt.subplots(ncols=2, figsize=figsize, **kwargs)
             ax_im, ax_hist = axs
             assert isinstance(ax_hist, Axes)
         else:
-            fig, ax_im = plt.subplots(**kwargs)
+            fig, ax_im = plt.subplots(figsize=figsize, **kwargs)
 
         assert isinstance(ax_im, Axes)
 
@@ -343,6 +349,7 @@ def plot_region_of_interest(
     window_size: int = 30,
     signal_threshold: float = 5.0,
     scalebar: dict | None = SCALEBAR_PARAMS,
+    figsize: tuple[float, float] = (12, 8),
     **kwargs,
 ) -> Figure:
     """
@@ -364,6 +371,8 @@ def plot_region_of_interest(
         If `None` no scalebar will be plotted. Otherwise a dictionary with
         additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
         By default :py:attr:`ovrlpy.SCALEBAR_PARAMS`
+    figsize : tuple[float, float]
+        Size of the figure in inches.
     kwargs
         Other keyword arguments are passed to :py:func:`matplotlib.pyplot.figure`
 
@@ -391,7 +400,7 @@ def plot_region_of_interest(
 
     roi = ((x - window_size, x + window_size), (y - window_size, y + window_size))
 
-    fig = plt.figure(**kwargs)
+    fig = plt.figure(figsize=figsize, **kwargs)
     gs = fig.add_gridspec(2, 3)
 
     # integrity map
