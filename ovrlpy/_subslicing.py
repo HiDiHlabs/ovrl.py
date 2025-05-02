@@ -11,7 +11,10 @@ from scipy.sparse import coo_array
 
 
 def _assign_xy(
-    df: pl.DataFrame, xy_columns: Sequence[str] = ("x", "y"), gridsize: float = 1
+    df: pl.DataFrame,
+    xy_columns: Sequence[str] = ("x", "y"),
+    gridsize: float = 1,
+    shift: bool = True,
 ) -> pl.DataFrame:
     """
     Assigns an x,y pixel coordinate.
@@ -24,17 +27,23 @@ def _assign_xy(
         The names of the columns containing the x,y-coordinates.
     gridsize : float, optional
         The size of the grid.
+    shift : bool
+        Whether to shift the x,y coordinates to 0 to minimize the analysis area.
+        If False, the sample will keep its original shape.
     """
-    df = (
-        df.lazy()
-        .with_columns(((pl.col(xy) - pl.col(xy).min()) / gridsize for xy in xy_columns))
-        .with_columns(
-            pl.col(xy_columns[0]).cast(Int32).shrink_dtype().alias("x_pixel"),
-            pl.col(xy_columns[1]).cast(Int32).shrink_dtype().alias("y_pixel"),
-        )
-        .collect(engine="streaming")  # reduce memory usage by using streaming
+    lf = df.lazy()
+
+    if shift:
+        lf = lf.with_columns(pl.col(col) - pl.col(col).min() for col in xy_columns)
+    elif df.select(pl.col(xy_columns).min() < 0).to_numpy().any():
+        raise ValueError("shift=False is only possible if coordinates are > 0")
+
+    lf = lf.with_columns(pl.col(xy_columns) / gridsize).with_columns(
+        pl.col(xy_columns[0]).cast(Int32).shrink_dtype().alias("x_pixel"),
+        pl.col(xy_columns[1]).cast(Int32).shrink_dtype().alias("y_pixel"),
     )
-    return df
+
+    return lf.collect(engine="streaming")  # reduce memory usage by using streaming
 
 
 Shape = TypeVar("Shape", bound=tuple[int, ...])
@@ -106,6 +115,7 @@ def process_coordinates(
     *,
     coordinate_keys: tuple[str, str, str] = ("x", "y", "z"),
     method: _METHODS = "message_passing",
+    shift: bool = True,
     n_iter: int = 20,
     dtype: type[DataType] = Float32,
 ) -> pl.DataFrame:
@@ -126,6 +136,9 @@ def process_coordinates(
     method : bool, optional
         The measure to use to determine the z-dimension threshold for subslicing.
         One of, mean, median, and message_passing.
+    shift : bool
+        Whether to shift the x,y coordinates to 0 to minimize the analysis area.
+        If False, the sample will keep its original shape.
     n_iter : int, optional
         Number of iterations. Only used if the method is message_passing.
     dtype : type[polars.DataType], optional
@@ -141,7 +154,7 @@ def process_coordinates(
 
     *xy, z = coordinate_keys
 
-    coordinates = _assign_xy(coordinates, xy_columns=xy, gridsize=gridsize)
+    coordinates = _assign_xy(coordinates, xy_columns=xy, gridsize=gridsize, shift=shift)
 
     if method == "message_passing":
         z_center = _assign_z_mean_message_passing(
