@@ -82,6 +82,10 @@ def kde_nd(
     """
     assert len(coordinates) >= 1
 
+    mins = tuple(int(floor(c.min())) for c in coordinates)
+    maxs = tuple(int(floor(c.max() + 1)) for c in coordinates)
+    assert all(min >= 0 for min in mins)
+
     n = coordinates[0].shape[0]
     if not all(x.shape[0] == n for x in coordinates[1:]):
         raise ValueError("All coordinates must have the same number of rows")
@@ -93,11 +97,9 @@ def kde_nd(
             return np.zeros(size, dtype=dtype)
 
     if size is None:
-        size = tuple(int(floor(c.max() + 1)) for c in coordinates)
+        size = maxs
 
-    dim_bins = [
-        np.arange(int(c.min()), int(floor(c.max() + 1)) + 1) for c in coordinates
-    ]
+    dim_bins = [np.arange(min, max + 1) for min, max in zip(mins, maxs)]
     counts, bins = np.histogramdd(coordinates, bins=dim_bins)
     kde = _kde(counts, bandwidth, dtype=dtype, **kwargs)
 
