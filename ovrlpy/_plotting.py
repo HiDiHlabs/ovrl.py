@@ -384,15 +384,6 @@ def plot_region_of_interest(
     _, embedding_color = ovrlp.transform_transcripts(roi_transcripts)
     roi_transcripts = roi_transcripts.with_columns(RGB=embedding_color)
 
-    if x is None:
-        x = (roi_transcripts["x"].max() + roi_transcripts["x"].min()) / 2
-    if y is None:
-        y = (roi_transcripts["y"].max() + roi_transcripts["y"].min()) / 2
-    if window_size is None:
-        window_size = int(
-            1 + (roi_transcripts["x"].max() - roi_transcripts["x"].min()) / 2
-        )
-
     roi = ((x - window_size, x + window_size), (y - window_size, y + window_size))
 
     fig = plt.figure(figsize=figsize, **kwargs)
