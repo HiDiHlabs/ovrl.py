@@ -53,7 +53,7 @@ class Ovrlp:
         Number of components for PCA.
     gene_key : str
         Name of the gene column
-    coordinate_keys : collections.abc.Sequence[str]
+    coordinate_keys : collections.abc.Iterable[str]
         Names of the coordinate columns.
     n_workers : int
         Number of threads used in parallel processing.
@@ -115,7 +115,7 @@ class Ovrlp:
         n_components: int = 30,
         *,
         gene_key: str = "gene",
-        coordinate_keys: tuple[str, str, str] = ("x", "y", "z"),
+        coordinate_keys: Iterable[str] = ("x", "y", "z"),
         n_workers: int = 1,
         dtype: npt.DTypeLike = np.float32,
         patch_length: int = 500,
