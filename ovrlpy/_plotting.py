@@ -154,15 +154,10 @@ def _plot_embeddings(
     if celltypes is not None and celltype_centers is not None:
         text_artists: list[Text] = []
         for i, celltype in enumerate(celltypes):
-            if not np.isnan(celltype_centers[i, 0]):
-                t = ax.text(
-                    np.nan_to_num((celltype_centers[i, 0])),
-                    np.nan_to_num(celltype_centers[i, 1]),
-                    celltype,
-                    color="k",
-                    fontsize=12,
-                )
-                text_artists.append(t)
+            if not np.isnan(celltype_centers[i, 0:2]).any():
+                x, y = celltype_centers[i, 0:2]
+                text = ax.text(x, y, celltype, color="k")
+                text_artists.append(text)
 
         _untangle_text(text_artists, ax)
 
