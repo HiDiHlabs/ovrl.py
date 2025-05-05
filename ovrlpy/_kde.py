@@ -284,6 +284,6 @@ def _sample_expression(
     # TODO: sparse?
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=ImplicitModificationWarning)
-        adata = AnnData(pd.concat(patches).reset_index(drop=True)[gene_list].fillna(0))
+        adata = AnnData(pd.concat(patches, ignore_index=True)[gene_list].fillna(0))
     adata.obsm["spatial"] = np.rint(np.vstack(coords) * kde_bandwidth).astype(np.int32)
     return adata
