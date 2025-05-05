@@ -7,8 +7,13 @@ import polars as pl
 
 def _filter_genes(df: pl.DataFrame, remove_features: Collection[str]) -> pl.DataFrame:
     if len(remove_features) > 0:
-        df = df.filter(
-            ~pl.col("gene").cast(pl.Utf8).str.contains(f"({'|'.join(remove_features)})")
+        remove_pattern = "|".join(remove_features)
+        df = (
+            df.lazy()
+            .with_columns(pl.col("gene").cast(pl.String))
+            .filter(~pl.col("gene").str.contains(f"({remove_pattern})"))
+            .with_columns(pl.col("gene").cast(pl.Categorical))
+            .collect()
         )
     return df
 
