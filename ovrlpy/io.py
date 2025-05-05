@@ -11,7 +11,7 @@ def _filter_genes(df: pl.DataFrame, remove_features: Collection[str]) -> pl.Data
         df = (
             df.lazy()
             .with_columns(pl.col("gene").cast(pl.String))
-            .filter(~pl.col("gene").str.contains(f"({remove_pattern})"))
+            .filter(~pl.col("gene").str.contains(remove_pattern))
             .with_columns(pl.col("gene").cast(pl.Categorical))
             .collect()
         )
