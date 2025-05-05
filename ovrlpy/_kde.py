@@ -226,6 +226,7 @@ def _sample_expression(
 
     if genes is not None:
         transcripts = transcripts.filter(pl.col("gene").cast(pl.String).is_in(genes))
+    gene_list = sorted(transcripts[gene_column].unique())
 
     # truncate * bandwidth -> _TRUNCATE * 1
     padding = _TRUNCATE
@@ -279,8 +280,8 @@ def _sample_expression(
                 pd.DataFrame(dict(f.result() for f in as_completed(futures)))
             )
             del futures
+        del transcripts, local_maximum_coordinates
 
-    gene_list = sorted(transcripts[gene_column].unique())
     # TODO: sparse?
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=ImplicitModificationWarning)
