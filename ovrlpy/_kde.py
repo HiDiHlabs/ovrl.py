@@ -203,8 +203,10 @@ def _sample_expression(
     assert len(coord_columns) == 3 or len(coord_columns) == 2
 
     # lower resolution instead of increasing bandwidth!
-    transcripts = transcripts.select(
-        (pl.col(c) / kde_bandwidth for c in coord_columns), gene_column
+    transcripts = (
+        transcripts.lazy()
+        .select(pl.col(coord_columns) / kde_bandwidth, gene_column)
+        .collect(engine="streaming")
     )
 
     print("determining pseudocells")
