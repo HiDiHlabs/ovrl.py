@@ -52,15 +52,20 @@ autosummary_imported_members = True
 
 nitpicky = True
 nitpick_ignore = [
+    ("py:class", "numpy.typing.DTypeLike"),
+    ("py:class", "polars.DataFrame"),
+    ("py:class", "polars.DataType"),
+    ("py:class", "umap.UMAP"),
     ("py:class", "optional"),
 ]
 
 intersphinx_mapping = dict(
+    anndata=("https://anndata.readthedocs.io/en/stable/", None),
     matplotlib=("https://matplotlib.org/stable/", None),
     numpy=("https://numpy.org/doc/stable/", None),
     pandas=("https://pandas.pydata.org/pandas-docs/stable/", None),
+    polars=("https://docs.pola.rs/api/python/stable/", None),
     python=("https://docs.python.org/3", None),
-    scanpy=("https://scanpy.readthedocs.io/en/stable/", None),
     scipy=("https://docs.scipy.org/doc/scipy/", None),
     sklearn=("https://scikit-learn.org/stable/", None),
     umap=("https://umap-learn.readthedocs.io/page/", None),
