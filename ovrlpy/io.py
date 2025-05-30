@@ -131,7 +131,7 @@ def read_MERFISH(
     Parameters
     ----------
     filepath : os.PathLike or str
-        Path to the Vizgen transcripts file.
+        Path to the Vizgen transcripts file. Both, .csv(.gz) and .parquet files, are supported.
     z_scale : float
         Factor to scale z-plane index to um, i.e. distance between z-planes.
     remove_genes : collections.abc.Collection[str], optional
@@ -147,18 +147,38 @@ def read_MERFISH(
     -------
     polars.DataFrame
     """
+    filepath = Path(filepath)
+    columns = list(set(_MERFISH_COLUMNS.keys()) | set(additional_columns))
 
-    transcripts = pl.read_csv(
-        Path(filepath),
-        columns=list(set(_MERFISH_COLUMNS.keys()) | set(additional_columns)),
-        schema_overrides={"gene": pl.Categorical},
-        n_threads=n_threads,
-    ).rename(_MERFISH_COLUMNS)
+    if filepath.suffixes[-2:] == [".csv", ".gz"]:
+        transcripts = pl.read_csv(
+            filepath,
+            columns=columns,
+            schema_overrides={"gene": pl.Categorical},
+            n_threads=n_threads,
+        )
 
+    else:
+        if filepath.suffix == ".parquet":
+            transcripts = pl.scan_parquet(filepath)
+        elif filepath.suffix == ".csv":
+            transcripts = pl.scan_csv(filepath)
+        else:
+            raise ValueError(
+                "Unsupported file format; must be one of .csv(.gz) or .parquet"
+            )
+
+        with pl.StringCache():
+            transcripts = (
+                transcripts.select(columns)
+                .with_columns(pl.col("gene").cast(pl.String).cast(pl.Categorical))
+                .collect()
+            )
+
+    transcripts = transcripts.rename(_MERFISH_COLUMNS)
     transcripts = _filter_genes(transcripts, remove_genes)
 
     # convert plane to um
-
     transcripts = transcripts.with_columns(pl.col("z") * z_scale)
 
     return transcripts
