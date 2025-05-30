@@ -110,18 +110,18 @@ def read_Xenium(
     return transcripts
 
 
-# Vizgen MERFISH
-_MERFISH_COLUMNS = {"gene": "gene", "global_x": "x", "global_y": "y", "global_z": "z"}
+# Vizgen MERSCOPE
+_MERSCOPE_COLUMNS = {"gene": "gene", "global_x": "x", "global_y": "y", "global_z": "z"}
 
-MERFISH_CTRLS = ["^Blank"]
+MERSCOPE_CTRLS = ["^Blank"]
 """Patterns for Vizgen controls"""
 
 
-def read_MERFISH(
+def read_MERSCOPE(
     filepath: str | os.PathLike,
     z_scale: float = 1.5,
     *,
-    remove_genes: Collection[str] = MERFISH_CTRLS,
+    remove_genes: Collection[str] = MERSCOPE_CTRLS,
     additional_columns: Collection[str] = [],
     n_threads: int | None = None,
 ) -> pl.DataFrame:
@@ -136,7 +136,7 @@ def read_MERFISH(
         Factor to scale z-plane index to um, i.e. distance between z-planes.
     remove_genes : collections.abc.Collection[str], optional
         List of regex patterns to filter the 'gene' column,
-        :py:attr:`ovrlpy.io.MERFISH_CTRLS` by default.
+        :py:attr:`ovrlpy.io.MERSCOPE_CTRLS` by default.
     additional_columns : collections.abc.Collection[str], optional
         Additional columns to load from the transcripts file.
     n_threads : int | None, optional
@@ -148,7 +148,7 @@ def read_MERFISH(
     polars.DataFrame
     """
     filepath = Path(filepath)
-    columns = list(set(_MERFISH_COLUMNS.keys()) | set(additional_columns))
+    columns = list(set(_MERSCOPE_COLUMNS.keys()) | set(additional_columns))
 
     if filepath.suffixes[-2:] == [".csv", ".gz"]:
         transcripts = pl.read_csv(
@@ -175,7 +175,7 @@ def read_MERFISH(
                 .collect()
             )
 
-    transcripts = transcripts.rename(_MERFISH_COLUMNS)
+    transcripts = transcripts.rename(_MERSCOPE_COLUMNS)
     transcripts = _filter_genes(transcripts, remove_genes)
 
     # convert plane to um
