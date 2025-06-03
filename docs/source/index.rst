@@ -9,7 +9,7 @@ Introduction
 In spatial biology, tissue slices are commonly used to study the spatial distribution of cells and molecules. However, since these slices represent 3D structures in 2D, overlapping structures in the vertical dimension can lead to artefacts and inconsistencies in the data.
 
 **ovrlpy** is a quality-control tool for spatial transcriptomics data that can help analysts find sources of vertical signal inconsistency in their data.
-It is works with imaging-based spatial transcriptomics data, such as 10x Genomics' Xenium or Vizgen's MERFISH platforms.
+It is works with imaging-based spatial transcriptomics data, such as 10x Genomics' Xenium or Vizgen's MERSCOPE platforms.
 The main feature of the tool is the production of 'signal integrity maps' that can help analysts identify sources of signal inconsistency in their data.
 Users can also use the built-in 3D visualisation tool to explore regions of signal inconsistency in their data on a molecular level.
 
