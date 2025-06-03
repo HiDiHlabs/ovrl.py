@@ -84,13 +84,13 @@ class Ovrlp:
         The center of gravity of each celltype in the 2D embedding, used for UMAP annotation.
     celltype_assignments : numpy.ndarray
         The assignments of the cell types.
-    pca_2d : sklearn.decomposition.PCA
-        The PCA object used for the 2D embedding.
-    embedder_2d : umap.UMAP
+    pca : sklearn.decomposition.PCA
+        The PCA object used for the 2D embedding and calculating the VSI score.
+    umap_2d : umap.UMAP
         The UMAP object used for the 2D embedding.
-    pca_3d : sklearn.decomposition.PCA
+    pca_rgb : sklearn.decomposition.PCA
         The PCA object used for the 3D RGB embedding.
-    embedder_3d : umap.UMAP
+    umap_rgb : umap.UMAP
         The UMAP object used for the 3D RGB embedding.
     genes : list
         A list of genes to utilize in the model.
@@ -147,10 +147,10 @@ class Ovrlp:
             n_jobs = n_workers if cumap_kwargs.get("random_state") is None else 1
             cumap_kwargs["n_jobs"] = n_jobs
 
-        self.pca_2d = PCA(n_components=n_components, random_state=random_state)
-        self.embedder_2d = UMAP(**(umap_kwargs | {"n_components": 2}))
-        self.pca_3d = PCA(n_components=3, random_state=random_state)
-        self.embedder_3d = UMAP(**(cumap_kwargs | {"n_components": 3}))
+        self.pca = PCA(n_components=n_components, random_state=random_state)
+        self.umap_2d = UMAP(**(umap_kwargs | {"n_components": 2}))
+        self.pca_rgb = PCA(n_components=3, random_state=random_state)
+        self.umap_rgb = UMAP(**(cumap_kwargs | {"n_components": 3}))
 
     def process_coordinates(self, gridsize: float = 1, **kwargs):
         """
@@ -225,19 +225,19 @@ class Ovrlp:
 
         self.pseudocells = pseudocells
         X = pseudocells[:, self.genes].X
-        self.pca_2d.fit(X)
+        self.pca.fit(X)
 
         if fit_umap:
-            factors = self.pca_2d.transform(X)
+            factors = self.pca.transform(X)
 
             print(f"Modeling {factors.shape[1]} pseudo-celltype clusters;")
 
-            self.pseudocells.obsm["2D_UMAP"] = self.embedder_2d.fit_transform(factors)
+            self.pseudocells.obsm["2D_UMAP"] = self.umap_2d.fit_transform(factors)
 
-            embedding_color = self.embedder_3d.fit_transform(
+            embedding_color = self.umap_rgb.fit_transform(
                 factors / norm(factors, axis=1, keepdims=True)
             )
-            embedding_color = _fill_color_axes(embedding_color, self.pca_3d, fit=True)
+            embedding_color = _fill_color_axes(embedding_color, self.pca_rgb, fit=True)
 
             self._colors_min_max = (
                 embedding_color.min(axis=0),
@@ -405,7 +405,7 @@ class Ovrlp:
                                 _calculate_embedding,
                                 gene_queue,
                                 patch_mask,
-                                self.pca_2d.components_,
+                                self.pca.components_,
                                 bandwidth=self.KDE_bandwidth,
                                 dtype=self.dtype,
                             )
@@ -602,11 +602,11 @@ class Ovrlp:
 
         embedding, embedding_color = _transform_embeddings(
             pseudocells.to_numpy(),
-            self.pca_2d,
-            embedder_2d=self.embedder_2d,
-            embedder_3d=self.embedder_3d,
+            self.pca,
+            umap_2d=self.umap_2d,
+            umap_rgb=self.umap_rgb,
         )
-        embedding_color = _fill_color_axes(embedding_color, self.pca_3d)
+        embedding_color = _fill_color_axes(embedding_color, self.pca_rgb)
         color_min, color_max = self._colors_min_max
         embedding_color = (embedding_color - color_min) / (color_max - color_min)
         embedding_color = np.clip(embedding_color, 0, 1)

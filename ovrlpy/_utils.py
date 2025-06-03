@@ -78,14 +78,12 @@ def _minmax_scaling(x: np.ndarray):
     return (x - x_min) / (x_max - x_min)
 
 
-def _transform_embeddings(expression, pca: PCA, embedder_2d: UMAP, embedder_3d: UMAP):
+def _transform_embeddings(expression, pca: PCA, umap_2d: UMAP, umap_rgb: UMAP):
     """fit the expression data into the umap embeddings after PCA transformation"""
     factors = pca.transform(expression)
 
-    embedding = embedder_2d.transform(factors)
-    embedding_color = embedder_3d.transform(
-        factors / norm(factors, axis=1, keepdims=True)
-    )
+    embedding = umap_2d.transform(factors)
+    embedding_color = umap_rgb.transform(factors / norm(factors, axis=1, keepdims=True))
 
     return embedding, embedding_color
 
