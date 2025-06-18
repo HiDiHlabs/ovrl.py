@@ -38,7 +38,7 @@ import pandas as pd
 import ovrlpy
 
 # define ovrlpy analysis parameters
-n_components = 20
+n_components = 20 # number pf PCA components
 
 # load the data
 coordinate_df = pd.read_csv('path/to/coordinate_file.csv')
@@ -90,7 +90,7 @@ doublet_to_show = 0
 
 x, y = doublets["x", "y"].row(doublet_to_show)
 
-fig = ovrlpy.plot_region_of_interest(dataset, x, y, window_size=window_size)
+fig = ovrlpy.plot_region_of_interest(dataset, x, y, window_size=50)
 ```
 
 ![plot_region_of_interest output](docs/resources/plot_roi.png)
