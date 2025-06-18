@@ -29,6 +29,8 @@ BIH_CMAP = LinearSegmentedColormap.from_list(
     ][::-1],
 )
 
+VSI = "vertical signal integrity"
+
 
 def _plot_scalebar(ax: Axes, dx: float = 1, units="um", **kwargs):
     ax.add_artist(ScaleBar(dx, units=units, **kwargs))
@@ -323,15 +325,14 @@ def plot_signal_integrity(
             bars = ax_hist.barh(bins[1:-1], vals[1:], height=0.01)
             for i, bar in enumerate(bars):
                 bar.set_color(colors[i])
-            ax_hist.set(ylim=(0, 1), ylabel="signal integrity")
+            ax_hist.set(ylim=(0, 1), ylabel=VSI, xticks=[])
             ax_hist.yaxis.tick_right()
             ax_hist.yaxis.set_label_position("right")
-            ax_hist.set_xticks([], [])
             ax_hist.invert_xaxis()
             ax_hist.spines[["top", "bottom", "left"]].set_visible(False)
 
         else:
-            fig.colorbar(img)
+            fig.colorbar(img, label=VSI)
 
     return fig
 
@@ -402,7 +403,7 @@ def plot_region_of_interest(
 
     ax_integrity.set_title("ROI, signal integrity")
     ax_integrity.invert_yaxis()
-    fig.colorbar(img)
+    fig.colorbar(img, label=VSI)
 
     ax_integrity.set_xlim(x - window_size, x + window_size)
     ax_integrity.set_ylim(y - window_size, y + window_size)

@@ -11,7 +11,7 @@ Much of spatial biology uses microscopic tissue slices to study the spatial dist
 ![3D slice visualization](docs/resources/cell_overlap_visualization.jpg)
 
 Ovrl.py is a quality-control tool for spatial transcriptomics data that can help analysts find sources of vertical signal inconsistency in their data.
-It is works with imaging-based spatial transcriptomics data, such as 10x genomics' Xenium or vizgen's MERFISH platforms.
+It is works with imaging-based spatial transcriptomics data, such as 10x genomics' Xenium or vizgen's MERSCOPE platforms.
 The main feature of the tool is the production of 'signal integrity maps' that can help analysts identify sources of signal inconsistency in their data.
 Users can also use the built-in 3D visualisation tool to explore regions of signal inconsistency in their data on a molecular level.
 
@@ -38,7 +38,7 @@ import pandas as pd
 import ovrlpy
 
 # define ovrlpy analysis parameters
-n_components = 20
+n_components = 20 # number pf PCA components
 
 # load the data
 coordinate_df = pd.read_csv('path/to/coordinate_file.csv')
@@ -90,7 +90,7 @@ doublet_to_show = 0
 
 x, y = doublets["x", "y"].row(doublet_to_show)
 
-fig = ovrlpy.plot_region_of_interest(dataset, x, y, window_size=window_size)
+fig = ovrlpy.plot_region_of_interest(dataset, x, y, window_size=50)
 ```
 
 ![plot_region_of_interest output](docs/resources/plot_roi.png)

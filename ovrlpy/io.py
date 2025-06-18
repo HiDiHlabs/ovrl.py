@@ -41,6 +41,7 @@ def read_Xenium(
     *,
     min_qv: float | None = None,
     remove_features: Collection[str] = XENIUM_CTRLS,
+    additional_columns: Collection[str] = [],
     n_threads: int | None = None,
 ) -> pl.DataFrame:
     """
@@ -56,6 +57,8 @@ def read_Xenium(
     remove_features : collections.abc.Collection[str], optional
         List of regex patterns to filter the 'feature_name' column,
         :py:attr:`ovrlpy.io.XENIUM_CTRLS` by default.
+    additional_columns : collections.abc.Collection[str], optional
+        Additional columns to load from the transcripts file.
     n_threads : int | None, optional
         Number of threads used for parsing the input file.
         If None, will default to number of available CPUs.
@@ -65,7 +68,7 @@ def read_Xenium(
     polars.DataFrame
     """
     filepath = Path(filepath)
-    columns = list(_XENIUM_COLUMNS.keys())
+    columns = list(set(_XENIUM_COLUMNS.keys()) | set(additional_columns))
 
     if filepath.suffix == ".parquet":
         transcripts = pl.scan_parquet(filepath)
@@ -87,7 +90,7 @@ def read_Xenium(
             )
 
     else:
-        if min_qv is not None:
+        if min_qv is not None and "qv" not in additional_columns:
             columns.append("qv")
         transcripts = pl.read_csv(
             filepath,
@@ -97,7 +100,9 @@ def read_Xenium(
         )
 
         if min_qv is not None:
-            transcripts = transcripts.filter(pl.col("qv") >= min_qv).drop("qv")
+            transcripts = transcripts.filter(pl.col("qv") >= min_qv)
+            if "qv" not in additional_columns:
+                transcripts = transcripts.drop("qv")
 
     transcripts = transcripts.rename(_XENIUM_COLUMNS)
     transcripts = _filter_genes(transcripts, remove_features)
@@ -105,18 +110,19 @@ def read_Xenium(
     return transcripts
 
 
-# Vizgen MERFISH
-_MERFISH_COLUMNS = {"gene": "gene", "global_x": "x", "global_y": "y", "global_z": "z"}
+# Vizgen MERSCOPE
+_MERSCOPE_COLUMNS = {"gene": "gene", "global_x": "x", "global_y": "y", "global_z": "z"}
 
-MERFISH_CTRLS = ["^Blank"]
+MERSCOPE_CTRLS = ["^Blank"]
 """Patterns for Vizgen controls"""
 
 
-def read_MERFISH(
+def read_MERSCOPE(
     filepath: str | os.PathLike,
     z_scale: float = 1.5,
     *,
-    remove_genes: Collection[str] = MERFISH_CTRLS,
+    remove_genes: Collection[str] = MERSCOPE_CTRLS,
+    additional_columns: Collection[str] = [],
     n_threads: int | None = None,
 ) -> pl.DataFrame:
     """
@@ -125,12 +131,14 @@ def read_MERFISH(
     Parameters
     ----------
     filepath : os.PathLike or str
-        Path to the Vizgen transcripts file.
+        Path to the Vizgen transcripts file. Both, .csv(.gz) and .parquet files, are supported.
     z_scale : float
         Factor to scale z-plane index to um, i.e. distance between z-planes.
     remove_genes : collections.abc.Collection[str], optional
         List of regex patterns to filter the 'gene' column,
-        :py:attr:`ovrlpy.io.MERFISH_CTRLS` by default.
+        :py:attr:`ovrlpy.io.MERSCOPE_CTRLS` by default.
+    additional_columns : collections.abc.Collection[str], optional
+        Additional columns to load from the transcripts file.
     n_threads : int | None, optional
         Number of threads used for parsing the input file.
         If None, will default to number of available CPUs.
@@ -139,18 +147,38 @@ def read_MERFISH(
     -------
     polars.DataFrame
     """
+    filepath = Path(filepath)
+    columns = list(set(_MERSCOPE_COLUMNS.keys()) | set(additional_columns))
 
-    transcripts = pl.read_csv(
-        Path(filepath),
-        columns=list(_MERFISH_COLUMNS.keys()),
-        schema_overrides={"gene": pl.Categorical},
-        n_threads=n_threads,
-    ).rename(_MERFISH_COLUMNS)
+    if filepath.suffixes[-2:] == [".csv", ".gz"]:
+        transcripts = pl.read_csv(
+            filepath,
+            columns=columns,
+            schema_overrides={"gene": pl.Categorical},
+            n_threads=n_threads,
+        )
 
+    else:
+        if filepath.suffix == ".parquet":
+            transcripts = pl.scan_parquet(filepath)
+        elif filepath.suffix == ".csv":
+            transcripts = pl.scan_csv(filepath)
+        else:
+            raise ValueError(
+                "Unsupported file format; must be one of .csv(.gz) or .parquet"
+            )
+
+        with pl.StringCache():
+            transcripts = (
+                transcripts.select(columns)
+                .with_columns(pl.col("gene").cast(pl.String).cast(pl.Categorical))
+                .collect()
+            )
+
+    transcripts = transcripts.rename(_MERSCOPE_COLUMNS)
     transcripts = _filter_genes(transcripts, remove_genes)
 
     # convert plane to um
-
     transcripts = transcripts.with_columns(pl.col("z") * z_scale)
 
     return transcripts
@@ -168,6 +196,7 @@ def read_CosMx(
     scale: Mapping[str, float] = {"xy": 0.12028, "z": 0.8},
     *,
     remove_targets: Collection[str] = COSMX_CTRLS,
+    additional_columns: Collection[str] = [],
     n_threads: int | None = None,
 ) -> pl.DataFrame:
     """
@@ -182,6 +211,8 @@ def read_CosMx(
     remove_targets : collections.abc.Collection[str], optional
         List of regex patterns to filter the 'target' column,
         :py:attr:`ovrlpy.io.COSMX_CTRLS` by default.
+    additional_columns : collections.abc.Collection[str], optional
+        Additional columns to load from the transcripts file.
     n_threads : int | None, optional
         Number of threads used for parsing the input file.
         If None, will default to number of available CPUs.
@@ -193,7 +224,7 @@ def read_CosMx(
 
     transcripts = pl.read_csv(
         Path(filepath),
-        columns=list(_COSMX_COLUMNS.keys()),
+        columns=list(set(_COSMX_COLUMNS.keys()) | set(additional_columns)),
         schema_overrides={"target": pl.Categorical},
         n_threads=n_threads,
     ).rename(_COSMX_COLUMNS)
