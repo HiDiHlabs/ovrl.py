@@ -11,7 +11,7 @@ Much of spatial biology uses microscopic tissue slices to study the spatial dist
 ![3D slice visualization](docs/resources/cell_overlap_visualization.jpg)
 
 Ovrl.py is a quality-control tool for spatial transcriptomics data that can help analysts find sources of vertical signal inconsistency in their data.
-It is works with imaging-based spatial transcriptomics data, such as 10x genomics' Xenium or vizgen's MERSCOE platforms.
+It is works with imaging-based spatial transcriptomics data, such as 10x genomics' Xenium or vizgen's MERSCOPE platforms.
 The main feature of the tool is the production of 'signal integrity maps' that can help analysts identify sources of signal inconsistency in their data.
 Users can also use the built-in 3D visualisation tool to explore regions of signal inconsistency in their data on a molecular level.
 
