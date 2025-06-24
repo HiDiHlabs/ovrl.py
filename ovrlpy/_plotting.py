@@ -7,6 +7,7 @@ import polars as pl
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, LinearSegmentedColormap
 from matplotlib.figure import Figure
+from matplotlib.image import AxesImage
 from matplotlib.patches import Rectangle
 from matplotlib.text import Text
 from matplotlib_scalebar.scalebar import ScaleBar
@@ -249,6 +250,20 @@ def plot_pseudocells(
     return fig
 
 
+def _plot_signal_integrity(
+    ax: Axes, integrity, signal, threshold, *, cmap: Colormap = BIH_CMAP
+) -> AxesImage:
+    img = ax.imshow(
+        integrity,
+        cmap=cmap,
+        alpha=(signal / threshold).clip(0, 1),
+        vmin=0,
+        vmax=1,
+        origin="lower",
+    )
+    return img
+
+
 def plot_signal_integrity(
     ovrlp: Ovrlp,
     *,
@@ -268,6 +283,7 @@ def plot_signal_integrity(
     signal_threshold : float, optional
         Threshold below which the signal is faded out in the plot,
         to avoid displaying noisy areas with low predictive confidence.
+        Pixels below the threshold are not counted in the histogram.
     cmap : str | matplotlib.colors.Colormap, optional
         Colormap for display.
     histogram : bool, optional
@@ -301,14 +317,10 @@ def plot_signal_integrity(
 
         assert isinstance(ax_im, Axes)
 
-        img = ax_im.imshow(
-            integrity,
-            cmap=cmap,
-            alpha=((signal / signal_threshold).clip(0, 1) ** 2),
-            vmin=0,
-            vmax=1,
+        img = _plot_signal_integrity(
+            ax_im, integrity, signal, signal_threshold, cmap=cmap
         )
-        ax_im.invert_yaxis()
+
         ax_im.spines[["top", "right"]].set_visible(False)
 
         if scalebar is not None:
@@ -362,7 +374,8 @@ def plot_region_of_interest(
     window_size : int, optional
         Size of the window to display.
     signal_threshold : float, optional
-        Threshold for the signal plot.
+        Threshold below which the signal is faded out in the VSI plot,
+        to avoid displaying noisy areas with low predictive confidence.
     scalebar : dict[str, typing.Any] | None
         If `None` no scalebar will be plotted. Otherwise a dictionary with
         additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
@@ -393,18 +406,12 @@ def plot_region_of_interest(
     # integrity map
     ax_integrity = fig.add_subplot(gs[0, 2], label="signal_integrity", facecolor="k")
 
-    img = ax_integrity.imshow(
-        integrity,
-        cmap=BIH_CMAP,
-        alpha=(signal / signal_threshold).clip(0, 1),
-        vmin=0,
-        vmax=1,
+    img = _plot_signal_integrity(
+        ax_integrity, integrity, signal, signal_threshold, cmap=BIH_CMAP
     )
-
-    ax_integrity.set_title("ROI, signal integrity")
-    ax_integrity.invert_yaxis()
     fig.colorbar(img, label=VSI)
 
+    ax_integrity.set_title("ROI, signal integrity")
     ax_integrity.set_xlim(x - window_size, x + window_size)
     ax_integrity.set_ylim(y - window_size, y + window_size)
 
