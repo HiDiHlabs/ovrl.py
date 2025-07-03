@@ -251,16 +251,16 @@ def plot_pseudocells(
 
 
 def _plot_signal_integrity(
-    ax: Axes, integrity, signal, threshold, *, cmap: Colormap = BIH_CMAP
+    ax: Axes,
+    integrity: np.ndarray,
+    signal: np.ndarray,
+    threshold: float,
+    *,
+    cmap: Colormap = BIH_CMAP,
 ) -> AxesImage:
-    img = ax.imshow(
-        integrity,
-        cmap=cmap,
-        alpha=(signal / threshold).clip(0, 1),
-        vmin=0,
-        vmax=1,
-        origin="lower",
-    )
+    # fade out for pixels with signal < threshold
+    alpha = (signal / threshold).clip(0, 1)
+    img = ax.imshow(integrity, cmap=cmap, alpha=alpha, vmin=0, vmax=1, origin="lower")
     return img
 
 
