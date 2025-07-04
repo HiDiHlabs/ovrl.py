@@ -31,6 +31,7 @@ BIH_CMAP = LinearSegmentedColormap.from_list(
 )
 
 VSI = "vertical signal integrity"
+_SIGNAL_THRESHOLD = 2
 
 
 def _plot_scalebar(ax: Axes, dx: float = 1, units="um", **kwargs):
@@ -267,7 +268,7 @@ def _plot_signal_integrity(
 def plot_signal_integrity(
     ovrlp: Ovrlp,
     *,
-    signal_threshold: float = 2.0,
+    signal_threshold: float = _SIGNAL_THRESHOLD,
     cmap: str | Colormap = BIH_CMAP,
     histogram: bool = True,
     scalebar: dict | None = SCALEBAR_PARAMS,
@@ -355,7 +356,7 @@ def plot_region_of_interest(
     y: float,
     *,
     window_size: int = 30,
-    signal_threshold: float = 5.0,
+    signal_threshold: float = _SIGNAL_THRESHOLD,
     scalebar: dict | None = SCALEBAR_PARAMS,
     figsize: tuple[float, float] = (12, 8),
     **kwargs,
