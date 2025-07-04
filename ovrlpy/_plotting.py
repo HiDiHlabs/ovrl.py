@@ -259,7 +259,7 @@ def _plot_signal_integrity(
     cmap: Colormap = BIH_CMAP,
 ) -> AxesImage:
     # fade out for pixels with signal < threshold
-    alpha = (signal / threshold).clip(0, 1)
+    alpha = (signal / threshold).clip(0, 1) ** 2
     img = ax.imshow(integrity, cmap=cmap, alpha=alpha, vmin=0, vmax=1, origin="lower")
     return img
 
