@@ -37,6 +37,7 @@ Tiesmeyer, S., Müller-Bötticher, N., Malt, A., Long, B., Marco-Salas, S., Kies
    installation
    usage
    tutorials/index
+   guide
 
 
 Indices and tables
