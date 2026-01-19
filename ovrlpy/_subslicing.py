@@ -42,15 +42,17 @@ def _assign_xy(
     elif df.select(pl.col(xy_columns).min() < 0).to_numpy().any():
         raise ValueError("shift=False is only possible if coordinates are > 0")
 
-    lf = lf.with_columns(pl.col(xy_columns) / gridsize).with_columns(
-        pl.col(xy_columns[0]).cast(Int32).shrink_dtype().alias("x_pixel"),
-        pl.col(xy_columns[1]).cast(Int32).shrink_dtype().alias("y_pixel"),
+    df = (
+        lf.with_columns(pl.col(xy_columns) / gridsize)
+        .with_columns(
+            pl.col(xy_columns[0]).cast(Int32).alias("x_pixel"),
+            pl.col(xy_columns[1]).cast(Int32).alias("y_pixel"),
+        )
+        .collect(engine="streaming")  # reduce memory usage by using streaming
     )
+    df = df.with_columns(df[xy].shrink_dtype() for xy in xy_columns)
 
-    return (
-        lf.collect(engine="streaming"),  # reduce memory usage by using streaming
-        min_coord,
-    )
+    return df, min_coord
 
 
 Shape = TypeVar("Shape", bound=tuple[int, ...])
