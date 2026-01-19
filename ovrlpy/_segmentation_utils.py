@@ -143,11 +143,13 @@ def cell_integrity_from_masks(
     for mask in segmentation_masks:
         prepare(mask)
 
+    px_size = ovrlp.gridsize
+
     # get groups where within each group no pair of cells is too close to each other
-    groups = _disjoint_groups(segmentation_masks, px_size=ovrlp.gridsize)
+    groups = _disjoint_groups(segmentation_masks, px_size=px_size)
 
     shape = ovrlp.integrity_map.shape
-    transform = from_origin(ovrlp.origin[0], ovrlp.origin[1], 1, -1)
+    transform = from_origin(ovrlp.origin[0], ovrlp.origin[1], px_size, -px_size)
 
     # get pixels that belong to each cell
     cell_pixels = pl.concat(
