@@ -107,6 +107,7 @@ def plot_umap(ovrlp: Ovrlp, *, annotate: bool = True, ax: Axes | None = None, **
 
     Parameters
     ----------
+    ovrlp : ovrlpy.Ovrlp
     annotate : bool
         Whether to add cell-type annotation if it was calculated using `Ovrlp.fit_signatures`.
     ax : matplotlib.axes.Axes | None
@@ -178,6 +179,7 @@ def plot_tissue(
 
     Parameters
     ----------
+    ovrlp : ovrlpy.Ovrlp
     scalebar : dict[str, typing.Any] | None
         If `None` no scalebar will be plotted. Otherwise a dictionary with
         additional kwargs for ``matplotlib_scalebar.scalebar.ScaleBar``.
@@ -280,7 +282,7 @@ def plot_signal_integrity(
 
     Parameters
     ----------
-    ovrlp : Ovrlp
+    ovrlp : ovrlpy.Ovrlp
     signal_threshold : float, optional
         Threshold below which the signal is faded out in the plot,
         to avoid displaying noisy areas with low predictive confidence.
