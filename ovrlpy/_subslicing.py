@@ -2,7 +2,7 @@ import warnings
 from collections.abc import Callable, Sequence
 from functools import reduce
 from operator import add
-from typing import Literal, TypeVar, get_args
+from typing import Literal, TypeVar, get_args, overload
 
 import numpy as np
 import polars as pl
@@ -15,7 +15,7 @@ def _assign_xy(
     xy_columns: Sequence[str] = ("x", "y"),
     gridsize: float = 1,
     shift: bool = True,
-) -> pl.DataFrame:
+) -> tuple[pl.DataFrame, tuple[float, float]]:
     """
     Assigns an x,y pixel coordinate.
 
@@ -32,9 +32,13 @@ def _assign_xy(
         If False, the sample will keep its original shape.
     """
     lf = df.lazy()
-
+    min_coord = (0, 0)
     if shift:
-        lf = lf.with_columns(pl.col(col) - pl.col(col).min() for col in xy_columns)
+        min_coord = df[xy_columns].min().row(0)
+        lf = lf.with_columns(
+            pl.col(xy_columns[0]) - min_coord[0],
+            pl.col(xy_columns[1]) - min_coord[1],
+        )
     elif df.select(pl.col(xy_columns).min() < 0).to_numpy().any():
         raise ValueError("shift=False is only possible if coordinates are > 0")
 
@@ -43,7 +47,10 @@ def _assign_xy(
         pl.col(xy_columns[1]).cast(Int32).shrink_dtype().alias("y_pixel"),
     )
 
-    return lf.collect(engine="streaming")  # reduce memory usage by using streaming
+    return (
+        lf.collect(engine="streaming"),  # reduce memory usage by using streaming
+        min_coord,
+    )
 
 
 Shape = TypeVar("Shape", bound=tuple[int, ...])
@@ -108,6 +115,7 @@ def _transform(
 _METHODS = Literal["mean", "median", "message_passing"]
 
 
+@overload
 def process_coordinates(
     coordinates: pl.DataFrame,
     /,
@@ -118,7 +126,48 @@ def process_coordinates(
     shift: bool = True,
     n_iter: int = 20,
     dtype: type[DataType] = Float32,
-) -> pl.DataFrame:
+    return_shift: Literal[False],
+) -> pl.DataFrame: ...
+@overload
+def process_coordinates(
+    coordinates: pl.DataFrame,
+    /,
+    gridsize: float = 1,
+    *,
+    coordinate_keys: tuple[str, str, str] = ("x", "y", "z"),
+    method: _METHODS = "message_passing",
+    shift: bool = True,
+    n_iter: int = 20,
+    dtype: type[DataType] = Float32,
+    return_shift: Literal[True],
+) -> tuple[pl.DataFrame, tuple[float, float]]: ...
+@overload
+def process_coordinates(
+    coordinates: pl.DataFrame,
+    /,
+    gridsize: float = 1,
+    *,
+    coordinate_keys: tuple[str, str, str] = ("x", "y", "z"),
+    method: _METHODS = "message_passing",
+    shift: bool = True,
+    n_iter: int = 20,
+    dtype: type[DataType] = Float32,
+    return_shift: bool = False,
+) -> pl.DataFrame | tuple[pl.DataFrame, tuple[float, float]]: ...
+
+
+def process_coordinates(
+    coordinates: pl.DataFrame,
+    /,
+    gridsize: float = 1,
+    *,
+    coordinate_keys: tuple[str, str, str] = ("x", "y", "z"),
+    method: _METHODS = "message_passing",
+    shift: bool = True,
+    n_iter: int = 20,
+    dtype: type[DataType] = Float32,
+    return_shift: bool = False,  # for backwards compatibility
+) -> pl.DataFrame | tuple[pl.DataFrame, tuple[float, float]]:
     """
     Runs the pre-processing routine of the coordinate dataframe.
 
@@ -143,6 +192,8 @@ def process_coordinates(
         Number of iterations. Only used if the method is message_passing.
     dtype : type[polars.DataType], optional
         Datatype of the z-coordinate center.
+    return_shift : bool
+        Return the amount the coordinates have been shifted.
 
     Returns
     -------
@@ -154,7 +205,9 @@ def process_coordinates(
 
     *xy, z = coordinate_keys
 
-    coordinates = _assign_xy(coordinates, xy_columns=xy, gridsize=gridsize, shift=shift)
+    coordinates, shifted = _assign_xy(
+        coordinates, xy_columns=xy, gridsize=gridsize, shift=shift
+    )
 
     if method == "message_passing":
         z_center = _assign_z_mean_message_passing(
@@ -168,4 +221,9 @@ def process_coordinates(
 
         z_center = _transform(coordinates, f, z, dtype=dtype)
 
-    return coordinates.with_columns(pl.Series("z_center", z_center))
+    coordinates = coordinates.with_columns(pl.Series("z_center", z_center))
+
+    if return_shift:
+        return coordinates, shifted
+    else:
+        return coordinates

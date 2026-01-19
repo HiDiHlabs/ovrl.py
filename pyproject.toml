@@ -37,6 +37,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+segmentation = ["networkx~=3.3", "rasterio~=1.4", "shapely~=2.0"]
 docs = [
     "sphinx~=8.0",
     "sphinx-autoapi~=3.1",

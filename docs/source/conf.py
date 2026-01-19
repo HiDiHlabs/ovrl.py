@@ -67,6 +67,7 @@ intersphinx_mapping = dict(
     polars=("https://docs.pola.rs/api/python/stable/", None),
     python=("https://docs.python.org/3", None),
     scipy=("https://docs.scipy.org/doc/scipy/", None),
+    shapely=("https://shapely.readthedocs.io/en/stable/", None),
     sklearn=("https://scikit-learn.org/stable/", None),
     umap=("https://umap-learn.readthedocs.io/page/", None),
 )
@@ -85,5 +86,12 @@ def skip_attributes(app, what, name, obj, skip, options):
     return skip
 
 
+def modify_overloads(app, what, name, obj, skip, options):
+    if what == "function" and len(obj.overloads) > 0:
+        obj.overloads.clear()  # delete overloads
+    return skip
+
+
 def setup(sphinx):
     sphinx.connect("autoapi-skip-member", skip_attributes)
+    sphinx.connect("autoapi-skip-member", modify_overloads)
