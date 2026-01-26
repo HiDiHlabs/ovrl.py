@@ -94,6 +94,11 @@ class Ovrlp:
         The UMAP object used for the 3D RGB embedding.
     genes : list
         A list of genes to utilize in the model.
+    gridsize : float
+        The size of a pixel.
+    origin : tuple[float, float]
+        The origin of the grid (corresponds to the amount the coordinates
+        have been shifted to minimize the analysis area).
     integrity_map : numpy.ndarray
         The integrity map of the tissue.
     signal_map : numpy.ndarray
@@ -159,13 +164,19 @@ class Ovrlp:
         Parameters
         ----------
         gridsize : float, optional
-            The size of the pixel grid.
+            The size of each pixel in the grid.
+            Measured in units of the transcript locations (usually µm).
         kwargs
             Other keyword arguments are passed to :py:func:`ovrlpy.process_coordinates`
         """
-        self.transcripts = process_coordinates(
-            self.transcripts, gridsize=gridsize, **kwargs
+        self.gridsize = gridsize
+        transcripts, origin = process_coordinates(
+            self.transcripts, gridsize=gridsize, return_shift=True, **kwargs
         )
+        assert isinstance(transcripts, pl.DataFrame)
+        assert isinstance(origin, tuple)
+        self.transcripts = transcripts
+        self.origin = origin
 
     def _expression_threshold(self, n: float = 10, scale: float = 1.1) -> float:
         return n * scale / (2 * np.pi * self.KDE_bandwidth**2)

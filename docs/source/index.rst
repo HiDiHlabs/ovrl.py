@@ -38,6 +38,7 @@ Tiesmeyer, S., Müller-Bötticher, N., Malt, A., Long, B., Marco-Salas, S., Kies
    usage
    tutorials/index
    guide
+   how_to/index
 
 
 Indices and tables
