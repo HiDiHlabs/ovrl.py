@@ -12,8 +12,8 @@ requires-python = ">=3.11, <3.14"
 dynamic         = ["version"]
 
 authors = [
-    { name = "Sebastian Tiesmeyer", email = "sebastian.tiesmeyer@bih-charite.de" },
-    { name = "Nikla Müller-Bötticher", email = "niklas.mueller-boetticher@bih-charite.de" },
+    { name = "Sebastian Tiesmeyer" },
+    { name = "Niklas Müller-Bötticher", email = "niklas.mueller-boetticher@bih-charite.de" },
 ]
 dependencies = [
     "anndata>=0.10",
