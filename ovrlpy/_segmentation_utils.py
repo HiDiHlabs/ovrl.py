@@ -95,6 +95,8 @@ def _segmentation_to_pixel(
 ) -> pl.DataFrame:
     from rasterio.features import rasterize
 
+    assert all(i >= 0 for _, i in geometries)
+
     segmentation_map = rasterize(
         geometries,
         out_shape=shape,
