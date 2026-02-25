@@ -24,9 +24,10 @@ Citation
 
 If you are using `ovrlpy` for your research please cite
 
-Tiesmeyer, S., Müller-Bötticher, N., Malt, A., Long, B., Marco-Salas, S., Kiessling, P., ... & Ishaque, N. (2025).
-2D, or not 2D? Investigating Vertical Signal Integrity of Tissue Slices.
-*bioRxiv* https://doi.org/10.1101/2025.01.13.632601
+Tiesmeyer, S., Müller-Bötticher, N., Malt, A., Ma, L., Marco-Salas, S., Kiessling, P., ... & Ishaque, N.
+(2026).
+Identifying 3D signal overlaps in spatial transcriptomics data with ovrlpy.
+*Nature Biotechnology*, 1-5. https://doi.org/10.1038/s41587-026-03004-8
 
 
 .. toctree::
