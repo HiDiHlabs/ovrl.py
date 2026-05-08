@@ -14,7 +14,7 @@ from matplotlib_scalebar.scalebar import ScaleBar
 
 from ._ovrlp import Ovrlp
 
-SCALEBAR_PARAMS: dict[str, Any] = {"dx": 1, "units": "um"}
+SCALEBAR_PARAMS: dict[str, Any] = {"units": "um"}
 """Default scalebar parameters"""
 
 BIH_CMAP = LinearSegmentedColormap.from_list(
@@ -34,7 +34,7 @@ VSI = "vertical signal integrity"
 _SIGNAL_THRESHOLD = 2
 
 
-def _plot_scalebar(ax: Axes, dx: float = 1, units="um", **kwargs):
+def _plot_scalebar(ax: Axes, dx: float = 1, units: str = "um", **kwargs):
     ax.add_artist(ScaleBar(dx, units=units, **kwargs))
 
 
@@ -202,6 +202,7 @@ def plot_tissue(
     )
 
     if scalebar is not None:
+        scalebar = {"dx": ovrlp.gridsize} | scalebar
         _plot_scalebar(ax, **scalebar)
 
 
@@ -327,6 +328,7 @@ def plot_signal_integrity(
         ax_im.spines[["top", "right"]].set_visible(False)
 
         if scalebar is not None:
+            scalebar = {"dx": ovrlp.gridsize} | scalebar
             _plot_scalebar(ax_im, **scalebar)
 
         if histogram:
@@ -467,6 +469,7 @@ def plot_region_of_interest(
     _mark_roi_center(ax_roi_bottom, x, y, roi)
 
     if scalebar is not None:
+        scalebar = {"dx": ovrlp.gridsize} | scalebar
         _plot_scalebar(ax_integrity, **scalebar)
         _plot_scalebar(ax_tissue_whole, **scalebar)
         _plot_scalebar(ax_roi_top, **scalebar)
