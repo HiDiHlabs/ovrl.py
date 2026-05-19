@@ -18,14 +18,38 @@ def _filter_genes(df: pl.DataFrame, remove_features: Collection[str]) -> pl.Data
     return df
 
 
-# 10x Xenium
-_XENIUM_COLUMNS = {
+## 10x Genomics platforms
+_10X_GENOMICS_COLUMNS = {
     "feature_name": "gene",
     "x_location": "x",
     "y_location": "y",
     "z_location": "z",
 }
 
+
+def _read_10x_parquet(
+    filepath: Path, *, min_qv: float | None = None, columns: Collection[str] = []
+) -> pl.DataFrame:
+    transcripts = pl.scan_parquet(filepath)
+
+    # 'is_gene' column exists for Xenium OA v3 and v4 / Atera
+    # but not Xenium OA v2 parquet (Xenium OA v1 does not have parquet)
+    if "is_gene" in transcripts.collect_schema().names():
+        transcripts = transcripts.filter(pl.col("is_gene"))
+
+    if min_qv is not None:
+        transcripts = transcripts.filter(pl.col("qv") >= min_qv)
+
+    with pl.StringCache():
+        transcripts = (
+            transcripts.select(columns)
+            .with_columns(pl.col("feature_name").cast(pl.String).cast(pl.Categorical))
+            .collect()
+        )
+    return transcripts
+
+
+# 10x Xenium
 XENIUM_CTRLS = [
     "^BLANK",
     "^DeprecatedCodeword",
@@ -68,28 +92,13 @@ def read_Xenium(
     polars.DataFrame
     """
     filepath = Path(filepath)
-    columns = list(set(_XENIUM_COLUMNS.keys()) | set(additional_columns))
+    columns = list(set(_10X_GENOMICS_COLUMNS.keys()) | set(additional_columns))
 
     if filepath.suffix == ".parquet":
-        transcripts = pl.scan_parquet(filepath)
-
-        # 'is_gene' column only exists for Xenium v3 which only has .parquet
-        if "is_gene" in transcripts.collect_schema().names():
-            transcripts = transcripts.filter(pl.col("is_gene"))
-
-        if min_qv is not None:
-            transcripts = transcripts.filter(pl.col("qv") >= min_qv)
-
-        with pl.StringCache():
-            transcripts = (
-                transcripts.select(columns)
-                .with_columns(
-                    pl.col("feature_name").cast(pl.String).cast(pl.Categorical)
-                )
-                .collect()
-            )
+        transcripts = _read_10x_parquet(filepath, min_qv=min_qv, columns=columns)
 
     else:
+        # read Xenium csv i.e. Xenium Onboard Analysis v1 output
         if min_qv is not None and "qv" not in additional_columns:
             columns.append("qv")
         transcripts = pl.read_csv(
@@ -104,7 +113,50 @@ def read_Xenium(
             if "qv" not in additional_columns:
                 transcripts = transcripts.drop("qv")
 
-    transcripts = transcripts.rename(_XENIUM_COLUMNS)
+    transcripts = transcripts.rename(_10X_GENOMICS_COLUMNS)
+    transcripts = _filter_genes(transcripts, remove_features)
+
+    return transcripts
+
+
+# 10x Atera
+
+# technically they are all dropped due to is_gene filter anyways
+ATERA_CTRLS = ["^Intergenic", "^NegControl", "^UnassignedCodeword"]
+
+
+def read_Atera(
+    filepath: str | os.PathLike,
+    *,
+    min_qv: float | None = None,
+    remove_features: Collection[str] = ATERA_CTRLS,
+    additional_columns: Collection[str] = [],
+) -> pl.DataFrame:
+    """
+    Read a Xenium transcripts file.
+
+    Parameters
+    ----------
+    filepath : os.PathLike or str
+        Path to the Atera transcripts file (.parquet). The Zarr-store is currently not supported.
+    min_qv : float | None, optional
+        Minimum Phred-scaled quality value (Q-Score) of a transcript to be included.
+        If `None` no filtering is performed.
+    remove_features : collections.abc.Collection[str], optional
+        List of regex patterns to filter the 'feature_name' column,
+        :py:attr:`ovrlpy.io.ATERA_CTRLS` by default.
+    additional_columns : collections.abc.Collection[str], optional
+        Additional columns to load from the transcripts file.
+
+    Returns
+    -------
+    polars.DataFrame
+    """
+    filepath = Path(filepath)
+    columns = list(set(_10X_GENOMICS_COLUMNS.keys()) | set(additional_columns))
+
+    transcripts = _read_10x_parquet(filepath, min_qv=min_qv, columns=columns)
+    transcripts = transcripts.rename(_10X_GENOMICS_COLUMNS)
     transcripts = _filter_genes(transcripts, remove_features)
 
     return transcripts
