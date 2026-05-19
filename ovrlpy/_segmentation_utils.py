@@ -47,15 +47,19 @@ def cell_integrity_from_transcripts(
         DataFrame containing all pixels and their corresponding signal strength and VSI
         values per cell.
     """
-    cell_pixels = (
-        ovrlp.transcripts.lazy()
-        .filter(pl.col(cell_id) != unassigned)
-        .select([pl.col(cell_id), "x_pixel", "y_pixel"])
-        .unique()
-        .collect()
+
+    cell_pixels = ovrlp.transcripts.lazy().select(
+        [pl.col(cell_id), "x_pixel", "y_pixel"]
     )
 
-    return _values_from_pixels(ovrlp, cell_pixels)
+    if unassigned is None:
+        cell_pixels = cell_pixels.drop_nulls()
+    else:
+        cell_pixels = cell_pixels.filter(pl.col(cell_id) != unassigned)
+
+    cell_pixels = cell_pixels.unique()
+
+    return _values_from_pixels(ovrlp, cell_pixels.collect())
 
 
 def _close_pairs(
