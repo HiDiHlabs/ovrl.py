@@ -19,13 +19,13 @@ from ._patching import _patches, n_patches
 _TRUNCATE = 4
 
 Shape1D = tuple[int]
-Array1D = np.ndarray[Shape1D, np.dtype]
-Array1D_Int = np.ndarray[Shape1D, np.dtype[np.integer]]
+Array1D: TypeAlias = np.ndarray[Shape1D, np.dtype]
+Array1D_Int: TypeAlias = np.ndarray[Shape1D, np.dtype[np.integer]]
 
 Coordinate: TypeAlias = Array1D | pl.Series
 
-KDE_2D = np.ndarray[tuple[int, int], np.dtype[np.floating]]
-KDE_ND = np.ndarray[tuple[int, ...], np.dtype[np.floating]]
+KDE_2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[np.floating]]
+KDE_ND: TypeAlias = np.ndarray[tuple[int, ...], np.dtype[np.floating]]
 
 
 def kde_2d_discrete(
