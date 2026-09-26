@@ -74,3 +74,6 @@ python_version         = "3.11"
 ignore_missing_imports = true
 warn_no_return         = false
 packages               = "ovrlpy"
+
+[tool.codespell]
+ignore-words-list = "iterm,theis"
