@@ -1,0 +1,98 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the software release and the accompanying paper below."
+title: ovrlpy
+abstract: "Cell overlap and vertical signal integrity detection for imaging-based spatial transcriptomics."
+type: software
+repository-code: "https://github.com/HiDiHlabs/ovrl.py"
+version: "1.2.1"
+date-released: "2026-09-26"
+license: MIT
+authors:
+  - family-names: Marco-Salas
+    given-names: Sergio
+    affiliation: "Science for Life Laboratory, Department of Biochemistry and Biophysics, Stockholm University, Stockholm, Sweden"
+    orcid: "https://orcid.org/0000-0002-4636-0322"
+  - family-names: Kiessling
+    given-names: Paul
+    affiliation: "Department of Nephrology, Rheumatology, and Clinical Immunology, University Hospital RWTH Aachen, Aachen, Germany"
+    orcid: "https://orcid.org/0000-0002-9794-9532"
+  - family-names: Horn
+    given-names: Paul
+    affiliation: "Department of Hepatology and Gastroenterology, Charité-Universitätsmedizin Berlin, Campus Virchow-Klinikum and Campus Charité Mitte, Berlin, Germany; Berlin Institute of Health at Charité-Universitätsmedizin Berlin, BIH Biomedical Innovation Academy, BIH Charité Digital Clinician Scientist Program, Berlin, Germany"
+    orcid: "https://orcid.org/0000-0002-8755-7703"
+  - family-names: Guillot
+    given-names: Adrien
+    affiliation: "Department of Hepatology and Gastroenterology, Charité-Universitätsmedizin Berlin, Campus Virchow-Klinikum and Campus Charité Mitte, Berlin, Germany"
+    orcid: "https://orcid.org/0000-0002-6002-9986"
+  - family-names: Kuemmerle
+    given-names: "Louis B."
+    affiliation: "Institute of Computational Biology, Computational Health Center, Helmholtz Munich, Munich, Germany; Institute for Tissue Engineering and Regenerative Medicine (iTERM), Helmholtz Zentrum München, Munich, Germany"
+    orcid: "https://orcid.org/0000-0002-9193-1243"
+  - family-names: Tacke
+    given-names: Frank
+    affiliation: "Department of Hepatology and Gastroenterology, Charité-Universitätsmedizin Berlin, Campus Virchow-Klinikum and Campus Charité Mitte, Berlin, Germany"
+    orcid: "https://orcid.org/0000-0001-6206-0226"
+  - family-names: Kuppe
+    given-names: Christoph
+    affiliation: "Department of Nephrology, Rheumatology, and Clinical Immunology, University Hospital RWTH Aachen, Aachen, Germany"
+    orcid: "https://orcid.org/0000-0003-4597-9833"
+  - family-names: Nilsson
+    given-names: Mats
+    affiliation: "Science for Life Laboratory, Department of Biochemistry and Biophysics, Stockholm University, Stockholm, Sweden"
+    orcid: "https://orcid.org/0000-0001-9985-0387"
+  - family-names: Eils
+    given-names: Roland
+    affiliation: "Berlin Institute of Health at Charité-Universitätsmedizin Berlin, Center of Digital Health, Berlin, Germany; Freie Universität Berlin, Department of Mathematics and Computer Science, Berlin, Germany; Health Data Science Unit, Heidelberg University Hospital and BioQuant, University of Heidelberg, Heidelberg, Germany"
+    orcid: "https://orcid.org/0000-0002-0034-4036"
+  - family-names: Long
+    given-names: Brian
+    affiliation: "Allen Institute for Brain Science, Seattle, WA, USA"
+    orcid: "https://orcid.org/0000-0002-7793-5969"
+  - family-names: Ishaque
+    given-names: Naveed
+    affiliation: "Berlin Institute of Health at Charité-Universitätsmedizin Berlin, Center of Digital Health, Berlin, Germany"
+    orcid: "https://orcid.org/0000-0002-8426-901X"
+    email: naveed.ishaque@bih-charite.de
+preferred-citation:
+  type: article
+  title: "Identifying 3D signal overlaps in spatial transcriptomics data with ovrlpy"
+  journal: "Nature Biotechnology"
+  year: 2026
+  doi: "10.1038/s41587-026-03004-8"
+  identifiers:
+    - type: other
+      value: "PMID:41667711"
+      description: "PubMed ID"
+  authors:
+    - family-names: Tiesmeyer
+      given-names: Sebastian
+    - family-names: Müller-Bötticher
+      given-names: Niklas
+    - family-names: Malt
+      given-names: Alexander
+    - family-names: Ma
+      given-names: Leyao
+    - family-names: Marco-Salas
+      given-names: Sergio
+    - family-names: Kiessling
+      given-names: Paul
+    - family-names: Horn
+      given-names: Paul
+    - family-names: Guillot
+      given-names: Adrien
+    - family-names: Kuemmerle
+      given-names: "Louis B."
+    - family-names: Tacke
+      given-names: Frank
+    - family-names: Theis
+      given-names: "Fabian J."
+    - family-names: Kuppe
+      given-names: Christoph
+    - family-names: Nilsson
+      given-names: Mats
+    - family-names: Eils
+      given-names: Roland
+    - family-names: Long
+      given-names: Brian
+    - family-names: Ishaque
+      given-names: Naveed
