@@ -34,18 +34,17 @@ def _patches(
     y_patches = np.linspace(0, size[1], patch_count_y + 1, dtype=int)
 
     for i in range(len(x_patches) - 1):
+        x_ = max(0, x_patches[i] - padding)
+        _x = min(size[0], x_patches[i + 1] + padding)
+        x_strip = df.filter(pl.col(x_key).is_between(x_, _x, closed="left"))
         for j in range(len(y_patches) - 1):
-            # coordinates with padding
-            x_ = max(0, x_patches[i] - padding)
             y_ = max(0, y_patches[j] - padding)
-            _x = min(size[0], x_patches[i + 1] + padding)
             _y = min(size[1], y_patches[j + 1] + padding)
 
             padded_range = (slice(x_, _x), slice(y_, _y))
 
-            patch = df.filter(
-                pl.col(x_key).is_between(x_, _x, closed="left")
-                & pl.col(y_key).is_between(y_, _y, closed="left")
+            patch = x_strip.filter(
+                pl.col(y_key).is_between(y_, _y, closed="left")
             ).with_columns(pl.col(x_key) - x_, pl.col(y_key) - y_)
 
             unpadded_range = (
